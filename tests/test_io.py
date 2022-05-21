@@ -163,10 +163,18 @@ def test_write_read_maps(tmp_path):
     nside = 4
     npix = 12*nside**2
 
+    p = np.random.rand(npix)
+    v = np.random.rand(npix)
+    g = np.random.rand(2, npix)
+
+    p.dtype = np.dtype(p.dtype, metadata={'spin': 0})
+    v.dtype = np.dtype(v.dtype, metadata={'spin': 0})
+    g.dtype = np.dtype(g.dtype, metadata={'spin': 0})
+
     maps = {
-        ('P', 1): np.random.rand(npix),
-        ('V', 2): np.random.rand(npix),
-        ('G1', 3): np.random.rand(npix),
+        ('P', 1): p,
+        ('V', 2): v,
+        ('G', 3): g,
     }
 
     write_maps('maps.fits', maps, workdir=str(tmp_path))
@@ -176,6 +184,7 @@ def test_write_read_maps(tmp_path):
     assert maps.keys() == maps_r.keys()
     for key in maps:
         np.testing.assert_array_equal(maps[key], maps_r[key])
+        assert maps[key].dtype.metadata == maps_r[key].dtype.metadata
 
     # make sure map can be read by healpy
     m = hp.read_map(tmp_path / 'maps.fits', hdu='MAP0')
@@ -194,6 +203,7 @@ def test_write_read_alms(mock_alms, tmp_path):
     assert alms.keys() == mock_alms.keys()
     for key in mock_alms:
         np.testing.assert_array_equal(mock_alms[key], alms[key])
+        assert mock_alms[key].dtype.metadata == alms[key].dtype.metadata
 
 
 def test_write_read_cls(mock_cls, tmp_path):
@@ -214,6 +224,7 @@ def test_write_read_cls(mock_cls, tmp_path):
     assert cls.keys() == mock_cls.keys()
     for key in mock_cls:
         np.testing.assert_array_equal(cls[key], mock_cls[key])
+        assert cls[key].dtype.metadata == mock_cls[key].dtype.metadata
 
 
 def test_write_read_mms(tmp_path):

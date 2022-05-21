@@ -132,7 +132,9 @@ def mock_alms(zbins):
     alms = {}
     for n in names:
         for i in zbins:
-            alms[n, i] = np.random.randn(Nlm, 2) @ [1, 1j]
+            a = np.random.randn(Nlm, 2) @ [1, 1j]
+            a.dtype = np.dtype(a.dtype, metadata={'nside': 32})
+            alms[n, i] = a
 
     return alms
 
@@ -140,11 +142,14 @@ def mock_alms(zbins):
 @pytest.fixture
 def mock_cls(options, mock_alms):
     from itertools import combinations_with_replacement
+    import numpy as np
     import healpy as hp
 
     cls = {}
     for (n1, i1), (n2, i2) in combinations_with_replacement(mock_alms, 2):
-        cls[f'{n1}{n2}', i1, i2] = hp.alm2cl(mock_alms[n1, i1], mock_alms[n2, i2])
+        cl = hp.alm2cl(mock_alms[n1, i1], mock_alms[n2, i2])
+        cl.dtype = np.dtype(cl.dtype, metadata={'nside_1': 32, 'nside_2': 32})
+        cls[f'{n1}{n2}', i1, i2] = cl
     return cls
 
 

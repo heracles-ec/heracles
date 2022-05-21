@@ -11,6 +11,20 @@ import fitsio
 logger = logging.getLogger(__name__)
 
 
+_METADATA_COMMENTS = {
+    'spin': 'spin weight of map',
+    'kernel': 'mapping kernel of map',
+    'power': 'area power of map',
+    'spin_1': 'spin weight of first map',
+    'kernel_1': 'mapping kernel of first map',
+    'power_1': 'area power of first map',
+    'spin_2': 'spin weight of second map',
+    'kernel_2': 'mapping kernel of second map',
+    'power_2': 'area power of second map',
+    'noisbias': 'noise bias of spectrum',
+}
+
+
 def _write_array(a, name, fits, ext):
     '''write an array to a FITS table column'''
 
@@ -18,9 +32,9 @@ def _write_array(a, name, fits, ext):
     fits.write_table([np.reshape(a, -1)], names=[name], extname=ext)
 
     # write metadata to reconstitute the array later
-    fits[ext].write_key(f'{name}AXES', np.ndim(a), f'number of {name} array axes')
+    fits[ext].write_key('NDIM', np.ndim(a), 'dimensions of array')
     for j, d in enumerate(np.shape(a)):
-        fits[ext].write_key(f'{name}AXIS{j}', d, f'axis {j} of {name} array')
+        fits[ext].write_key(f'NDIM{j+1}', d, f'dimension {j+1} of array')
 
 
 def _read_array(hdu, name):
@@ -31,11 +45,28 @@ def _read_array(hdu, name):
 
     # recreate the shape of the array
     h = hdu.read_header()
-    d = h[f'{name}AXES']
-    s = tuple(h[f'{name}AXIS{j}'] for j in range(d))
+    d = h['NDIM']
+    s = tuple(h[f'NDIM{j+1}'] for j in range(d))
 
     # return the array data in the given shape
     return np.reshape(a[name], s)
+
+
+def _write_metadata(hdu, metadata):
+    '''write array metadata to FITS HDU'''
+    md = metadata or {}
+    for key, value in md.items():
+        hdu.write_key('META ' + key.upper(), value, _METADATA_COMMENTS.get(key))
+
+
+def _read_metadata(hdu):
+    '''read array metadata from FITS HDU'''
+    h = hdu.read_header()
+    md = {}
+    for key in h:
+        if key.startswith('META '):
+            md[key[5:].lower()] = h[key]
+    return md
 
 
 def write_binspec(filename, bin_id, seed, query, workdir='.'):
@@ -214,8 +245,18 @@ def write_maps(filename, maps, *, clobber=False, workdir='.'):
             ext = f'MAP{mapn}'
             mapn += 1
 
+            # prepare column data and names
+            cols = list(np.atleast_2d(m))
+            if len(cols) == 1:
+                colnames = [n]
+            else:
+                colnames = [f'{n}{j+1}' for j in range(len(cols))]
+
             # write the data
-            fits.write_table([m], names=[n], extname=ext)
+            fits.write_table(cols, names=colnames, extname=ext)
+
+            # write the metadata
+            _write_metadata(fits[ext], m.dtype.metadata)
 
             # HEALPix metadata
             npix = np.shape(m)[-1]
@@ -261,8 +302,16 @@ def read_maps(filename, workdir='.'):
             # read the map from the extension
             m = fits[ext].read()
 
+            # turn the structured array of columns into an unstructured array
+            # transpose so that columns become rows (as that is how maps are)
+            # then squeeze out degenerate axes
+            m = np.squeeze(np.lib.recfunctions.structured_to_unstructured(m).T)
+
+            # read and attach metadata
+            m.dtype = np.dtype(m.dtype, metadata=_read_metadata(fits[ext]))
+
             # store in set of maps
-            maps[n, i] = m[n]
+            maps[n, i] = m
 
     logger.info('done with %d maps', len(maps))
 
@@ -316,6 +365,9 @@ def write_alms(filename, alms, *, clobber=False, workdir='.'):
             # write the data
             fits.write_table([alm.real, alm.imag], names=['real', 'imag'], extname=ext)
 
+            # write the metadata
+            _write_metadata(fits[ext], alm.dtype.metadata)
+
             # write the TOC entry
             tocentry[0] = (ext, n, i)
             fits['ALMTOC'].append(tocentry)
@@ -352,6 +404,9 @@ def read_alms(filename, workdir='.'):
             alm.real = raw['real']
             alm.imag = raw['imag']
             del raw
+
+            # read and attach metadata
+            alm.dtype = np.dtype(alm.dtype, metadata=_read_metadata(fits[ext]))
 
             # store in set of alms
             alms[n, i] = alm
@@ -406,7 +461,10 @@ def write_cls(filename, cls, *, clobber=False, workdir='.'):
             cln += 1
 
             # write the data column
-            _write_array(cl, 'CL', fits, ext)
+            fits.write_table([cl], names=['CL'], extname=ext)
+
+            # write the metadata
+            _write_metadata(fits[ext], cl.dtype.metadata)
 
             # write the TOC entry
             tocentry[0] = (ext, n, i1, i2)
@@ -439,7 +497,13 @@ def read_cls(filename, workdir='.'):
             logger.info('reading %s cl for bins %s, %s', n, i1, i2)
 
             # read the cl from the extension
-            cls[n, i1, i2] = _read_array(fits[ext], 'CL')
+            cl = fits[ext].read(columns=['CL'])['CL']
+
+            # read and attach metadata
+            cl.dtype = np.dtype(cl.dtype, metadata=_read_metadata(fits[ext]))
+
+            # store in set of cls
+            cls[n, i1, i2] = cl
 
     logger.info('done with %d cls', len(cls))
 
@@ -493,6 +557,9 @@ def write_mms(filename, mms, *, clobber=False, workdir='.'):
             # write the mixing matrix as a table column
             _write_array(mm, 'MM', fits, ext)
 
+            # write the metadata
+            _write_metadata(fits[ext], mm.dtype.metadata)
+
             # write the TOC entry
             tocentry[0] = (ext, n, i1, i2)
             fits['MMTOC'].append(tocentry)
@@ -524,7 +591,13 @@ def read_mms(filename, workdir='.'):
             logger.info('reading mixing matrix %s for bins %s, %s', n, i1, i2)
 
             # read the mixing matrix from the extension
-            mms[n, i1, i2] = _read_array(fits[ext], 'MM')
+            mm = _read_array(fits[ext], 'MM')
+
+            # read and attach metadata
+            mm.dtype = np.dtype(mm.dtype, metadata=_read_metadata(fits[ext]))
+
+            # store in set of mms
+            mms[n, i1, i2] = mm
 
     logger.info('done with %d mm(s)', len(mms))
 
@@ -575,8 +648,11 @@ def write_cov(filename, cov, clobber=False, workdir='.'):
 
             logger.info('writing %s x %s covariance matrix', k1, k2)
 
-            # write the data
+            # write the covariance matrix as a table column
             _write_array(mat, 'COV', fits, ext)
+
+            # write the metadata
+            _write_metadata(fits[ext], mat.dtype.metadata)
 
             # write the TOC entry
             tocentry[0] = (ext, *k1, *k2)
@@ -610,8 +686,14 @@ def read_cov(filename, workdir='.'):
 
             logger.info('reading %s x %s covariance matrix', k1, k2)
 
-            # read the mixing matrix from the extension
-            cov[k1, k2] = _read_array(fits[ext], 'COV')
+            # read the covariance matrix from the extension
+            mat = _read_array(fits[ext], 'COV')
+
+            # read and attach metadata
+            mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(fits[ext]))
+
+            # store in set
+            cov[k1, k2] = mat
 
     logger.info('done with %d covariance(s)', len(cov))
 
