@@ -25,11 +25,11 @@ _METADATA_COMMENTS = {
 }
 
 
-def _write_array(a, name, fits, ext):
+def _write_array(fits, ext, a):
     '''write an array to a FITS table column'''
 
     # write the array as a single column
-    fits.write_table([np.reshape(a, -1)], names=[name], extname=ext)
+    fits.write_table([np.reshape(a, -1)], names=['ARRAY'], extname=ext)
 
     # write metadata to reconstitute the array later
     fits[ext].write_key('NDIM', np.ndim(a), 'dimensions of array')
@@ -37,11 +37,11 @@ def _write_array(a, name, fits, ext):
         fits[ext].write_key(f'NDIM{j+1}', d, f'dimension {j+1} of array')
 
 
-def _read_array(hdu, name):
+def _read_array(hdu):
     '''read an array from a FITS table HDU'''
 
     # read the flattened array
-    a = hdu.read(columns=[name])
+    a = hdu.read(columns=['ARRAY'])['ARRAY']
 
     # recreate the shape of the array
     h = hdu.read_header()
@@ -49,7 +49,7 @@ def _read_array(hdu, name):
     s = tuple(h[f'NDIM{j+1}'] for j in range(d))
 
     # return the array data in the given shape
-    return np.reshape(a[name], s)
+    return np.reshape(a, s)
 
 
 def _write_metadata(hdu, metadata):
@@ -555,7 +555,7 @@ def write_mms(filename, mms, *, clobber=False, workdir='.'):
             mmn += 1
 
             # write the mixing matrix as a table column
-            _write_array(mm, 'MM', fits, ext)
+            _write_array(fits, ext, mm)
 
             # write the metadata
             _write_metadata(fits[ext], mm.dtype.metadata)
@@ -591,7 +591,7 @@ def read_mms(filename, workdir='.'):
             logger.info('reading mixing matrix %s for bins %s, %s', n, i1, i2)
 
             # read the mixing matrix from the extension
-            mm = _read_array(fits[ext], 'MM')
+            mm = _read_array(fits[ext])
 
             # read and attach metadata
             mm.dtype = np.dtype(mm.dtype, metadata=_read_metadata(fits[ext]))
@@ -649,7 +649,7 @@ def write_cov(filename, cov, clobber=False, workdir='.'):
             logger.info('writing %s x %s covariance matrix', k1, k2)
 
             # write the covariance matrix as a table column
-            _write_array(mat, 'COV', fits, ext)
+            _write_array(fits, ext, mat)
 
             # write the metadata
             _write_metadata(fits[ext], mat.dtype.metadata)
@@ -687,7 +687,7 @@ def read_cov(filename, workdir='.'):
             logger.info('reading %s x %s covariance matrix', k1, k2)
 
             # read the covariance matrix from the extension
-            mat = _read_array(fits[ext], 'COV')
+            mat = _read_array(fits[ext])
 
             # read and attach metadata
             mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(fits[ext]))
