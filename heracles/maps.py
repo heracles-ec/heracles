@@ -97,7 +97,7 @@ def map_positions(nside, catalog, vmap=None, *, random=False, overdensity=True):
     else:
         power = 1
 
-    logger.info('positions mapped in %s', timedelta(seconds=(time.monotonic() - t)))
+    logger.info('mapped %s positions in %s', f'{ngal:_}', timedelta(seconds=(time.monotonic() - t)))
 
     # set metadata of array
     update_metadata(pos, spin=0, nbar=nbar, kernel='healpix', power=power)
@@ -117,6 +117,9 @@ def map_shears(nside, catalog, *, random=False):
 
     # number of pixels for nside
     npix = hp.nside2npix(nside)
+
+    # keep track of the total number of galaxies
+    ngal = 0
 
     # create the weight and shear map
     wht = np.zeros(npix, dtype=np.float64)
@@ -145,6 +148,7 @@ def map_shears(nside, catalog, *, random=False):
 
         ipix = hp.ang2pix(nside, rows.ra, rows.dec, lonlat=True)
         _map_she(wht, she, ipix, w, g1, g2)
+        ngal += rows.size
 
     # shear was averaged in each pixel for numerical stability
     # now compute the sum
@@ -153,7 +157,7 @@ def map_shears(nside, catalog, *, random=False):
     # set metadata of array
     update_metadata(she, spin=2, kernel='healpix', power=1)
 
-    logger.info('shears mapped in %s', timedelta(seconds=(time.monotonic() - t)))
+    logger.info('mapped %s shears in %s', f'{ngal:_}', timedelta(seconds=(time.monotonic() - t)))
 
     # return the shear map
     return she
@@ -248,7 +252,7 @@ def map_catalogs(which, nside, catalogs, vmaps=None, *, overdensity=True, random
     '''
 
     logger.info('mapping %d catalog(s)', len(catalogs))
-    logger.info('creating %s maps', ', '.join(map(str.upper, which)))
+    logger.info('creating %s map(s)', ', '.join(map(str.upper, which)))
     logger.info('using NSIDE = %s', nside)
     logger.info('given %s visibility map(s)', 'no' if vmaps is None else len(vmaps))
     t = time.monotonic()
@@ -298,7 +302,7 @@ def map_catalogs(which, nside, catalogs, vmaps=None, *, overdensity=True, random
                 raise ValueError(f'unknown map code: {k}')
             maps[k, i] = m
 
-    logger.info('created %d maps in %s', len(maps), timedelta(seconds=(time.monotonic() - t)))
+    logger.info('created %d map(s) in %s', len(maps), timedelta(seconds=(time.monotonic() - t)))
 
     # return maps as a toc dict
     return maps
