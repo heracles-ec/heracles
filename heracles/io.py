@@ -120,46 +120,6 @@ def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
     return mask
 
 
-def write_header(filename, params=None, clobber=False, workdir='.'):
-    '''write the PK-WL metadata to the primary HDU of a FITS file
-
-    If the output file exists, its header will be overwritten, unless the
-    ``clobber`` parameter is set to ``True``, in which case the entire file
-    will be overwritten.
-
-    '''
-
-    logger.info('writing FITS header: %s', filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # if new or overwriting, create an empty FITS with primary HDU
-    if not os.path.isfile(path) or clobber:
-        with fitsio.FITS(path, mode='rw', clobber=True) as fits:
-            fits.write(None)
-
-    # reopen FITS for writing header
-    with fitsio.FITS(path, mode='rw', clobber=False) as fits:
-
-        # write the software metadata
-        fits[0].write_key('SOFTNAME', 'LE3_PK_WL', 'software name')
-        fits[0].write_key('SOFTVERS', '1.0.0', 'software version')
-
-        # write params if given
-        if params is not None:
-            fits[0].write_key('NSIDE', params.nside, 'HEALPix map resolution')
-            fits[0].write_key('LMIN', params.lmin, 'minimum angular mode number')
-            fits[0].write_key('LMAX', params.lmax, 'maximum angular mode number')
-            fits[0].write_key('NELLBIN', params.nell_bins, 'number of angular mode bins')
-            fits[0].write_key('LOGLIN', ['lin', 'log'][params.linlogspace], 'linear or logarithmic binning')
-            fits[0].write_key('NLSAMP', params.nlsamp, 'number of noise realisations')
-            fits[0].write_key('NBARCUT', params.nbar_cut, 'cut for estimating mean density')
-            fits[0].write_key('SEED', params.seed, 'random seed for noise realisations')
-
-    logger.info('> DONE')
-
-
 def read_header(filename, workdir='.'):
     '''read the PK-WL parameters from the primary HDU of a FITS file
 

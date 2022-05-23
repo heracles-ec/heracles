@@ -109,51 +109,6 @@ def test_clobber_fits(tmp_path):
     fits.close()
 
 
-def test_write_read_header(tmp_path):
-
-    import fitsio
-    from le3_pk_wl.parameters import Params
-    from le3_pk_wl.io import write_header, read_header
-
-    # these are the options written to the header
-    options = {
-        'nside': 256,
-        'lmin': 1,
-        'lmax': 123,
-        'nell_bins': 45,
-        'linlogspace': 1,
-        'nlsamp': 6,
-        'nbar_cut': 0.7,
-        'seed': 8910,
-    }
-
-    params = Params(**options)
-
-    filename = 'test.fits'
-    workdir = str(tmp_path)
-
-    write_header(filename, params, workdir=workdir)
-
-    assert (tmp_path / filename).exists()
-
-    h = fitsio.read_header(str(tmp_path / filename))
-
-    assert h['SOFTNAME'] == 'LE3_PK_WL'
-    assert h['SOFTVERS'] == '1.0.0'
-    assert h['NSIDE'] == 256
-    assert h['LMIN'] == 1
-    assert h['LMAX'] == 123
-    assert h['NELLBIN'] == 45
-    assert h['LOGLIN'] == 'log'
-    assert h['NLSAMP'] == 6
-    assert h['NBARCUT'] == 0.7
-    assert h['SEED'] == 8910
-
-    options_r = read_header(filename, workdir)
-
-    assert options == options_r
-
-
 def test_write_read_maps(tmp_path):
 
     import numpy as np
