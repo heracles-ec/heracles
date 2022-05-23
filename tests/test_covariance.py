@@ -78,3 +78,23 @@ def test_update_covariance():
         assert (k1, k2) in cov
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
         assert np.all(cov[k1, k2] != 0)
+
+
+def test_jackknife_regions_kmeans():
+
+    from le3_pk_wl.covariance import jackknife_regions_kmeans
+
+    nside = 64
+
+    fpmap = np.zeros(12*nside**2)
+    fpmap[:fpmap.size//2] = 1.
+
+    n = 12
+
+    jkmap, jkcen = jackknife_regions_kmeans(fpmap, n, return_centers=True)
+
+    assert jkmap.size == fpmap.size
+    assert np.all(jkmap[jkmap.size//2:] == 0)
+    assert np.all(jkmap[:jkmap.size//2] > 0)
+    assert list(np.unique(jkmap)) == list(range(n+1))
+    assert len(jkcen) == n
