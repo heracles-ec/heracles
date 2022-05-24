@@ -4,6 +4,37 @@ import numpy as np
 
 
 @pytest.fixture
+def nside():
+    return 32
+
+
+@pytest.fixture
+def zbins():
+    zbins = {0: (0., 0.8), 1: (1.0, 1.2)}
+    return zbins
+
+
+@pytest.fixture
+def mock_alms(zbins):
+    import numpy as np
+
+    lmax = 32
+
+    Nlm = (lmax + 1) * (lmax + 2) // 2
+
+    names = ['P', 'E', 'B']
+
+    alms = {}
+    for n in names:
+        for i in zbins:
+            a = np.random.randn(Nlm, 2) @ [1, 1j]
+            a.dtype = np.dtype(a.dtype, metadata={'nside': 32})
+            alms[n, i] = a
+
+    return alms
+
+
+@pytest.fixture
 def catalog(nside):
 
     size = 100_000

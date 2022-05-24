@@ -4,6 +4,76 @@ import pytest
 NFIELDS_TEST = 4
 
 
+@pytest.fixture
+def zbins():
+    zbins = {0: (0., 0.8), 1: (1.0, 1.2)}
+    return zbins
+
+
+@pytest.fixture
+def mock_alms(zbins):
+    import numpy as np
+
+    lmax = 32
+
+    Nlm = (lmax + 1) * (lmax + 2) // 2
+
+    names = ['P', 'E', 'B']
+
+    alms = {}
+    for n in names:
+        for i in zbins:
+            a = np.random.randn(Nlm, 2) @ [1, 1j]
+            a.dtype = np.dtype(a.dtype, metadata={'nside': 32})
+            alms[n, i] = a
+
+    return alms
+
+
+@pytest.fixture
+def mock_cls():
+    import numpy as np
+
+    cl = np.random.rand(101)
+    cl.dtype = np.dtype(cl.dtype, metadata={'nside_1': 32, 'nside_2': 64})
+
+    return {
+        ('PP', 0, 0): cl,
+        ('PE', 0, 0): cl,
+        ('PB', 0, 0): cl,
+        ('EE', 0, 0): cl,
+        ('BB', 0, 0): cl,
+        ('EB', 0, 0): cl,
+        ('PP', 0, 1): cl,
+        ('PE', 0, 1): cl,
+        ('PB', 0, 1): cl,
+        ('EE', 0, 1): cl,
+        ('BB', 0, 1): cl,
+        ('EB', 0, 1): cl,
+        ('PE', 1, 0): cl,
+        ('PB', 1, 0): cl,
+        ('EB', 1, 0): cl,
+        ('PP', 1, 1): cl,
+        ('PE', 1, 1): cl,
+        ('PB', 1, 1): cl,
+        ('EE', 1, 1): cl,
+        ('BB', 1, 1): cl,
+        ('EB', 1, 1): cl,
+    }
+
+
+@pytest.fixture(scope='session')
+def nside():
+    nside = 32
+    return nside
+
+
+@pytest.fixture(scope='session')
+def datadir(tmp_path_factory):
+    datadir = tmp_path_factory.mktemp('data')
+    return datadir
+
+
 @pytest.fixture(scope='session')
 def mock_mask_fields(nside):
     import numpy as np

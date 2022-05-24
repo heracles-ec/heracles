@@ -120,48 +120,6 @@ def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
     return mask
 
 
-def read_header(filename, workdir='.'):
-    '''read the PK-WL parameters from the primary HDU of a FITS file
-
-    Returns an options dictionary.
-
-    '''
-
-    logger.info('reading FITS header: %s', filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # read primary header from FITS
-    h = fitsio.read_header(path)
-
-    # dictionary to contain whatever is found in the header
-    options = {}
-
-    # read keywords
-    if 'NSIDE' in h:
-        options['nside'] = h['NSIDE']
-    if 'LMIN' in h:
-        options['lmin'] = h['LMIN']
-    if 'LMAX' in h:
-        options['lmax'] = h['LMAX']
-    if 'NELLBIN' in h:
-        options['nell_bins'] = h['NELLBIN']
-    if 'LOGLIN' in h:
-        options['linlogspace'] = ['lin', 'log'].index(h['LOGLIN'])
-    if 'NLSAMP' in h:
-        options['nlsamp'] = h['NLSAMP']
-    if 'NBARCUT' in h:
-        options['nbar_cut'] = h['NBARCUT']
-    if 'SEED' in h:
-        options['seed'] = h['SEED']
-
-    logger.info('> DONE')
-
-    # return the dict of options
-    return options
-
-
 def write_maps(filename, maps, *, clobber=False, workdir='.'):
     '''write a set of maps to FITS file
 
