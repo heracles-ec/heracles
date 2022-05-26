@@ -69,28 +69,6 @@ def _read_metadata(hdu):
     return md
 
 
-def write_binspec(filename, bin_id, seed, query, workdir='.'):
-    '''write a bin specification to file'''
-    path = os.path.join(workdir, filename)
-    with open(path, 'w') as f:
-        f.write(f'{bin_id}:{seed}:{query}')
-
-
-def read_binspec(filename, workdir='.'):
-    '''read a bin specification from file'''
-    path = os.path.join(workdir, filename)
-    with open(path) as f:
-        bin_id, seed, query = f.read().split(':', 2)
-    return int(bin_id.strip()), int(seed.strip()), query.strip()
-
-
-def clobber_fits(filename, workdir='.'):
-    '''clobber a FITS file'''
-    path = os.path.join(workdir, filename)
-    with fitsio.FITS(path, 'rw', clobber=True) as fits:
-        fits.write(None)
-
-
 def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
     '''read visibility map from a HEALPix map file'''
     mask = hp.read_map(mask_name, field=field)

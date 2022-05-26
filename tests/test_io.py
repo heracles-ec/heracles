@@ -149,36 +149,6 @@ def mock_writemask_extra(mock_mask_extra, nside, datadir):
     return filename
 
 
-def test_write_read_binspec(tmp_path):
-
-    from le3_pk_wl.io import write_binspec, read_binspec
-
-    write_binspec('binspec.txt', 3, 12345, 'x == 5', workdir=str(tmp_path))
-    bin_id, seed, query = read_binspec('binspec.txt', workdir=str(tmp_path))
-
-    assert bin_id == 3
-    assert seed == 12345
-    assert query == 'x == 5'
-
-
-def test_clobber_fits(tmp_path):
-
-    import fitsio
-    from le3_pk_wl.io import clobber_fits
-
-    fits = fitsio.FITS(str(tmp_path / 'new.fits'), 'rw')
-    fits.write(None)
-    fits.write(None)
-    assert len(fits) == 2
-    fits.close()
-
-    clobber_fits('new.fits', workdir=str(tmp_path))
-
-    fits = fitsio.FITS(str(tmp_path / 'new.fits'), 'r')
-    assert len(fits) == 1
-    fits.close()
-
-
 def test_write_read_maps(tmp_path):
 
     import numpy as np
