@@ -78,10 +78,16 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         md = {}
         if alm1.dtype.metadata:
             for key, value in alm1.dtype.metadata.items():
-                md[f'{key}_1'] = value
+                if key == 'noisbias':
+                    md[key] = value if n1 == n2 and i1 == i2 else 0.
+                else:
+                    md[f'{key}_1'] = value
         if alm2.dtype.metadata:
             for key, value in alm2.dtype.metadata.items():
-                md[f'{key}_2'] = value
+                if key == 'noisbias':
+                    pass
+                else:
+                    md[f'{key}_2'] = value
         update_metadata(cl, **md)
 
         # add cl to the set
@@ -131,8 +137,8 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
         powers = [md.get('power_1', 0), md.get('power_2', 0)]
         areas = []
 
-        # get noise bias
-        nb = nbs.get(key, 0.)
+        # get noise bias from explicit dict, if given, or metadata
+        nb = nbs.get(key, md.get('noisbias', 0.))
 
         # if HEALPix, remove noise bias before deconvolution
         if nb != 0. and 'healpix' in kernels:
