@@ -242,7 +242,7 @@ def binned_cl(cl, bins, cmblike=False):
 
 
 def random_noisebias(which, nside, catalogs, vmaps=None, *, lmax=None, repeat=1,
-                     overdensity=True):
+                     overdensity=True, full=False):
     '''simple noise bias estimate from randomised position and shear maps'''
 
     if not all(k.upper() in ['P', 'G'] for k in which):
@@ -257,6 +257,12 @@ def random_noisebias(which, nside, catalogs, vmaps=None, *, lmax=None, repeat=1,
     logger.info('given %s visibility map(s)', 'no' if vmaps is None else len(vmaps))
     t = time.monotonic()
 
+    if full:
+        logger.info('estimating cross-noise biases')
+        include = None
+    else:
+        include = [('PP', ..., ...), ('EE', ..., ...), ('BB', ..., ...)]
+
     nbs = {}
 
     for n in range(repeat):
@@ -265,7 +271,7 @@ def random_noisebias(which, nside, catalogs, vmaps=None, *, lmax=None, repeat=1,
 
         maps = _map_catalogs(which, nside, catalogs, vmaps, overdensity=overdensity, random=True)
         alms = _transform_maps(maps, lmax=lmax)
-        cls = angular_power_spectra(alms, lmax=lmax)
+        cls = angular_power_spectra(alms, lmax=lmax, include=include)
 
         for k, cl in cls.items():
             ell = np.arange(cl.shape[-1])

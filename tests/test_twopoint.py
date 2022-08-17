@@ -163,7 +163,8 @@ def test_binned_cl(cmblike):
     np.testing.assert_array_almost_equal(result, binned)
 
 
-def test_random_noisebias(catalog):
+@pytest.mark.parametrize('full', [False, True])
+def test_random_noisebias(catalog, full):
 
     from le3_pk_wl.twopoint import random_noisebias
 
@@ -171,9 +172,9 @@ def test_random_noisebias(catalog):
 
     nside = 64
 
-    nbs = random_noisebias('pg', nside, catalogs, repeat=5)
+    nbs = random_noisebias('pg', nside, catalogs, repeat=5, full=full)
 
-    assert len(nbs) == 6
+    assert len(nbs) == 6 if full else 3
 
     rows = next(iter(catalog))
 
@@ -186,8 +187,10 @@ def test_random_noisebias(catalog):
     nb_bb = nb_ee
 
     np.testing.assert_allclose(nbs['PP', 0, 0], nb_pp, atol=0., rtol=0.05)
-    np.testing.assert_allclose(nbs['PE', 0, 0], 0., atol=1e-6, rtol=0.)
-    np.testing.assert_allclose(nbs['PB', 0, 0], 0., atol=1e-6, rtol=0.)
     np.testing.assert_allclose(nbs['EE', 0, 0], nb_ee, atol=0., rtol=0.05)
     np.testing.assert_allclose(nbs['BB', 0, 0], nb_bb, atol=0., rtol=0.05)
-    np.testing.assert_allclose(nbs['EB', 0, 0], 0., atol=1e-7, rtol=0.)
+
+    if full:
+        np.testing.assert_allclose(nbs['EB', 0, 0], 0., atol=1e-7, rtol=0.)
+        np.testing.assert_allclose(nbs['PE', 0, 0], 0., atol=1e-6, rtol=0.)
+        np.testing.assert_allclose(nbs['PB', 0, 0], 0., atol=1e-6, rtol=0.)
