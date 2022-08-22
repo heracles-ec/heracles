@@ -106,7 +106,7 @@ def map_positions(nside, catalog, vmap=None, *, random=False, overdensity=True):
     return pos
 
 
-def map_shears(nside, catalog, *, random=False):
+def map_shears(nside, catalog, *, random=False, normalize=True):
     '''map shears from catalog to HEALPix maps'''
 
     logger.info('mapping shears')
@@ -150,12 +150,22 @@ def map_shears(nside, catalog, *, random=False):
         _map_she(wht, she, ipix, w, g1, g2)
         ngal += rows.size
 
+    # compute average weight in nonzero pixels
+    wbar = wht.mean()
+
+    # normalise the weight in each pixel if asked to
+    if normalize:
+        wht /= wbar
+        power = 0
+    else:
+        power = 1
+
     # shear was averaged in each pixel for numerical stability
     # now compute the sum
     she *= wht
 
     # set metadata of array
-    update_metadata(she, spin=2, kernel='healpix', power=1)
+    update_metadata(she, spin=2, wbar=wbar, kernel='healpix', power=power)
 
     logger.info('mapped %s shears in %s', f'{ngal:_}', timedelta(seconds=(time.monotonic() - t)))
 
@@ -163,7 +173,7 @@ def map_shears(nside, catalog, *, random=False):
     return she
 
 
-def map_weights(nside, catalog):
+def map_weights(nside, catalog, normalize=True):
     '''map weights from catalog to HEALPix map'''
 
     logger.info('mapping weights')
@@ -182,8 +192,18 @@ def map_weights(nside, catalog):
         ipix = hp.ang2pix(nside, rows.ra, rows.dec, lonlat=True)
         _map_wht(wht, ipix, w)
 
+    # compute average weight in nonzero pixels
+    wbar = wht.mean()
+
+    # normalise the weight in each pixel if asked to
+    if normalize:
+        wht /= wbar
+        power = 0
+    else:
+        power = 1
+
     # set metadata of arrays
-    update_metadata(wht, spin=0, kernel='healpix', power=1)
+    update_metadata(wht, spin=0, wbar=wbar, kernel='healpix', power=power)
 
     logger.info('weights mapped in %s', timedelta(seconds=(time.monotonic() - t)))
 
