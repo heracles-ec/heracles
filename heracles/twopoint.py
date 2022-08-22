@@ -137,6 +137,9 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
         powers = [md.get('power_1', 0), md.get('power_2', 0)]
         areas = []
 
+        # minimum l for corrections
+        lmin = max(map(abs, spins))
+
         # get noise bias from explicit dict, if given, or metadata
         nb = nbs.get(key, md.get('noisbias', 0.))
 
@@ -145,7 +148,7 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
             logger.info('subtracting noise bias')
             if kernels[0] != kernels[1]:
                 raise TypeError('cannot apply noise bias to kernels of mixed type')
-            cl -= nb
+            cl[lmin:] -= nb
 
         # deconvolve the kernels of the first and second map
         for i, spin, kernel in zip([1, 2], spins, kernels):
@@ -157,7 +160,6 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
                 nside = md[f'nside_{i}']
                 if (nside, lmax, spin) not in fls[kernel]:
                     fl0, fl2 = hp.pixwin(nside, lmax=lmax, pol=True)
-                    fl2[0] = fl2[1] = 1.
                     fls[kernel][nside, lmax, 0] = fl0
                     fls[kernel][nside, lmax, 2] = fl2
                 fl = fls[kernel].get((nside, lmax, spin))
@@ -167,18 +169,18 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
             else:
                 raise ValueError(f'unknown kernel: {kernel}')
             if fl is not None:
-                cl /= fl
+                cl[lmin:] /= fl[lmin:]
             areas.append(a)
 
         # if not HEALPix, remove noise bias after deconvolution
         if nb != 0. and kernels[0] != 'healpix':
             logger.info('subtracting noise bias')
-            cl -= nb
+            cl[lmin:] -= nb
 
         # scale by area and its power
         for a, p in zip(areas, powers):
             if a is not None and p != 0:
-                cl /= a**p
+                cl[lmin:] /= a**p
 
         # write noise bias to corrected cl
         update_metadata(cl, noisbias=nb)
@@ -280,8 +282,8 @@ def random_noisebias(which, nside, catalogs, vmaps=None, *, lmax=None, repeat=1,
         cls = angular_power_spectra(alms, lmax=lmax, include=include)
 
         for k, cl in cls.items():
-            ell = np.arange(cl.shape[-1])
-            nb = np.sum((2*ell+1)*cl)/np.sum(2*ell+1)
+            ell = np.arange(2, cl.shape[-1])
+            nb = np.sum((2*ell+1)*cl[2:])/np.sum(2*ell+1)
             nbs[k] = nbs.get(k, 0.) + (nb - nbs.get(k, 0.))/(n + 1)
 
     logger.info('estimated %d two-point noise biases in %s', len(nbs), timedelta(seconds=(time.monotonic() - t)))
