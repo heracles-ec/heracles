@@ -178,12 +178,11 @@ def test_random_noisebias(catalog, full):
 
     rows = next(iter(catalog))
 
-    npix = 12*nside**2
     gvar = np.mean(rows.g1**2 + rows.g2**2)
-    wtot = np.sum(rows.w**2)
+    wbar = np.sum(rows.w**2)/np.sum(rows.w)**2
 
     nb_pp = 4*np.pi/rows.size
-    nb_ee = 2*np.pi/npix**2*gvar*wtot
+    nb_ee = 2*np.pi*gvar*wbar
     nb_bb = nb_ee
 
     np.testing.assert_allclose(nbs['PP', 0, 0], nb_pp, atol=0., rtol=0.05)

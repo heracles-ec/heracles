@@ -105,8 +105,18 @@ def test_map_shears(nside, catalog):
 
     m = map_shears(nside, catalog)
 
+    w = next(iter(catalog)).w
+    w = w.reshape(w.size//4, 4).sum(axis=-1)
+    wbar = w.mean()
+
     assert m.shape == (2, 12*nside**2,)
-    assert m.dtype.metadata == {'spin': 2, 'kernel': 'healpix', 'power': 1}
+    assert m.dtype.metadata == {'spin': 2, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
+    np.testing.assert_array_almost_equal(m, 0)
+
+    m = map_shears(nside, catalog, normalize=False)
+
+    assert m.shape == (2, 12*nside**2,)
+    assert m.dtype.metadata == {'spin': 2, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
     np.testing.assert_array_almost_equal(m, 0)
 
 
@@ -117,10 +127,18 @@ def test_map_weights(nside, catalog):
     m = map_weights(nside, catalog)
 
     w = next(iter(catalog)).w
+    w = w.reshape(w.size//4, 4).sum(axis=-1)
+    wbar = w.mean()
 
     assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'kernel': 'healpix', 'power': 1}
-    np.testing.assert_array_almost_equal(m, w.reshape(w.size//4, 4).sum(axis=-1))
+    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
+    np.testing.assert_array_almost_equal(m, w/wbar)
+
+    m = map_weights(nside, catalog, normalize=False)
+
+    assert m.shape == (12*nside**2,)
+    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
+    np.testing.assert_array_almost_equal(m, w)
 
 
 def test_transform_maps():
