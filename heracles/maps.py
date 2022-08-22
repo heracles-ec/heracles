@@ -243,7 +243,7 @@ def transform_maps(maps, **kwargs):
             if md:
                 update_metadata(alms[n, i], nside=nside, **md)
         elif spin == 2:
-            alms['E', i], alms['B', i] = -a[1], -a[2]
+            alms['E', i], alms['B', i] = a[1], a[2]
             if md:
                 update_metadata(alms['E', i], nside=nside, **md)
                 update_metadata(alms['B', i], nside=nside, **md)
