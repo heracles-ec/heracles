@@ -99,16 +99,11 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
     return cls
 
 
-def unbiased_cls(cls, *, noisebias=None, inplace=False):
-    '''compute unbiased cls'''
+def debias_cls(cls, noisebias=None, *, inplace=False):
+    '''remove noise bias from cls'''
 
     logger.info('debiasing %d cl(s)%s', len(cls), ' in place' if inplace else '')
     t = time.monotonic()
-
-    # keep a cache of convolution kernels (i.e. pixel window functions)
-    fls = {
-        'healpix': {},
-    }
 
     # toc dict for noise biases
     nbs = noisebias or {}
@@ -116,12 +111,57 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
     # the output toc dict
     out = cls if inplace else {}
 
-    # modify each cl in turn
-    # - remove effect of convolution
-    # - subtract noise bias
+    # subtract noise bias of each cl in turn
     for key in cls:
 
         logger.info('debiasing %s cl for bins %s, %s', *key)
+
+        cl = cls[key]
+        md = cl.dtype.metadata or {}
+
+        if not inplace:
+            cl = cl.copy()
+            update_metadata(cl, **md)
+
+        # minimum l for correction
+        lmin = max(abs(md.get('spin_1', 0)), abs(md.get('spin_2', 0)))
+
+        # get noise bias from explicit dict, if given, or metadata
+        nb = nbs.get(key, md.get('noisbias', 0.))
+
+        # remove noise bias
+        cl[lmin:] -= nb
+
+        # write noise bias to corrected cl
+        update_metadata(cl, noisbias=nb)
+
+        # store debiased cl in output set
+        out[key] = cl
+
+    logger.info('debiased %d cl(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
+
+    # return the toc dict of debiased cls
+    return out
+
+
+def depixelate_cls(cls, *, inplace=False):
+    '''remove discretisation kernel from cls'''
+
+    logger.info('depixelate %d cl(s)%s', len(cls), ' in place' if inplace else '')
+    t = time.monotonic()
+
+    # keep a cache of convolution kernels (i.e. pixel window functions)
+    fls = {
+        'healpix': {},
+    }
+
+    # the output toc dict
+    out = cls if inplace else {}
+
+    # remove effect of convolution for each cl in turn
+    for key in cls:
+
+        logger.info('depixelate %s cl for bins %s, %s', *key)
 
         cl = cls[key]
         md = cl.dtype.metadata or {}
@@ -140,19 +180,9 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
         # minimum l for corrections
         lmin = max(map(abs, spins))
 
-        # get noise bias from explicit dict, if given, or metadata
-        nb = nbs.get(key, md.get('noisbias', 0.))
-
-        # if HEALPix, remove noise bias before deconvolution
-        if nb != 0. and 'healpix' in kernels:
-            logger.info('subtracting noise bias')
-            if kernels[0] != kernels[1]:
-                raise TypeError('cannot apply noise bias to kernels of mixed type')
-            cl[lmin:] -= nb
-
         # deconvolve the kernels of the first and second map
         for i, spin, kernel in zip([1, 2], spins, kernels):
-            logger.info('deconvolving spin-%s %s mapping kernel', spin, kernel)
+            logger.info('- spin-%s %s kernel', spin, kernel)
             if kernel is None:
                 fl = None
                 a = None
@@ -172,25 +202,17 @@ def unbiased_cls(cls, *, noisebias=None, inplace=False):
                 cl[lmin:] /= fl[lmin:]
             areas.append(a)
 
-        # if not HEALPix, remove noise bias after deconvolution
-        if nb != 0. and kernels[0] != 'healpix':
-            logger.info('subtracting noise bias')
-            cl[lmin:] -= nb
-
-        # scale by area and its power
+        # scale by area**power
         for a, p in zip(areas, powers):
             if a is not None and p != 0:
                 cl[lmin:] /= a**p
 
-        # write noise bias to corrected cl
-        update_metadata(cl, noisbias=nb)
-
-        # store unbiased cl in output set
+        # store depixelated cl in output set
         out[key] = cl
 
-    logger.info('debiased %d cl(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
+    logger.info('depixelated %d cl(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
 
-    # return the toc dict of unbiased cls
+    # return the toc dict of depixelated cls
     return out
 
 
@@ -235,6 +257,57 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
 
     # return the toc dict of mixing matrices
     return mms
+
+
+def pixelate_mms_healpix(mms, nside, *, inplace=False):
+    '''apply HEALPix pixel window function to mms'''
+
+    logger.info('pixelate %d mm(s)%s', len(mms), ' in place' if inplace else '')
+    logger.info('kernel: HEALPix, NSIDE=%d', nside)
+    t = time.monotonic()
+
+    # pixel window functions
+    lmax = 4*nside
+    fl0, fl2 = hp.pixwin(nside, lmax=lmax, pol=True)
+
+    # will be multiplied over rows
+    fl0 = fl0[:, np.newaxis]
+    fl2 = fl2[:, np.newaxis]
+
+    # the output toc dict
+    out = mms if inplace else {}
+
+    # apply discretisation kernel from cl to each mm in turn
+    for key in mms:
+
+        logger.info('pixelate %s mm for bins %s, %s', *key)
+
+        mm = mms[key]
+        if not inplace:
+            mm = mm.copy()
+
+        n = np.shape(mm)[-2]
+        if n >= lmax:
+            logger.error('no HEALPix pixel window function for NSIDE=%d and LMAX=%d', nside, n-1)
+
+        name = key[0]
+        if name == '00':
+            mm *= fl0[:n]*fl0[:n]
+        elif name in ['0+', '+0']:
+            mm *= fl0[:n]*fl2[:n]
+        elif name in ['++', '--', '+-', '-+']:
+            mm *= fl2[:n]*fl2[:n]
+        else:
+            logger.warning('unknown mixing matrix, assuming spin-0')
+            mm *= fl0[:n]*fl0[:n]
+
+        # store pixelated mm in output set
+        out[key] = mm
+
+    logger.info('pixelated %d mm(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
+
+    # return the toc dict of modified cls
+    return out
 
 
 def binned_cl(cl, bins, cmblike=False):

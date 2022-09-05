@@ -97,6 +97,23 @@ def test_angular_power_spectra(mock_alms):
     assert cls.keys() == {(n, i1, i2) for n, i1, i2 in comb if i1 != 1}
 
 
+def test_debias_cls():
+
+    from le3_pk_wl.twopoint import debias_cls
+
+    cls = {
+        ('PP', 0, 0): np.zeros(100),
+    }
+
+    nbs = {
+        ('PP', 0, 0): 1.23,
+    }
+
+    debias_cls(cls, nbs, inplace=True)
+
+    assert np.all(cls['PP', 0, 0] == -1.23)
+
+
 def test_mixing_matrices():
 
     from le3_pk_wl.twopoint import mixing_matrices
@@ -134,6 +151,35 @@ def test_mixing_matrices():
     mms = mixing_matrices(cls)
     assert len(mms) == 1
     assert mms['XY', 0, 1].shape == (lmax+1, lmax+1)
+
+
+def test_pixelate_mms_healpix():
+
+    import healpy as hp
+    from le3_pk_wl.twopoint import pixelate_mms_healpix
+
+    nside = 512
+    lmax = 1000
+
+    fl0, fl2 = hp.pixwin(nside, lmax=lmax, pol=True)
+
+    mms = {
+        ('00', 0, 0): np.eye(lmax+1),
+        ('0+', 0, 0): np.eye(lmax+1),
+        ('++', 0, 0): np.eye(lmax+1),
+        ('--', 0, 0): np.eye(lmax+1),
+        ('+-', 0, 0): np.eye(lmax+1),
+        ('ab', 0, 0): np.eye(lmax+1),
+    }
+
+    pixelate_mms_healpix(mms, nside, inplace=True)
+
+    assert np.all(mms['00', 0, 0] == np.diag(fl0*fl0))
+    assert np.all(mms['0+', 0, 0] == np.diag(fl0*fl2))
+    assert np.all(mms['++', 0, 0] == np.diag(fl2*fl2))
+    assert np.all(mms['--', 0, 0] == np.diag(fl2*fl2))
+    assert np.all(mms['+-', 0, 0] == np.diag(fl2*fl2))
+    assert np.all(mms['ab', 0, 0] == np.diag(fl0*fl0))
 
 
 @pytest.mark.parametrize('cmblike', [False, True])
