@@ -11,29 +11,13 @@ from scipy.stats import binned_statistic
 
 from ._mixmat import mixmat, mixmat_eb
 from .maps import update_metadata, map_catalogs as _map_catalogs, transform_maps as _transform_maps
+from .util import toc_match
 
 logger = logging.getLogger(__name__)
 
 
 TWOPOINT_NAMES = list(map(''.join, combinations_with_replacement('PEBVW', 2)))
 '''standard names for two-point functions (PE not EP etc.)'''
-
-
-def _skip_cl(key, include=None, exclude=None):
-    '''return whether a cl should be skipped by inclusion or exclusion'''
-    skip = False
-    if include is not None:
-        for pattern in include:
-            if all(p is Ellipsis or p == k for p, k in zip(pattern, key)):
-                break
-        else:
-            skip = True
-    if exclude is not None:
-        for pattern in exclude:
-            if all(p is Ellipsis or p == k for p, k in zip(pattern, key)):
-                skip = True
-                break
-    return skip
 
 
 def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=None):
@@ -66,7 +50,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
             continue
 
         # check if cl is skipped by explicit include or exclude list
-        if _skip_cl((xy, i1, i2), include, exclude):
+        if not toc_match((xy, i1, i2), include, exclude):
             continue
 
         logger.info('computing %s cl for bins %s, %s', xy, i1, i2)
