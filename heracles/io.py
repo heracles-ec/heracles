@@ -7,6 +7,7 @@ import numpy as np
 import healpy as hp
 import fitsio
 
+from .util import toc_match
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
     return mask
 
 
-def write_maps(filename, maps, *, clobber=False, workdir='.'):
+def write_maps(filename, maps, *, clobber=False, workdir='.', include=None, exclude=None):
     '''write a set of maps to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -135,6 +136,11 @@ def write_maps(filename, maps, *, clobber=False, workdir='.'):
 
         # write every map
         for (n, i), m in maps.items():
+
+            # skip if not selected
+            if not toc_match((n, i), include=include, exclude=exclude):
+                continue
+
             logger.info('writing %s map for bin %s', n, i)
 
             # the cl extension name
@@ -172,7 +178,7 @@ def write_maps(filename, maps, *, clobber=False, workdir='.'):
     logger.info('done with %d maps', len(maps))
 
 
-def read_maps(filename, workdir='.'):
+def read_maps(filename, workdir='.', *, include=None, exclude=None):
     '''read a set of maps from a FITS file'''
 
     logger.info('reading maps from %s', filename)
@@ -192,6 +198,10 @@ def read_maps(filename, workdir='.'):
         # read every entry in the TOC, add it to the list, then read the maps
         for entry in fits_toc:
             ext, n, i = entry[['EXT', 'NAME', 'BIN']]
+
+            # skip if not selected
+            if not toc_match((n, i), include=include, exclude=exclude):
+                continue
 
             logger.info('reading %s map for bin %s', n, i)
 
@@ -215,7 +225,7 @@ def read_maps(filename, workdir='.'):
     return maps
 
 
-def write_alms(filename, alms, *, clobber=False, workdir='.'):
+def write_alms(filename, alms, *, clobber=False, workdir='.', include=None, exclude=None):
     '''write a set of alms to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -252,6 +262,11 @@ def write_alms(filename, alms, *, clobber=False, workdir='.'):
 
         # write every alm
         for (n, i), alm in alms.items():
+
+            # skip if not selected
+            if not toc_match((n, i), include=include, exclude=exclude):
+                continue
+
             logger.info('writing %s alm for bin %s', n, i)
 
             # the cl extension name
@@ -271,7 +286,7 @@ def write_alms(filename, alms, *, clobber=False, workdir='.'):
     logger.info('done with %d alms', len(alms))
 
 
-def read_alms(filename, workdir='.'):
+def read_alms(filename, workdir='.', *, include=None, exclude=None):
     '''read a set of alms from a FITS file'''
 
     logger.info('reading alms from %s', filename)
@@ -291,6 +306,10 @@ def read_alms(filename, workdir='.'):
         # read every entry in the TOC, add it to the list, then read the alms
         for entry in fits_toc:
             ext, n, i = entry[['EXT', 'NAME', 'BIN']]
+
+            # skip if not selected
+            if not toc_match((n, i), include=include, exclude=exclude):
+                continue
 
             logger.info('reading %s alm for bin %s', n, i)
 
@@ -313,7 +332,7 @@ def read_alms(filename, workdir='.'):
     return alms
 
 
-def write_cls(filename, cls, *, clobber=False, workdir='.'):
+def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclude=None):
     '''write a set of cls to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -350,6 +369,11 @@ def write_cls(filename, cls, *, clobber=False, workdir='.'):
 
         # write every cl
         for (n, i1, i2), cl in cls.items():
+
+            # skip if not selected
+            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+                continue
+
             logger.info('writing %s cl for bins %s, %s', n, i1, i2)
 
             # the cl extension name
@@ -369,7 +393,7 @@ def write_cls(filename, cls, *, clobber=False, workdir='.'):
     logger.info('done with %d cls', len(cls))
 
 
-def read_cls(filename, workdir='.'):
+def read_cls(filename, workdir='.', *, include=None, exclude=None):
     '''read a set of cls from a FITS file'''
 
     logger.info('reading cls from %s', filename)
@@ -390,6 +414,10 @@ def read_cls(filename, workdir='.'):
         for entry in fits_toc:
             ext, n, i1, i2 = entry[['EXT', 'NAME', 'BIN1', 'BIN2']]
 
+            # skip if not selected
+            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+                continue
+
             logger.info('reading %s cl for bins %s, %s', n, i1, i2)
 
             # read the cl from the extension
@@ -407,7 +435,7 @@ def read_cls(filename, workdir='.'):
     return cls
 
 
-def write_mms(filename, mms, *, clobber=False, workdir='.'):
+def write_mms(filename, mms, *, clobber=False, workdir='.', include=None, exclude=None):
     '''write a set of mixing matrices to FITS file
 
     If the output file exists, the new mixing matrices will be appended, unless
@@ -444,6 +472,11 @@ def write_mms(filename, mms, *, clobber=False, workdir='.'):
 
         # write every mixing matrix
         for (n, i1, i2), mm in mms.items():
+
+            # skip if not selected
+            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+                continue
+
             logger.info('writing mixing matrix %s for bins %s, %s', n, i1, i2)
 
             # the mm extension name
@@ -463,7 +496,7 @@ def write_mms(filename, mms, *, clobber=False, workdir='.'):
     logger.info('done with %d mm(s)', len(mms))
 
 
-def read_mms(filename, workdir='.'):
+def read_mms(filename, workdir='.', *, include=None, exclude=None):
     '''read a set of mixing matrices from a FITS file'''
 
     logger.info('reading mixing matrices from %s', filename)
@@ -484,6 +517,10 @@ def read_mms(filename, workdir='.'):
         for entry in fits_toc:
             ext, n, i1, i2 = entry[['EXT', 'NAME', 'BIN1', 'BIN2']]
 
+            # skip if not selected
+            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+                continue
+
             logger.info('reading mixing matrix %s for bins %s, %s', n, i1, i2)
 
             # read the mixing matrix from the extension
@@ -501,7 +538,7 @@ def read_mms(filename, workdir='.'):
     return mms
 
 
-def write_cov(filename, cov, clobber=False, workdir='.'):
+def write_cov(filename, cov, clobber=False, workdir='.', include=None, exclude=None):
     '''write a set of covariance matrices to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -538,6 +575,11 @@ def write_cov(filename, cov, clobber=False, workdir='.'):
 
         # write every covariance sub-matrix
         for (k1, k2), mat in cov.items():
+
+            # skip if not selected
+            if not toc_match((k1, k2), include=include, exclude=exclude):
+                continue
+
             # the cl extension name
             ext = f'COV{extn}'
             extn += 1
@@ -557,7 +599,7 @@ def write_cov(filename, cov, clobber=False, workdir='.'):
     logger.info('done with %d covariance(s)', len(cov))
 
 
-def read_cov(filename, workdir='.'):
+def read_cov(filename, workdir='.', *, include=None, exclude=None):
     '''read a set of covariances matrices from a FITS file'''
 
     logger.info('reading covariance matrices from %s', filename)
@@ -579,6 +621,10 @@ def read_cov(filename, workdir='.'):
             ext = entry['EXT']
             k1 = tuple(entry[['NAME_1', 'BIN1_1', 'BIN2_1']])
             k2 = tuple(entry[['NAME_2', 'BIN1_2', 'BIN2_2']])
+
+            # skip if not selected
+            if not toc_match((k1, k2), include=include, exclude=exclude):
+                continue
 
             logger.info('reading %s x %s covariance matrix', k1, k2)
 
