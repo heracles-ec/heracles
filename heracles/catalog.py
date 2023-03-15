@@ -168,6 +168,19 @@ class Catalog(metaclass=ABCMeta):
             # yield the filtered page
             yield page
 
+    def __copy__(self):
+        '''return a shallow copy of the catalogue'''
+
+        other = self.__class__.__new__(self.__class__)
+
+        other._page_size = self._page_size
+        other._filters = self._filters.copy()
+        other._visibility = self._visibility
+        other._names = self._names
+        other._size = self._size
+
+        return other
+
 
 class InvalidValueFilter:
     '''Filter invalid values from a catalogue.'''

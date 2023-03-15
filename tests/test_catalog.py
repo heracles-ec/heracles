@@ -195,6 +195,32 @@ def test_catalog_empty_page():
         next(iter(c))
 
 
+def test_catalog_copy():
+
+    from le3_pk_wl.catalog import Catalog
+
+    class TestCatalog(Catalog):
+        def __init__(self):
+            super().__init__()
+            self._visibility = object()
+            self._names = object()
+            self._size = object()
+
+        def _pages(self):
+            return iter([])
+
+    catalog = TestCatalog()
+
+    copied = catalog.__copy__()
+
+    assert isinstance(copied, TestCatalog)
+    assert copied is not catalog
+    assert copied.visibility is catalog.visibility
+    assert copied.names is catalog.names
+    assert copied.size is catalog.size
+    assert copied.filters is not catalog.filters
+
+
 def test_invalid_value_filter(catalog):
 
     from le3_pk_wl.catalog import InvalidValueFilter
