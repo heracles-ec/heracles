@@ -1,217 +1,643 @@
 '''module for map-making'''
 
+import warnings
 import time
 from datetime import timedelta
+from abc import ABCMeta, abstractmethod
+from collections.abc import Generator, Sequence, Mapping
+from functools import wraps, partial
 import logging
 import numpy as np
 import healpy as hp
-from numba import njit, int64, float64
+from numba import njit
 
+from typing import Optional, Tuple, Dict, Any, Union, Generator as GeneratorT
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .catalog import Catalog, CatalogPage
 
 logger = logging.getLogger(__name__)
 
 
-@njit((float64[:], int64[:]), nogil=True)
-def _map_pos(m, ipix):
+def _nativebyteorder(fn):
+    '''utility decorator to convert inputs to native byteorder'''
+
+    @wraps(fn)
+    def wrapper(*inputs):
+        native = []
+        for a in inputs:
+            if a.dtype.byteorder != '=':
+                a = a.byteswap().newbyteorder('=')
+            native.append(a)
+        return fn(*native)
+
+    return wrapper
+
+
+@_nativebyteorder
+@njit(nogil=True, fastmath=True)
+def _map_pos(pos, ipix):
     for i in ipix:
-        m[i] += 1
+        pos[i] += 1
 
 
-@njit((float64[:], float64[:, :], int64[:], float64[:], float64[:], float64[:]), nogil=True)
-def _map_she(n, m, ipix, w, g1, g2):
-    for i, w_i, g1_i, g2_i in zip(ipix, w, g1, g2):
-        n[i] += w_i
-        m[0, i] += w_i/n[i]*(g1_i - m[0, i])
-        m[1, i] += w_i/n[i]*(g2_i - m[1, i])
+@_nativebyteorder
+@njit(nogil=True, fastmath=True)
+def _map_real(wht, val, ipix, w, v):
+    for i, w_i, v_i in zip(ipix, w, v):
+        wht[i] += w_i
+        val[i] += w_i/wht[i]*(v_i - val[i])
 
 
-@njit((float64[:], int64[:], float64[:]), nogil=True)
-def _map_wht(m, ipix, w):
+@_nativebyteorder
+@njit(nogil=True, fastmath=True)
+def _map_complex(wht, val, ipix, w, re, im):
+    for i, w_i, re_i, im_i in zip(ipix, w, re, im):
+        wht[i] += w_i
+        val[0, i] += w_i/wht[i]*(re_i - val[0, i])
+        val[1, i] += w_i/wht[i]*(im_i - val[1, i])
+
+
+@_nativebyteorder
+@njit(nogil=True, fastmath=True)
+def _map_weight(wht, ipix, w):
     for i, w_i in zip(ipix, w):
-        m[i] += w_i
+        wht[i] += w_i
 
 
-def visibility_map(nside, vmap):
-    '''create a visibility map with metadata for analysis'''
-
-    logger.info('copying visibility map')
-    t = time.monotonic()
-
-    nside_in = hp.get_nside(vmap)
-    if nside != nside_in:
-        logger.info('changing NSIDE of visibility map from %s to %s', nside_in, nside)
-        vmap = hp.ud_grade(vmap, nside)
-    else:
-        vmap = np.copy(vmap)
-
-    logger.info('visibility map copied in %s', timedelta(seconds=(time.monotonic() - t)))
-
-    update_metadata(vmap, spin=0, kernel='healpix', power=0)
-
-    return vmap
+def update_metadata(array, **metadata):
+    '''update metadata of an array dtype'''
+    md = {}
+    if array.dtype.metadata is not None:
+        md.update(array.dtype.metadata)
+    md.update(metadata)
+    array.dtype = np.dtype(array.dtype, metadata=md)
 
 
-def map_positions(nside, catalog, vmap=None, *, random=False, overdensity=True):
-    '''map positions from catalog to HEALPix map'''
+# type alias for map data
+MapData = np.ndarray
 
-    logger.info('mapping positions')
-    t = time.monotonic()
+# type hint for map generators
+MapGenerator = GeneratorT[None, 'CatalogPage', MapData]
 
-    # number of pixels for nside
-    npix = hp.nside2npix(nside)
 
-    # keep track of the total number of galaxies
-    ngal = 0
+class Map(metaclass=ABCMeta):
+    '''Abstract base class for map making from catalogues.
 
-    # map positions
-    pos = np.zeros(npix, dtype=np.float64)
-    for rows in catalog:
-        if not random:
-            ipix = hp.ang2pix(nside, rows.ra, rows.dec, lonlat=True)
-            _map_pos(pos, ipix)
-        ngal += rows.size
+    Concrete classes must implement the `__call__()` method which takes a
+    catalogue instance and returns a generator for mapping.
 
-    # randomise position map if asked to
-    if random:
-        logger.info('randomising positions')
+    '''
+
+    def __init__(self, columns: Tuple[Optional[str]]) -> None:
+        '''Initialise the map.'''
+        self._columns = columns
+        super().__init__()
+
+    @property
+    def columns(self) -> Tuple[Optional[str]]:
+        '''Return the catalogue columns used by this map.'''
+        return self._columns
+
+    @abstractmethod
+    def __call__(self, catalog: 'Catalog') -> Union[MapData, MapGenerator]:
+        '''Implementation for mapping a catalogue.'''
+        ...
+
+
+class HealpixMap(Map):
+    '''Abstract base class for HEALPix map making.
+
+    HEALPix maps have a resolution parameter, available as the ``nside``
+    property.
+
+    '''
+
+    def __init__(self, nside: int, **kwargs) -> None:
+        '''Initialize map with the given nside parameter.'''
+        self._nside: int = nside
+        super().__init__(**kwargs)
+
+    @property
+    def nside(self) -> int:
+        '''The resolution parameter of the HEALPix map.'''
+        return self._nside
+
+    @nside.setter
+    def nside(self, nside: int) -> None:
+        '''Set the resolution parameter of the HEALPix map.'''
+        self._nside = nside
+
+
+class RandomizableMap(Map):
+    '''Abstract base class for randomisable maps.
+
+    Randomisable maps have a ``randomize`` property that determines
+    whether or not the maps are randomised.
+
+    '''
+
+    def __init__(self, randomize: bool, **kwargs) -> None:
+        '''Initialise map with the given randomize property.'''
+        self._randomize = randomize
+        super().__init__(**kwargs)
+
+    @property
+    def randomize(self) -> bool:
+        return self._randomize
+
+    @randomize.setter
+    def randomize(self, randomize: bool) -> None:
+        '''Set the randomize flag.'''
+        self._randomize = randomize
+
+
+class NormalizableMap(Map):
+    '''Abstract base class for normalisable maps.
+
+    A normalised map is a map that is divided by its mean weight.
+
+    Normalisable maps have a ``normalize`` property that determines
+    whether or not the maps are normalised.
+
+    '''
+
+    def __init__(self, normalize: bool, **kwargs) -> None:
+        '''Initialise map with the given normalize property.'''
+        self._normalize = normalize
+        super().__init__(**kwargs)
+
+    @property
+    def normalize(self) -> bool:
+        return self._normalize
+
+    @normalize.setter
+    def normalize(self, normalize: bool) -> None:
+        '''Set the normalize flag.'''
+        self._normalize = normalize
+
+
+class PositionMap(HealpixMap, RandomizableMap):
+    '''Create HEALPix maps from positions in a catalogue.
+
+    Can produce both overdensity maps and number count maps, depending
+    on the ``overdensity`` property.
+
+    '''
+
+    def __init__(self, nside: int, lon: str, lat: str, *,
+                 overdensity: bool = True, randomize: bool = False
+                 ) -> None:
+        '''Create a position map with the given properties.'''
+        super().__init__(columns=(lon, lat), nside=nside, randomize=randomize)
+        self._overdensity: bool = overdensity
+
+    @property
+    def overdensity(self) -> bool:
+        '''Flag to create overdensity maps.'''
+        return self._overdensity
+
+    @overdensity.setter
+    def overdensity(self, overdensity: bool) -> None:
+        self._overdensity = overdensity
+
+    def __call__(self, catalog: 'Catalog') -> MapGenerator:
+        '''Map the given catalogue.'''
+
+        # get catalogue column definition
+        col = self.columns
+
+        # number of pixels for nside
+        npix = hp.nside2npix(self.nside)
+
+        # position map
+        pos = np.zeros(npix, dtype=np.float64)
+
+        # keep track of the total number of galaxies
+        ngal = 0
+
+        # catalogue pages to map
+        while True:
+            try:
+                page = yield
+            except GeneratorExit:
+                break
+
+            if not self._randomize:
+                lon, lat = page.get(*col)
+                ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+                _map_pos(pos, ipix)
+                del lon, lat
+
+            ngal += page.size
+
+        # get visibility map if present in catalogue
+        vmap = catalog.visibility
+
+        # match resolution of visibility map if present
+        if vmap is not None and hp.get_nside(vmap) != self.nside:
+            warnings.warn('position and visibility maps have different NSIDE')
+            vmap = hp.ud_grade(vmap, self.nside)
+
+        # randomise position map if asked to
+        if self._randomize:
+            if vmap is None:
+                p = np.full(npix, 1/npix)
+            else:
+                p = vmap/np.sum(vmap)
+            pos[:] = np.random.multinomial(ngal, p)
+
+        # compute average number density
+        nbar = ngal/npix
+        if vmap is not None:
+            nbar /= np.mean(vmap)
+
+        # compute overdensity if asked to
+        if self._overdensity:
+            pos /= nbar
+            if vmap is None:
+                pos -= 1
+            else:
+                pos -= vmap
+            power = 0
+        else:
+            power = 1
+
+        # set metadata of array
+        update_metadata(pos, spin=0, nbar=nbar, kernel='healpix', power=power)
+
+        # return the position map
+        return pos
+
+
+class RealMap(HealpixMap, NormalizableMap):
+    '''Create HEALPix maps from real values in a catalogue.'''
+
+    def __init__(self, nside: int, lon: str, lat: str, value: str,
+                 weight: Optional[str] = None, *, normalize: bool = True
+                 ) -> None:
+        '''Create a new real map.'''
+
+        super().__init__(columns=(lon, lat, value, weight), nside=nside,
+                         normalize=normalize)
+
+    def __call__(self, catalog: 'Catalog') -> MapGenerator:
+        '''Map real values from catalogue to HEALPix map.'''
+
+        # get the column definition of the catalogue
+        *col, wcol = self.columns
+
+        # number of pixels for nside
+        npix = hp.nside2npix(self.nside)
+
+        # create the weight and value map
+        wht = np.zeros(npix)
+        val = np.zeros(npix)
+
+        # go through pages in catalogue and map values
+        while True:
+            try:
+                page = yield
+            except GeneratorExit:
+                break
+
+            if wcol is not None:
+                page.delete(page[wcol] == 0)
+
+            lon, lat, v = page.get(*col)
+
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
+            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+
+            _map_real(wht, val, ipix, w, v)
+
+            del lon, lat, v, w
+
+        # compute average weight in nonzero pixels
+        wbar = wht.mean()
+
+        # normalise the weight in each pixel if asked to
+        if self.normalize:
+            wht /= wbar
+            power = 0
+        else:
+            power = 1
+
+        # value was averaged in each pixel for numerical stability
+        # now compute the sum
+        val *= wht
+
+        # set metadata of array
+        update_metadata(val, spin=0, wbar=wbar, kernel='healpix', power=power)
+
+        # return the value map
+        return val
+
+
+class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
+    '''Create HEALPix maps from complex values in a catalogue.
+
+    Complex maps can have non-zero spin weight, set using the ``spin=``
+    parameter.
+
+    Can optionally flip the sign of the second shear component,
+    depending on the ``conjugate`` property.
+
+    '''
+
+    def __init__(self, nside: int, lon: str, lat: str, real: str, imag: str,
+                 weight: Optional[str] = None, *, spin: int = 0,
+                 conjugate: bool = False, normalize: bool = True,
+                 randomize: bool = False
+                 ) -> None:
+        '''Create a new shear map.'''
+
+        self._spin: int = spin
+        self._conjugate: bool = conjugate
+        super().__init__(columns=(lon, lat, real, imag, weight), nside=nside,
+                         normalize=normalize, randomize=randomize)
+
+    @property
+    def spin(self) -> int:
+        '''Spin weight of map.'''
+        return self._spin
+
+    @spin.setter
+    def spin(self, spin: int) -> None:
+        '''Set the spin weight.'''
+        self._spin = spin
+
+    @property
+    def conjugate(self) -> bool:
+        '''Flag to conjugate shear maps.'''
+        return self._conjugate
+
+    @conjugate.setter
+    def conjugate(self, conjugate: bool) -> None:
+        '''Set the conjugate flag.'''
+        self._conjugate = conjugate
+
+    def __call__(self, catalog: 'Catalog') -> MapGenerator:
+        '''Map shears from catalogue to HEALPix map.'''
+
+        # get the column definition of the catalogue
+        *col, wcol = self.columns
+
+        # number of pixels for nside
+        npix = hp.nside2npix(self.nside)
+
+        # create the weight and shear map
+        wht = np.zeros(npix)
+        val = np.zeros((2, npix))
+
+        # go through pages in catalogue and get the shear values,
+        # randomise if asked to, and do the mapping
+        while True:
+            try:
+                page = yield
+            except GeneratorExit:
+                break
+
+            if wcol is not None:
+                page.delete(page[wcol] == 0)
+
+            lon, lat, re, im = page.get(*col)
+
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
+            if self._conjugate:
+                im = -im
+
+            if self.randomize:
+                a = np.random.uniform(0., 2*np.pi, size=page.size)
+                r = np.hypot(re, im)
+                re, im = r*np.cos(a), r*np.sin(a)
+                del a, r
+
+            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+
+            _map_complex(wht, val, ipix, w, re, im)
+
+            del lon, lat, re, im, w
+
+        # compute average weight in nonzero pixels
+        wbar = wht.mean()
+
+        # normalise the weight in each pixel if asked to
+        if self.normalize:
+            wht /= wbar
+            power = 0
+        else:
+            power = 1
+
+        # value was averaged in each pixel for numerical stability
+        # now compute the sum
+        val *= wht
+
+        # set metadata of array
+        update_metadata(val, spin=self.spin, wbar=wbar, kernel='healpix',
+                        power=power)
+
+        # return the shear map
+        return val
+
+
+class VisibilityMap(HealpixMap):
+    '''Copy visibility map from catalogue at given resolution.'''
+
+    def __init__(self, nside: int) -> None:
+        '''Create visibility map at given NSIDE parameter.'''
+        super().__init__(columns=(), nside=nside)
+
+    def __call__(self, catalog: 'Catalog') -> MapData:
+        '''Create a visibility map from the given catalogue.'''
+
+        # make sure that catalogue has a visibility map
+        vmap = catalog.visibility
         if vmap is None:
-            p = np.full(npix, 1/npix)
-        else:
-            p = vmap/np.sum(vmap)
-        pos[:] = np.random.multinomial(ngal, p)
+            raise ValueError('no visibility map in catalog')
 
-    # compute average number density
-    nbar = ngal/npix
-    if vmap is not None:
-        nbar /= np.mean(vmap)
-
-    # compute overdensity if asked to
-    if overdensity:
-        logger.info('computing overdensity maps')
-        pos /= nbar
-        if vmap is None:
-            pos -= 1
+        # warn if visibility is changing resolution
+        vmap_nside = hp.get_nside(vmap)
+        if vmap_nside != self.nside:
+            warnings.warn(f'changing NSIDE of visibility map '
+                          f'from {vmap_nside} to {self.nside}')
+            vmap = hp.ud_grade(vmap, self.nside)
         else:
-            pos -= vmap
-        power = 0
+            # make a copy for updates to metadata
+            vmap = np.copy(vmap)
+
+        update_metadata(vmap, spin=0, kernel='healpix', power=0)
+
+        return vmap
+
+
+class WeightMap(HealpixMap, NormalizableMap):
+    '''Create a HEALPix weight map from a catalogue.'''
+
+    def __init__(self, nside: int, lon: str, lat: str, weight: str, *,
+                 normalize=True) -> None:
+        '''Create a new weight map.'''
+        super().__init__(columns=(lon, lat, weight), nside=nside,
+                         normalize=normalize)
+
+    def __call__(self, catalog: 'Catalog') -> MapGenerator:
+        '''Map catalogue weights.'''
+
+        # get the columns for this map
+        *col, wcol = self.columns
+
+        # number of pixels for nside
+        npix = hp.nside2npix(self.nside)
+
+        # create the weight map
+        wht = np.zeros(npix)
+
+        # map catalogue
+        while True:
+            try:
+                page = yield
+            except GeneratorExit:
+                break
+
+            lon, lat = page.get(*col)
+
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
+            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+
+            _map_weight(wht, ipix, w)
+
+            del lon, lat, w
+
+        # compute average weight in nonzero pixels
+        wbar = wht.mean()
+
+        # normalise the weight in each pixel if asked to
+        if self.normalize:
+            wht /= wbar
+            power = 0
+        else:
+            power = 1
+
+        # set metadata of arrays
+        update_metadata(wht, spin=0, wbar=wbar, kernel='healpix', power=power)
+
+        # return the weight map
+        return wht
+
+
+Spin2Map = partial(ComplexMap, spin=2)
+ShearMap = Spin2Map
+EllipticityMap = Spin2Map
+
+
+def _items(obj):
+    '''Create an iterator over items for mapping, sequence, or object.'''
+
+    # always convert key to tuple for concatenation
+    if isinstance(obj, Mapping):
+        return (((i,), v) for i, v in obj.items())
+    elif isinstance(obj, Sequence):
+        return (((i,), v) for i, v in enumerate(obj))
     else:
-        power = 1
-
-    logger.info('mapped %s positions in %s', f'{ngal:_}', timedelta(seconds=(time.monotonic() - t)))
-
-    # set metadata of array
-    update_metadata(pos, spin=0, nbar=nbar, kernel='healpix', power=power)
-
-    # return the position map
-    return pos
+        # single catalogue: items are empty tuple + catalogue
+        return (((), v) for v in [obj])
 
 
-def map_shears(nside, catalog, *, random=False, normalize=True):
-    '''map shears from catalog to HEALPix maps'''
+def map_catalogs(maps: Dict[Any, Map],
+                 catalogs: Dict[Any, 'Catalog']
+                 ) -> Union[MapData, Dict[Tuple[Any, ...], MapData]]:
+    '''Make maps for a set of catalogues.
 
-    logger.info('mapping shears')
+    The output is a single map, if both ``maps`` and ``catalogs`` are single
+    objects, or a dict where the keys are the broadcast of ``maps`` and
+    ``catalogs``.
+
+    '''
+
     t = time.monotonic()
 
-    if random:
-        logger.info('randomising shears')
+    # the toc dict of maps
+    m = {}
 
-    # number of pixels for nside
-    npix = hp.nside2npix(nside)
+    # for computation, go through catalogues first and maps second
+    for i, catalog in _items(catalogs):
 
-    # keep track of the total number of galaxies
-    ngal = 0
+        logger.info('mapping catalog %s', '' if i == () else i[0])
+        ti = time.monotonic()
 
-    # create the weight and shear map
-    wht = np.zeros(npix, dtype=np.float64)
-    she = np.zeros((2, npix), dtype=np.float64)
+        # apply the maps to the catalogue
+        results = {k: v(catalog) for k, v in _items(maps)}
 
-    # go through rows in catalogue and get the shear columns
-    # randomise if asked to
-    # do the mapping
-    for rows in catalog:
-        if rows.g1 is None:
-            raise TypeError('map_shears: catalogue does not contain shears')
+        # collect generators from results
+        gen = {k: v for k, v in results.items() if isinstance(v, Generator)}
 
-        g1 = np.asanyarray(rows.g1, dtype=np.float64)
-        g2 = np.asanyarray(rows.g2, dtype=np.float64)
+        # if there are any generators, feed them the catalogue pages
+        if gen:
 
-        if rows.w is None:
-            w = np.ones(rows.size, dtype=np.float64)
-        else:
-            w = np.asanyarray(rows.w, dtype=np.float64)
+            # prime the generators for mapping
+            for g in gen.values():
+                g.send(None)
 
-        if random:
-            a = np.random.uniform(0., 2*np.pi, size=rows.size)
-            r = np.hypot(g1, g2)
-            g1, g2 = r*np.cos(a), r*np.sin(a)
-            del a, r
+            # go through catalogue pages once
+            # give each page to each generator
+            # make copies to that generators can delete() etc.
+            for page in catalog:
+                for g in gen.values():
+                    g.send(page.copy())
 
-        ipix = hp.ang2pix(nside, rows.ra, rows.dec, lonlat=True)
-        _map_she(wht, she, ipix, w, g1, g2)
-        ngal += rows.size
+            # close generators and store results
+            for k, g in gen.items():
+                try:
+                    g.throw(GeneratorExit)
+                except StopIteration as e:
+                    results[k] = e.value
+                else:
+                    results[k] = None
 
-    # compute average weight in nonzero pixels
-    wbar = wht.mean()
+        # store results
+        for k, v in results.items():
+            j = k + i
+            if len(j) == 1:
+                m[j[0]] = v
+            else:
+                m[j] = v
 
-    # normalise the weight in each pixel if asked to
-    if normalize:
-        wht /= wbar
-        power = 0
-    else:
-        power = 1
+        # results are no longer needed
+        del results
 
-    # shear was averaged in each pixel for numerical stability
-    # now compute the sum
-    she *= wht
+        logger.info('mapped catalog %s in %s', '' if i == () else i[0],
+                    timedelta(seconds=(time.monotonic() - ti)))
 
-    # set metadata of array
-    update_metadata(she, spin=2, wbar=wbar, kernel='healpix', power=power)
+    logger.info('created %d map(s) in %s', len(m),
+                timedelta(seconds=(time.monotonic() - t)))
 
-    logger.info('mapped %s shears in %s', f'{ngal:_}', timedelta(seconds=(time.monotonic() - t)))
+    # return single item if inputs were single item
+    if len(m) == 1:
+        try:
+            return m[()]
+        except KeyError:
+            pass
 
-    # return the shear map
-    return she
-
-
-def map_weights(nside, catalog, normalize=True):
-    '''map weights from catalog to HEALPix map'''
-
-    logger.info('mapping weights')
-    t = time.monotonic()
-
-    # number of pixels for nside
-    npix = hp.nside2npix(nside)
-
-    # create the weight map
-    wht = np.zeros(npix, dtype=np.float64)
-    for rows in catalog:
-        if rows.w is None:
-            w = np.ones(rows.size, dtype=np.float64)
-        else:
-            w = np.asanyarray(rows.w, dtype=np.float64)
-        ipix = hp.ang2pix(nside, rows.ra, rows.dec, lonlat=True)
-        _map_wht(wht, ipix, w)
-
-    # compute average weight in nonzero pixels
-    wbar = wht.mean()
-
-    # normalise the weight in each pixel if asked to
-    if normalize:
-        wht /= wbar
-        power = 0
-    else:
-        power = 1
-
-    # set metadata of arrays
-    update_metadata(wht, spin=0, wbar=wbar, kernel='healpix', power=power)
-
-    logger.info('weights mapped in %s', timedelta(seconds=(time.monotonic() - t)))
-
-    # return the weight map
-    return wht
+    # return maps as a toc dict
+    return m
 
 
-def transform_maps(maps, **kwargs):
+def transform_maps(maps: Dict[Tuple[Any, Any], MapData],
+                   names: Dict[Any, Any] = {},
+                   **kwargs
+                   ) -> Dict[Tuple[Any, Any], np.ndarray]:
     '''transform a set of maps to alms'''
 
     logger.info('transforming %d map(s) to alms', len(maps))
@@ -219,14 +645,14 @@ def transform_maps(maps, **kwargs):
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     alms = {}
-    for (n, i), m in maps.items():
+    for (k, i), m in maps.items():
 
         nside = hp.get_nside(m)
 
         md = m.dtype.metadata or {}
         spin = md.get('spin', 0)
 
-        logger.info('transforming %s map (spin %s) for bin %s', n, spin, i)
+        logger.info('transforming %s map (spin %s) for bin %s', k, spin, i)
 
         if spin == 0:
             pol = False
@@ -239,90 +665,20 @@ def transform_maps(maps, **kwargs):
         a = hp.map2alm(m, pol=pol, **kwargs)
 
         if spin == 0:
-            alms[n, i] = a
-            if md:
-                update_metadata(alms[n, i], nside=nside, **md)
+            j = names.get(k, k)
+            out = {(j, i): a}
         elif spin == 2:
-            alms['E', i], alms['B', i] = a[1], a[2]
+            j1, j2 = names.get(k, ('E', 'B'))
+            out = {(j1, i): a[1], (j2, i): a[2]}
+
+        for j, aj in out.items():
+            if j in alms:
+                raise KeyError(f'duplicate alm {j}, set `names=` manually')
             if md:
-                update_metadata(alms['E', i], nside=nside, **md)
-                update_metadata(alms['B', i], nside=nside, **md)
+                update_metadata(aj, nside=nside, **md)
+            alms[j] = aj
 
     logger.info('transformed %d map(s) in %s', len(alms), timedelta(seconds=(time.monotonic() - t)))
 
     # return the toc dict of alms
     return alms
-
-
-def update_metadata(array, **metadata):
-    '''update metadata of an array dtype'''
-    md = {}
-    if array.dtype.metadata is not None:
-        md.update(array.dtype.metadata)
-    md.update(metadata)
-    array.dtype = np.dtype(array.dtype, metadata=md)
-
-
-def map_catalogs(which, nside, catalogs, vmaps=None, *, overdensity=True, random=False):
-    '''map a set of catalogues
-
-    The `which` argument is a string that selects maps to be produced: `P` for
-    positions, `G` for shears, `V` for visibilities, and `W` for weights.
-
-    '''
-
-    logger.info('mapping %d catalog(s)', len(catalogs))
-    logger.info('creating %s map(s)', ', '.join(map(str.upper, which)))
-    logger.info('using NSIDE = %s', nside)
-    logger.info('given %s visibility map(s)', 'no' if vmaps is None else len(vmaps))
-    t = time.monotonic()
-
-    # the toc dict of maps
-    maps = {}
-
-    # for output, set up the toc dict in map-first order
-    for k in map(str.upper, which):
-        for i in catalogs:
-            maps[k, i] = None
-
-    # for computation, go through catalogues first
-    for i, c in catalogs.items():
-
-        logger.info('mapping catalog for bin %s', i)
-
-        # try and find the visibility map for this bin
-        if vmaps is not None:
-            if i in vmaps:
-                v = vmaps[i]
-            elif None in vmaps:
-                v = vmaps[None]
-            else:
-                v = None
-        else:
-            v = None
-
-        if v is not None:
-            logger.info('found visibility map for bin %s', i)
-        else:
-            logger.info('no visibility map for bin %s', i)
-
-        # compute the individual maps
-        for k in map(str.upper, which):
-            if k == 'P':
-                m = map_positions(nside, c, v, overdensity=overdensity, random=random)
-            elif k == 'G':
-                m = map_shears(nside, c, random=random)
-            elif k == 'V':
-                if v is None:
-                    raise KeyError(f'missing visibility map for catalog {i}')
-                m = visibility_map(nside, v)
-            elif k == 'W':
-                m = map_weights(nside, c)
-            else:
-                raise ValueError(f'unknown map code: {k}')
-            maps[k, i] = m
-
-    logger.info('created %d map(s) in %s', len(maps), timedelta(seconds=(time.monotonic() - t)))
-
-    # return maps as a toc dict
-    return maps

@@ -34,30 +34,6 @@ def mock_alms(zbins):
     return alms
 
 
-@pytest.fixture
-def catalog(nside):
-
-    size = 100_000
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.degrees(np.arcsin(np.random.uniform(-1, 1, size=size)))
-    g1 = 0.1*np.random.randn(size)
-    g2 = 0.1*np.random.randn(size)
-    w = np.random.uniform(0, 1, size=size)
-
-    class MockCatalog:
-        def __iter__(self):
-            rows = unittest.mock.Mock()
-            rows.size = size
-            rows.ra = ra
-            rows.dec = dec
-            rows.g1 = g1
-            rows.g2 = g2
-            rows.w = w
-            yield rows
-
-    return MockCatalog()
-
-
 def test_angular_power_spectra(mock_alms):
     from itertools import combinations_with_replacement
     from le3_pk_wl.twopoint import angular_power_spectra
@@ -210,32 +186,32 @@ def test_binned_cl(cmblike):
 
 
 @pytest.mark.parametrize('full', [False, True])
-def test_random_noisebias(catalog, full):
+def test_random_noisebias(full):
 
     from le3_pk_wl.twopoint import random_noisebias
 
-    catalogs = {0: catalog}
-
     nside = 64
+    npix = 12*nside**2
 
-    nbs = random_noisebias('pg', nside, catalogs, repeat=5, full=full)
+    catalog = unittest.mock.Mock()
+    catalog.visibility = None
 
-    assert len(nbs) == 6 if full else 3
+    map_a = unittest.mock.Mock(side_effect=lambda _: np.random.rand(npix))
+    map_b = unittest.mock.Mock(side_effect=lambda _: np.random.rand(npix))
 
-    rows = next(iter(catalog))
+    initial_randomize = [map_a.randomize, map_b.randomize]
 
-    gvar = np.mean(rows.g1**2 + rows.g2**2)
-    wbar = np.sum(rows.w**2)/np.sum(rows.w)**2
+    maps = {'A': map_a, 'B': map_b}
+    catalogs = {0: catalog, 1: catalog}
 
-    nb_pp = 4*np.pi/rows.size
-    nb_ee = 2*np.pi*gvar*wbar
-    nb_bb = nb_ee
+    nbs = random_noisebias(maps, catalogs, repeat=5, full=full)
 
-    np.testing.assert_allclose(nbs['PP', 0, 0], nb_pp, atol=0., rtol=0.05)
-    np.testing.assert_allclose(nbs['EE', 0, 0], nb_ee, atol=0., rtol=0.05)
-    np.testing.assert_allclose(nbs['BB', 0, 0], nb_bb, atol=0., rtol=0.05)
+    for m, r in zip(maps.values(), initial_randomize):
+        assert m.randomize is r
 
+    keys = [('AA', 0, 0), ('AA', 0, 1), ('AA', 1, 1),
+            ('BB', 0, 0), ('BB', 0, 1), ('BB', 1, 1)]
     if full:
-        np.testing.assert_allclose(nbs['EB', 0, 0], 0., atol=1e-7, rtol=0.)
-        np.testing.assert_allclose(nbs['PE', 0, 0], 0., atol=1e-6, rtol=0.)
-        np.testing.assert_allclose(nbs['PB', 0, 0], 0., atol=1e-6, rtol=0.)
+        keys += [('AB', 0, 0), ('AB', 1, 1), ('AB', 0, 1), ('AB', 1, 0)]
+
+    assert set(nbs.keys()) == set(keys)

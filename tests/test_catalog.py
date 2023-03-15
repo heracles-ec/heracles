@@ -1,211 +1,185 @@
 import pytest
 import numpy as np
+import numpy.testing as npt
 
 
-def test_delete_catalog_rows():
+@pytest.fixture
+def catalog():
+    from le3_pk_wl.catalog import Catalog, CatalogPage
 
-    from le3_pk_wl.catalog import CatalogRows, delete_catalog_rows
+    # fix a set of rows to be returned for testing
+    size = 100
+    x = np.random.rand(size)
+    y = np.random.rand(size)
+    z = np.random.rand(size)
 
-    ra = [1., 2., 3., 4.]
+    class TestCatalog(Catalog):
+        SIZE = size
+        DATA = dict(x=x, y=y, z=z)
 
-    cat = CatalogRows(size=4, ra=ra, dec=None, g1=None, g2=None, w=None)
+        # implement abstract method
+        def _pages(self):
+            size = self.SIZE
+            page_size = self.page_size
+            for i in range(0, size, page_size):
+                page = {k: v[i:i+page_size] for k, v in self.DATA.items()}
+                yield CatalogPage(page)
 
-    cat = delete_catalog_rows(cat, [1, 2])
-
-    assert cat.size == 2
-    np.testing.assert_array_equal(cat.ra, [1., 4.])
-    assert cat.dec is None
-    assert cat.g1 is None
-    assert cat.g2 is None
-    assert cat.w is None
+    return TestCatalog()
 
 
-def test_catalog_abc():
+def test_catalog_page():
 
-    from le3_pk_wl.catalog import Catalog, CatalogRows
+    from le3_pk_wl.catalog import CatalogPage
 
-    # footprint for northern hemisphere
-    m = np.empty(192)
-    m[:m.size//2] = 1
-    m[m.size//2:] = 0
+    a = [1., 2., 3., 4.]
+    b = [5., 6., 7., 8.]
+
+    page = CatalogPage({'a': a, 'b': b})
+
+    # test basic behaviour
+    assert len(page) == 2
+    npt.assert_array_equal(page['a'], a)
+    npt.assert_array_equal(page['b'], b)
+    npt.assert_array_equal(page['a', 'b'], [a, b])
+    npt.assert_array_equal(page[['a', 'b']], [a, b])
+
+    # test names attribute
+    assert page.names == ['a', 'b']
+
+    # test size attribue
+    assert page.size == 4
+
+    # test data attribute, which is a readonly view
+    data = page.data
+    assert list(data.keys()) == ['a', 'b']
+    npt.assert_array_equal(list(data.values()), [a, b])
+    with pytest.raises(TypeError):
+        data['a'] = b
+
+    # test iterator
+    assert [_ for _ in page] == ['a', 'b']
+
+    # test copy method
+    copy = page.copy()
+    assert copy is not page
+    assert copy.size == page.size
+    assert copy.data == page.data
+
+    # test copy magic
+    copy = page.__copy__()
+    assert copy is not page
+    assert copy.size == page.size
+    assert copy.data == page.data
+
+    # test delete method
+    page.delete([1, 2])
+    assert len(page) == 2
+    np.testing.assert_array_equal(page['a'], [1., 4.])
+    np.testing.assert_array_equal(page['b'], [5., 8.])
+    assert page.size == 2
+
+    # test exception if column does not exist
+    with pytest.raises(KeyError):
+        page['c']
+    with pytest.raises(KeyError):
+        page['a', 'b', 'c']
+
+    # test exception if rows have unequal size
+    with pytest.raises(ValueError):
+        CatalogPage({'a': [1, 2, 3], 'b': [1, 2]})
+
+
+def test_catalog_page_get():
+
+    from le3_pk_wl.catalog import CatalogPage
+
+    a = [np.nan, 2., 3., 4.]
+    b = [5., 6., 7., 8.]
+
+    page = CatalogPage({'a': a, 'b': b})
+    with pytest.raises(ValueError, match='column "a"'):
+        page.get('a')
+    npt.assert_array_equal(page.get('b'), b)
+    with pytest.raises(ValueError, match='column "a"'):
+        page.get('a', 'b')
+
+    a[0] = 1.
+    b[1] = np.nan
+
+    page = CatalogPage({'a': a, 'b': b})
+    npt.assert_array_equal(page.get('a'), a)
+    with pytest.raises(ValueError, match='column "b"'):
+        page.get('b')
+    with pytest.raises(ValueError, match='column "b"'):
+        page.get('a', 'b')
+
+    b[1] = 6.
+
+    page = CatalogPage({'a': a, 'b': b})
+    npt.assert_array_equal(page.get('a'), a)
+    npt.assert_array_equal(page.get('b'), b)
+    npt.assert_array_equal(page.get('a', 'b'), [a, b])
+
+
+def test_catalog_abc(catalog):
+
+    from le3_pk_wl.catalog import Catalog
 
     # ABC cannot be instantiated directly
     with pytest.raises(TypeError):
         Catalog()
 
-    # fix a set of rows to be returned for testing
-    size = 100
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.random.choice([+1, -1], size=size)*np.random.uniform(30, 90, size=size)
-    g = np.random.uniform(0, 1, size=size)*np.exp(1j*np.random.uniform(0, 2*np.pi, size=size))
-    w = np.random.uniform(0, 1, size=size)
-
-    # concrete subclass
-    # only override abstract method to test ABC interface
-    class TestCatalog(Catalog):
-        def _rows(self):
-            batch_size = self.batch_size
-            for i in range(0, size, batch_size):
-                yield CatalogRows(size=len(ra[i:i+batch_size]),
-                                  ra=ra[i:i+batch_size],
-                                  dec=dec[i:i+batch_size],
-                                  g1=g.real[i:i+batch_size],
-                                  g2=g.imag[i:i+batch_size],
-                                  w=w[i:i+batch_size])
-
-    # instantiate concrete subclass for testing
-    c = TestCatalog(footprint=m)
-
-    # ---
-
-    assert c.footprint is m
-    c.footprint = None
-    assert c.footprint is None
-
-    assert c.batch_size == Catalog.default_batch_size
-    c.batch_size = 1
-    assert c.batch_size == 1
-    c.batch_size = Catalog.default_batch_size
-    assert c.batch_size == Catalog.default_batch_size
-
-    assert c.conjugate_shear is False
-    c.conjugate_shear = True
-    assert c.conjugate_shear is True
-    c.conjugate_shear = False
-    assert c.conjugate_shear is False
-
-    assert c.allow_invalid_positions is False
-    c.allow_invalid_positions = True
-    assert c.allow_invalid_positions is True
-    c.allow_invalid_positions = False
-    assert c.allow_invalid_positions is False
-
-    assert c.allow_invalid_shears is False
-    c.allow_invalid_shears = True
-    assert c.allow_invalid_shears is True
-    c.allow_invalid_shears = False
-    assert c.allow_invalid_shears is False
-
-    # ---
-
-    c.batch_size = size
-
-    for i, rows in enumerate(c):
-        assert rows.size == size
-        np.testing.assert_array_equal(rows.ra, ra)
-        np.testing.assert_array_equal(rows.dec, dec)
-        np.testing.assert_array_equal(rows.g1, g.real)
-        np.testing.assert_array_equal(rows.g2, g.imag)
-        np.testing.assert_array_equal(rows.w, w)
-    assert i == 0
-
-    c.batch_size = size//2
-
-    for i, rows in enumerate(c):
-        assert rows.size == size//2
-        np.testing.assert_array_equal(rows.ra, ra[i*size//2:(i+1)*size//2])
-        np.testing.assert_array_equal(rows.dec, dec[i*size//2:(i+1)*size//2])
-        np.testing.assert_array_equal(rows.g1, g.real[i*size//2:(i+1)*size//2])
-        np.testing.assert_array_equal(rows.g2, g.imag[i*size//2:(i+1)*size//2])
-        np.testing.assert_array_equal(rows.w, w[i*size//2:(i+1)*size//2])
-    assert i == 1
-
-    c.batch_size = size
-
-    # ---
-
-    c.conjugate_shear = True
-
-    rows = next(iter(c))
-    assert rows.size == size
-    np.testing.assert_array_equal(rows.ra, ra)
-    np.testing.assert_array_equal(rows.dec, dec)
-    np.testing.assert_array_equal(rows.g1, g.real)
-    np.testing.assert_array_equal(rows.g2, -g.imag)
-    np.testing.assert_array_equal(rows.w, w)
-
-    c.conjugate_shear = False
-
-    # ---
-
-    ra[0] = np.nan
-    dec[1] = np.nan
-
-    with pytest.raises(ValueError):
-        next(iter(c))
-
-    c.allow_invalid_positions = True
-
-    rows = next(iter(c))
-    assert rows.size == size - 2
-    np.testing.assert_array_equal(rows.ra, ra[2:])
-    np.testing.assert_array_equal(rows.dec, dec[2:])
-    np.testing.assert_array_equal(rows.g1, g.real[2:])
-    np.testing.assert_array_equal(rows.g2, g.imag[2:])
-    np.testing.assert_array_equal(rows.w, w[2:])
-
-    ra[0] = 0.
-    dec[1] = 45.
-
-    c.allow_invalid_positions = False
-
-    # ---
-
-    g[-2] = complex(np.nan, 0.)
-    g[-1] = complex(0., np.nan)
-
-    with pytest.raises(ValueError):
-        next(iter(c))
-
-    c.allow_invalid_shears = True
-
-    rows = next(iter(c))
-    assert rows.size == size - 2
-    np.testing.assert_array_equal(rows.ra, ra[:-2])
-    np.testing.assert_array_equal(rows.dec, dec[:-2])
-    np.testing.assert_array_equal(rows.g1, g.real[:-2])
-    np.testing.assert_array_equal(rows.g2, g.imag[:-2])
-    np.testing.assert_array_equal(rows.w, w[:-2])
-
-    c.allow_invalid_shears = False
-
-    w[-2] = w[-1] = 0.
-
-    rows = next(iter(c))
-    assert rows.size == size - 2
-    np.testing.assert_array_equal(rows.ra, ra[:-2])
-    np.testing.assert_array_equal(rows.dec, dec[:-2])
-    np.testing.assert_array_equal(rows.g1, g.real[:-2])
-    np.testing.assert_array_equal(rows.g2, g.imag[:-2])
-    np.testing.assert_array_equal(rows.w, w[:-2])
-
-    g[-2] = g[-1] = 0.
-    w[-2] = w[-1] = 1.
-
-    # ---
-
-    c.footprint = m
-
-    northern = np.where(dec > 0)[0]
-
-    rows = next(iter(c))
-    assert rows.size == len(northern)
-    np.testing.assert_array_equal(rows.ra, ra[northern])
-    np.testing.assert_array_equal(rows.dec, dec[northern])
-    np.testing.assert_array_equal(rows.g1, g.real[northern])
-    np.testing.assert_array_equal(rows.g2, g.imag[northern])
-    np.testing.assert_array_equal(rows.w, w[northern])
-
-    c.footprint = None
+    # fixture has tested concrete implementation
+    assert isinstance(catalog, Catalog)
 
 
-def test_catalog_empty_rows():
+def test_catalog_properties(catalog):
 
-    from le3_pk_wl.catalog import Catalog, CatalogRows
+    from le3_pk_wl.catalog import Catalog
+
+    assert catalog.page_size == Catalog.default_page_size
+    catalog.page_size = 1
+    assert catalog.page_size == 1
+    catalog.page_size = Catalog.default_page_size
+    assert catalog.page_size == Catalog.default_page_size
+
+    filt = object()
+    assert catalog.filters == []
+    catalog.add_filter(filt)
+    assert catalog.filters == [filt]
+    catalog.filters = []
+    assert catalog.filters == []
+
+    v = object()
+    assert catalog.visibility is None
+    catalog.visibility = v
+    assert catalog.visibility is v
+    catalog.visibility = None
+    assert catalog.visibility is None
+
+
+def test_catalog_pagination(catalog):
+
+    size = catalog.SIZE
+
+    for page_size in [size, size//2]:
+        catalog.page_size = page_size
+        for i, page in enumerate(catalog):
+            assert page.size == page_size
+            for k, v in catalog.DATA.items():
+                vp = v[i*page_size:(i+1)*page_size]
+                npt.assert_array_equal(page[k], vp)
+        assert i*page_size + page.size == size
+
+
+def test_catalog_empty_page():
+
+    from le3_pk_wl.catalog import Catalog, CatalogPage
 
     class TestCatalogEmpty(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=0, ra=None, dec=None, g1=None, g2=None, w=None)
+        def _pages(self):
+            yield CatalogPage({'lon': [], 'lat': []})
 
     c = TestCatalogEmpty()
 
@@ -213,180 +187,79 @@ def test_catalog_empty_rows():
         next(iter(c))
 
 
-def test_catalog_missing_positions():
+def test_invalid_value_filter(catalog):
 
-    from le3_pk_wl.catalog import Catalog, CatalogRows
+    from le3_pk_wl.catalog import InvalidValueFilter
 
-    size = 10
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.random.uniform(-90, 90, size=size)
-    g1 = np.random.uniform(-1, 1, size=size)
-    g2 = np.random.uniform(-1, 1, size=size)
-    w = np.random.uniform(0, 1, size=size)
+    catalog.DATA['x'][0] = np.nan
+    catalog.DATA['y'][1] = np.nan
 
-    class TestCatalogMissingRaDec(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=None, dec=None, g1=g1, g2=g2, w=w)
+    page = next(iter(catalog))
+    with pytest.raises(ValueError):
+        page.get('x')
+    with pytest.raises(ValueError):
+        page.get('y')
 
-    c = TestCatalogMissingRaDec()
+    catalog.add_filter(InvalidValueFilter('x', 'y'))
 
-    with pytest.raises(TypeError):
-        next(iter(c))
-
-    class TestCatalogMissingRa(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=None, dec=dec, g1=g1, g2=g2, w=w)
-
-    c = TestCatalogMissingRa()
-
-    with pytest.raises(TypeError):
-        next(iter(c))
-
-    class TestCatalogMissingDec(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=ra, dec=None, g1=g1, g2=g2, w=w)
-
-    c = TestCatalogMissingDec()
-
-    with pytest.raises(TypeError):
-        next(iter(c))
+    with pytest.warns(UserWarning):
+        page = next(iter(catalog))
+    assert page.size == catalog.SIZE - 2
+    for k, v in catalog.DATA.items():
+        npt.assert_array_equal(page.get(k), v[2:])
 
 
-def test_catalog_missing_shears():
+def test_footprint_filter(catalog):
 
-    from le3_pk_wl.catalog import Catalog, CatalogRows
+    from le3_pk_wl.catalog import FootprintFilter
+    from healpy import ang2pix
 
-    size = 10
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.random.uniform(-90, 90, size=size)
-    g1 = np.random.uniform(-1, 1, size=size)
-    g2 = np.random.uniform(-1, 1, size=size)
-    w = np.random.uniform(0, 1, size=size)
+    # footprint for northern hemisphere
+    nside = 8
+    m = np.round(np.random.rand(12*nside**2))
 
-    class TestCatalogMissingShears(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=ra, dec=dec, g1=None, g2=None, w=None)
+    # replace x and y in catalog with lon and lat
+    catalog.DATA['x'] = lon = np.random.uniform(-180, 180, size=catalog.SIZE)
+    catalog.DATA['y'] = lat = np.degrees(np.arcsin(np.random.uniform(-1, 1, size=catalog.SIZE)))
 
-    c = TestCatalogMissingShears()
+    catalog.add_filter(FootprintFilter(m, 'x', 'y'))
 
-    rows = next(iter(c))
-    assert rows.size == size
-    assert rows.ra is ra
-    assert rows.dec is dec
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
+    good = (m[ang2pix(nside, lon, lat, lonlat=True)] != 0)
+    assert good.sum() != good.size
 
-    class TestCatalogMissingWeights(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=ra, dec=dec, g1=g1, g2=g2, w=None)
-
-    c = TestCatalogMissingWeights()
-
-    rows = next(iter(c))
-    assert rows.size == size
-    assert rows.ra is ra
-    assert rows.dec is dec
-    assert rows.g1 is g1
-    assert rows.g2 is g2
-    assert rows.w is None
-
-    class TestCatalogMissingG1(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=ra, dec=dec, g1=None, g2=g2, w=w)
-
-    c = TestCatalogMissingG1()
-
-    with pytest.raises(TypeError):
-        next(iter(c))
-
-    class TestCatalogMissingG2(Catalog):
-        def _rows(self):
-            yield CatalogRows(size=size, ra=ra, dec=dec, g1=g1, g2=None, w=w)
-
-    c = TestCatalogMissingG2()
-
-    with pytest.raises(TypeError):
-        next(iter(c))
+    page = next(iter(catalog))
+    assert page.size == good.sum()
+    for k, v in catalog.DATA.items():
+        np.testing.assert_array_equal(page[k], v[good])
 
 
-def test_column_reader():
-
-    from le3_pk_wl.catalog import column_reader
-
-    rows = np.empty(100, [('a', float), ('b', float), ('c', float)])
-    rows['a'] = 1
-    rows['b'] = 2
-    rows['c'] = 3
-
-    read = column_reader(rows)
-    assert read.size == len(rows)
-    assert read.ra is None
-    assert read.dec is None
-    assert read.g1 is None
-    assert read.g2 is None
-    assert read.w is None
-
-    read = column_reader(rows, ra='a', g1='b', w='c')
-    assert read.size == len(rows)
-    np.testing.assert_array_equal(read.ra, rows['a'])
-    assert read.dec is None
-    np.testing.assert_array_equal(read.g1, rows['b'])
-    assert read.g2 is None
-    np.testing.assert_array_equal(read.w, rows['c'])
-
-
-def test_array_catalog_unstructured():
+def test_array_catalog():
 
     from le3_pk_wl.catalog import ArrayCatalog
 
-    arr = np.random.rand(100, 4)
+    arr = np.empty(100, [('lon', float), ('lat', float),
+                         ('x', float), ('y', float)])
+    for name in arr.dtype.names:
+        arr[name] = np.random.rand(len(arr))
 
+    # y not in catalogue, should not show up in pages
     cat = ArrayCatalog(arr)
 
-    for i, rows in enumerate(cat):
-        assert rows.size == 100
-        np.testing.assert_array_equal(rows.ra, arr[:, 0])
-        np.testing.assert_array_equal(rows.dec, arr[:, 1])
-        np.testing.assert_array_equal(rows.g1, arr[:, 2])
-        np.testing.assert_array_equal(rows.g2, arr[:, 3])
-        assert rows.w is None
+    cat.page_size = len(arr)
+
+    for i, page in enumerate(cat):
+        assert page.size == 100
+        assert len(page) == 4
+        assert page.names == list(arr.dtype.names)
+        for k in arr.dtype.names:
+            npt.assert_array_equal(page[k], arr[k])
     assert i == 0
-
-
-def test_array_catalog_structured():
-
-    from le3_pk_wl.catalog import ArrayCatalog, CatalogRows, CatalogColumns
-
-    def columns_function(rows):
-        return CatalogRows(size=len(rows), ra=rows['a'], dec=rows['b'], g1=None, g2=None, w=rows['c'])
-
-    columns_namedtuple = CatalogColumns(ra='a', dec='b', g1=None, g2=None, w='c')
-
-    columns_tuple = ('a', 'b', None, None, 'c')
-
-    for columns in columns_function, columns_namedtuple, columns_tuple:
-
-        arr = np.empty(100, [('a', float), ('b', float), ('c', float)])
-        for name in arr.dtype.names:
-            arr[name] = np.random.rand(len(arr))
-
-        cat = ArrayCatalog(arr, columns)
-
-        for i, rows in enumerate(cat):
-            assert rows.size == 100
-            np.testing.assert_array_equal(rows.ra, arr['a'])
-            np.testing.assert_array_equal(rows.dec, arr['b'])
-            assert rows.g1 is None
-            assert rows.g2 is None
-            np.testing.assert_array_equal(rows.w, arr['c'])
-        assert i == 0
 
 
 def test_fits_catalog(tmp_path):
 
     import fitsio
-    from le3_pk_wl.catalog import FitsCatalog, CatalogRows
+    from le3_pk_wl.catalog import FitsCatalog
 
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
@@ -396,65 +269,42 @@ def test_fits_catalog(tmp_path):
 
     with fitsio.FITS(filename, 'rw') as fits:
         fits.write(None)
-        fits.write_table([ra, dec], names=['COL1', 'COL2'], extname='MYEXT')
+        fits.write_table([ra, dec], names=['RA', 'DEC'], extname='MYEXT')
 
-    def columns(rows):
-        ra = rows['COL1']
-        dec = rows['COL2']
-        return CatalogRows(size=len(rows), ra=ra, dec=dec, g1=None, g2=None, w=None)
+    catalog = FitsCatalog(filename)
 
-    c = FitsCatalog(filename, columns)
+    page = next(iter(catalog))
+    assert page.size == size
+    assert len(page) == 2
+    np.testing.assert_array_equal(page['RA'], ra)
+    np.testing.assert_array_equal(page['DEC'], dec)
 
-    rows = next(iter(c))
-    assert rows.size == size
-    np.testing.assert_array_equal(rows.ra, ra)
-    np.testing.assert_array_equal(rows.dec, dec)
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
-
-    c = FitsCatalog(filename, columns, ext='MYEXT')
-
-    rows = next(iter(c))
-    assert rows.size == size
-    np.testing.assert_array_equal(rows.ra, ra)
-    np.testing.assert_array_equal(rows.dec, dec)
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
-
-    c = FitsCatalog(filename, columns, query='COL1 > 0')
+    catalog = FitsCatalog(filename, query='RA > 0')
 
     sel = np.where(ra > 0)[0]
 
-    rows = next(iter(c))
-    assert rows.size == len(sel)
-    np.testing.assert_array_equal(rows.ra, ra[sel])
-    np.testing.assert_array_equal(rows.dec, dec[sel])
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
+    page = next(iter(catalog))
+    assert page.size == len(sel)
+    assert len(page) == 2
+    np.testing.assert_array_equal(page['RA'], ra[sel])
+    np.testing.assert_array_equal(page['DEC'], dec[sel])
 
-    c = FitsCatalog(filename, columns).query('COL1 > 0')
+    catalog = FitsCatalog(filename).query('RA > 0')
 
     sel = np.where(ra > 0)[0]
 
-    rows = next(iter(c))
-    assert rows.size == len(sel)
-    np.testing.assert_array_equal(rows.ra, ra[sel])
-    np.testing.assert_array_equal(rows.dec, dec[sel])
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
+    page = next(iter(catalog))
+    assert page.size == len(sel)
+    assert len(page) == 2
+    np.testing.assert_array_equal(page['RA'], ra[sel])
+    np.testing.assert_array_equal(page['DEC'], dec[sel])
 
-    c = FitsCatalog(filename, columns).query('COL1 > 0').query('COL2 < 0')
+    catalog = FitsCatalog(filename).query('RA > 0').query('DEC < 0')
 
     sel = np.where((ra > 0) & (dec < 0))[0]
 
-    rows = next(iter(c))
-    assert rows.size == len(sel)
-    np.testing.assert_array_equal(rows.ra, ra[sel])
-    np.testing.assert_array_equal(rows.dec, dec[sel])
-    assert rows.g1 is None
-    assert rows.g2 is None
-    assert rows.w is None
+    page = next(iter(catalog))
+    assert page.size == len(sel)
+    assert len(page) == 2
+    np.testing.assert_array_equal(page['RA'], ra[sel])
+    np.testing.assert_array_equal(page['DEC'], dec[sel])

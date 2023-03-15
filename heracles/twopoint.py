@@ -16,10 +16,6 @@ from .util import toc_match
 logger = logging.getLogger(__name__)
 
 
-TWOPOINT_NAMES = list(map(''.join, combinations_with_replacement('PEBVW', 2)))
-'''standard names for two-point functions (PE not EP etc.)'''
-
-
 def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=None):
     '''compute angular power spectra from a set of alms'''
 
@@ -34,13 +30,16 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
     else:
         alm_pairs = product(alms.items(), alms2.items())
 
+    # keep track of the twopoint combinations we have seen here
+    twopoint_names = set()
+
     # compute cls for all alm pairs
     # do not compute duplicates
     cls = {}
     for ((n1, i1), alm1), ((n2, i2), alm2) in alm_pairs:
         # get the two-point code in standard order
         xy, yx = f'{n1}{n2}', f'{n2}{n1}'
-        if xy not in TWOPOINT_NAMES and yx in TWOPOINT_NAMES:
+        if xy not in twopoint_names and yx in twopoint_names:
             xy, yx = yx, xy
             i1, i2 = i2, i1
             n1, n2 = n2, n1
@@ -76,6 +75,9 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 
         # add cl to the set
         cls[xy, i1, i2] = cl
+
+        # keep track of names
+        twopoint_names.add(xy)
 
     logger.info('computed %d cl(s) in %s', len(cls), timedelta(seconds=(time.monotonic() - t)))
 
@@ -306,42 +308,53 @@ def binned_cl(cl, bins, cmblike=False):
     return binned_statistic(ell, cl, bins=bins, statistic='mean')[0]
 
 
-def random_noisebias(which, nside, catalogs, vmaps=None, *, lmax=None, repeat=1,
-                     overdensity=True, full=False):
-    '''simple noise bias estimate from randomised position and shear maps'''
+def random_noisebias(maps, catalogs, *, lmax=None, repeat=1, full=False):
+    '''noise bias estimate from randomised position and shear maps'''
 
-    if not all(k.upper() in ['P', 'G'] for k in which):
-        raise ValueError('can only estimate noise bias for position (P) and shear (G) maps')
+    if not maps:
+        raise ValueError('no maps given')
 
     if lmax is None:
-        lmax = nside
+        lmax = max(getattr(m, 'nside', 1) for m in maps)
 
     logger.info('estimating two-point noise bias for %d catalog(s)', len(catalogs))
-    logger.info('randomising %s maps', ', '.join(map(str.upper, which)))
-    logger.info('using NSIDE = %s', nside)
-    logger.info('given %s visibility map(s)', 'no' if vmaps is None else len(vmaps))
+    logger.info('randomising %s maps', ', '.join(map(str, maps)))
     t = time.monotonic()
 
+    # include will be set below after we have the first set of alms
+    include = None
     if full:
         logger.info('estimating cross-noise biases')
-        include = None
-    else:
-        include = [('PP', ..., ...), ('EE', ..., ...), ('BB', ..., ...)]
 
-    nbs = {}
+    # set all input maps to randomize
+    # store and later reset their initial state
+    randomize = {k: m.randomize for k, m in maps.items()}
+    try:
+        for m in maps.values():
+            m.randomize = True
 
-    for n in range(repeat):
+        nbs = {}
 
-        logger.info('estimating noise bias from randomised maps%s', '' if n == 0 else f' (repeat {n})')
+        for n in range(repeat):
 
-        maps = _map_catalogs(which, nside, catalogs, vmaps, overdensity=overdensity, random=True)
-        alms = _transform_maps(maps, lmax=lmax)
-        cls = angular_power_spectra(alms, lmax=lmax, include=include)
+            logger.info('estimating noise bias from randomised maps%s', '' if n == 0 else f' (repeat {n+1})')
 
-        for k, cl in cls.items():
-            ell = np.arange(2, cl.shape[-1])
-            nb = np.sum((2*ell+1)*cl[2:])/np.sum(2*ell+1)
-            nbs[k] = nbs.get(k, 0.) + (nb - nbs.get(k, 0.))/(n + 1)
+            data = _map_catalogs(maps, catalogs)
+            alms = _transform_maps(data, lmax=lmax)
+
+            # set the includes cls if full is false now that we know the alms
+            if not full and include is None:
+                include = [(f'{k}{k}', ..., ...) for k, _ in alms]
+
+            cls = angular_power_spectra(alms, lmax=lmax, include=include)
+
+            for k, cl in cls.items():
+                ell = np.arange(2, cl.shape[-1])
+                nb = np.sum((2*ell+1)*cl[2:])/np.sum(2*ell+1)
+                nbs[k] = nbs.get(k, 0.) + (nb - nbs.get(k, 0.))/(n + 1)
+    finally:
+        for k, m in maps.items():
+            m.randomize = randomize[k]
 
     logger.info('estimated %d two-point noise biases in %s', len(nbs), timedelta(seconds=(time.monotonic() - t)))
 
