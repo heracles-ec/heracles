@@ -103,6 +103,8 @@ class Catalog(metaclass=ABCMeta):
         self._page_size = self.default_page_size
         self._filters = []
         self._visibility = None
+        self._names = None
+        self._size = None
 
     @property
     def page_size(self):
@@ -130,6 +132,16 @@ class Catalog(metaclass=ABCMeta):
     @visibility.setter
     def visibility(self, visibility):
         self._visibility = visibility
+
+    @property
+    def names(self):
+        '''columns in the catalogue, if known, or None'''
+        return self._names
+
+    @property
+    def size(self):
+        '''total rows in the catalogue, if known, or None'''
+        return self._size
 
     def add_filter(self, filt):
         '''add a filter to catalogue'''
@@ -221,6 +233,8 @@ class ArrayCatalog(Catalog):
         '''create a new array catalogue reader'''
         super().__init__()
         self._arr = arr
+        self._size = len(arr)
+        self._names = arr.dtype.names
 
     def _pages(self):
         '''iterate the rows of the array in pages'''
@@ -278,7 +292,41 @@ class FitsCatalog(Catalog):
         else:
             copied._query = f'({self._query}) && ({query})'
 
+        copied._size = None
+
         return copied
+
+    def _open(self, fits):
+        '''open FITS for reading'''
+
+        # find or get the extension
+        if self._ext is None:
+            hdu = _fits_table_hdu(fits)
+        else:
+            hdu = fits[self._ext]
+
+        # use all columns or the selected ones
+        if self._columns is None:
+            names = hdu.get_colnames()
+        else:
+            names = self._columns
+
+        # use all rows or select from query if one is given
+        if self._query is None:
+            selected = None
+            size = hdu.get_nrows()
+        else:
+            selected = hdu.where(self._query)
+            size = len(selected)
+
+        return hdu, names, selected, size
+
+    def peek(self):
+        '''read the FITS file information'''
+        with fitsio.FITS(self._filename) as fits:
+            _, names, _, size = self._open(fits)
+            self._size = size
+            self._names = names
 
     def _pages(self):
         '''iterate pages of rows in FITS file, optionally using the query'''
@@ -288,25 +336,11 @@ class FitsCatalog(Catalog):
 
         with fitsio.FITS(self._filename) as fits:
 
-            # find or get the extension
-            if self._ext is None:
-                hdu = _fits_table_hdu(fits)
-            else:
-                hdu = fits[self._ext]
+            hdu, names, selected, nrows = self._open(fits)
 
-            # use all columns or the selected ones
-            if self._columns is None:
-                names = hdu.get_colnames()
-            else:
-                names = self._columns
-
-            # use all rows or select from query if one is given
-            if self._query is None:
-                selected = None
-                nrows = hdu.get_nrows()
-            else:
-                selected = hdu.where(self._query)
-                nrows = len(selected)
+            # set catalogue info
+            self._size = nrows
+            self._names = names
 
             # now iterate the (selected) rows in batches
             for i in range(0, nrows, page_size):

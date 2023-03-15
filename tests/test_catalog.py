@@ -17,6 +17,11 @@ def catalog():
         SIZE = size
         DATA = dict(x=x, y=y, z=z)
 
+        def __init__(self):
+            super().__init__()
+            self._size = self.SIZE
+            self._names = list(self.DATA.keys())
+
         # implement abstract method
         def _pages(self):
             size = self.SIZE
@@ -138,6 +143,9 @@ def test_catalog_properties(catalog):
 
     from le3_pk_wl.catalog import Catalog
 
+    assert catalog.size == catalog.SIZE
+    assert catalog.names == list(catalog.DATA.keys())
+
     assert catalog.page_size == Catalog.default_page_size
     catalog.page_size = 1
     assert catalog.page_size == 1
@@ -245,6 +253,9 @@ def test_array_catalog():
     # y not in catalogue, should not show up in pages
     cat = ArrayCatalog(arr)
 
+    assert cat.size == len(arr)
+    assert cat.names == arr.dtype.names
+
     cat.page_size = len(arr)
 
     for i, page in enumerate(cat):
@@ -272,6 +283,14 @@ def test_fits_catalog(tmp_path):
         fits.write_table([ra, dec], names=['RA', 'DEC'], extname='MYEXT')
 
     catalog = FitsCatalog(filename)
+
+    assert catalog.size is None
+    assert catalog.names is None
+
+    catalog.peek()
+
+    assert catalog.size == size
+    assert catalog.names == ['RA', 'DEC']
 
     page = next(iter(catalog))
     assert page.size == size
