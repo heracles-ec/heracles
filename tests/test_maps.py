@@ -346,7 +346,7 @@ def test_map_catalogs(Map, nside):
             else:
                 for k in range(len(maps)):
                     maps[k].assert_called_with(catalogs)
-                    assert data[k] is maps[k].return_value
+                    assert data[k, None] is maps[k].return_value
 
         elif isinstance(maps, dict):
 
@@ -363,20 +363,20 @@ def test_map_catalogs(Map, nside):
             else:
                 for k in maps.keys():
                     maps[k].assert_called_with(catalogs)
-                    assert data[k] is maps[k].return_value
+                    assert data[k, None] is maps[k].return_value
 
         else:
 
             if isinstance(catalogs, list):
                 for i in range(len(catalogs)):
                     maps.assert_any_call(catalogs[i])
-                    assert data[i] is maps.return_value
+                    assert data[None, i] is maps.return_value
 
             elif isinstance(catalogs, dict):
                 for i in catalogs.keys():
                     maps.assert_any_call(catalogs[i])
-                    assert data[i] is maps.return_value
+                    assert data[None, i] is maps.return_value
 
             else:
                 maps.assert_called_with(catalogs)
-                assert data is maps.return_value
+                assert data[None, None] is maps.return_value

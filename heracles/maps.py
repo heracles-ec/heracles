@@ -544,18 +544,18 @@ EllipticityMap = Spin2Map
 def _items(obj):
     '''Create an iterator over items for mapping, sequence, or object.'''
 
-    # always convert key to tuple for concatenation
     if isinstance(obj, Mapping):
-        return (((i,), v) for i, v in obj.items())
+        return obj.items()
     elif isinstance(obj, Sequence):
-        return (((i,), v) for i, v in enumerate(obj))
+        return enumerate(obj)
     else:
-        # single catalogue: items are empty tuple + catalogue
-        return (((), v) for v in [obj])
+        return zip([None], [obj])
 
 
-def map_catalogs(maps: t.Dict[t.Any, Map],
-                 catalogs: t.Dict[t.Any, 'Catalog'],
+def map_catalogs(maps: t.Mapping[t.Any, Map],
+                 catalogs: t.Mapping[t.Any, 'Catalog'],
+                 *,
+                 out: t.MutableMapping[t.Any, t.Any] = None,
                  ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, ...], MapData]]:
     '''Make maps for a set of catalogues.
 
@@ -568,12 +568,13 @@ def map_catalogs(maps: t.Dict[t.Any, Map],
     t = time.monotonic()
 
     # the toc dict of maps
-    m = {}
+    if out is None:
+        out = {}
 
     # for computation, go through catalogues first and maps second
     for i, catalog in _items(catalogs):
 
-        logger.info('mapping catalog %s', '' if i == () else i[0])
+        logger.info('mapping catalog %s', i or '')
         ti = time.monotonic()
 
         # apply the maps to the catalogue
@@ -607,34 +608,25 @@ def map_catalogs(maps: t.Dict[t.Any, Map],
 
         # store results
         for k, v in results.items():
-            j = k + i
-            if len(j) == 1:
-                m[j[0]] = v
-            else:
-                m[j] = v
+            out[k, i] = v
 
         # results are no longer needed
         del results
 
-        logger.info('mapped catalog %s in %s', '' if i == () else i[0],
+        logger.info('mapped catalog %s in %s', i or '',
                     timedelta(seconds=(time.monotonic() - ti)))
 
-    logger.info('created %d map(s) in %s', len(m),
+    logger.info('created %d map(s) in %s', len(out),
                 timedelta(seconds=(time.monotonic() - t)))
 
-    # return single item if inputs were single item
-    if len(m) == 1:
-        try:
-            return m[()]
-        except KeyError:
-            pass
-
-    # return maps as a toc dict
-    return m
+    # return the toc dict
+    return out
 
 
-def transform_maps(maps: t.Dict[t.Tuple[t.Any, t.Any], MapData],
-                   names: t.Dict[t.Any, t.Any] = {},
+def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
+                   names: t.Mapping[t.Any, t.Any] = {},
+                   *,
+                   out: t.MutableMapping[t.Any, t.Any] = None,
                    **kwargs
                    ) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
     '''transform a set of maps to alms'''
@@ -642,8 +634,11 @@ def transform_maps(maps: t.Dict[t.Tuple[t.Any, t.Any], MapData],
     logger.info('transforming %d map(s) to alms', len(maps))
     t = time.monotonic()
 
+    # the output toc dict
+    if out is None:
+        out = {}
+
     # convert maps to alms, taking care of complex and spin-weighted maps
-    alms = {}
     for (k, i), m in maps.items():
 
         nside = hp.get_nside(m)
@@ -661,23 +656,25 @@ def transform_maps(maps: t.Dict[t.Tuple[t.Any, t.Any], MapData],
         else:
             raise NotImplementedError(f'spin-{spin} maps not yet supported')
 
-        a = hp.map2alm(m, pol=pol, **kwargs)
+        alms = hp.map2alm(m, pol=pol, **kwargs)
 
         if spin == 0:
             j = names.get(k, k)
-            out = {(j, i): a}
+            alms = {(j, i): alms}
         elif spin == 2:
             j1, j2 = names.get(k, ('E', 'B'))
-            out = {(j1, i): a[1], (j2, i): a[2]}
+            alms = {(j1, i): alms[1], (j2, i): alms[2]}
 
-        for j, aj in out.items():
-            if j in alms:
+        for j, alm in alms.items():
+            if j in out:
                 raise KeyError(f'duplicate alm {j}, set `names=` manually')
             if md:
-                update_metadata(aj, nside=nside, **md)
-            alms[j] = aj
+                update_metadata(alm, nside=nside, **md)
+            out[j] = alm
 
-    logger.info('transformed %d map(s) in %s', len(alms), timedelta(seconds=(time.monotonic() - t)))
+        del m, alms, alm
+
+    logger.info('transformed %d map(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
 
     # return the toc dict of alms
-    return alms
+    return out
