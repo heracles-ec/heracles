@@ -196,6 +196,13 @@ class InvalidValueFilter:
         self.weight = weight
         self.warn = warn
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        args = list(map(repr, self.columns))
+        args += [f'weight={self.weight!r}', f'warn={self.warn!r}']
+        args = ', '.join(args)
+        return f'{name}({args})'
+
     def __call__(self, page):
         '''Filter a catalog page.'''
 
@@ -229,6 +236,11 @@ class FootprintFilter:
     def lonlat(self):
         '''longitude and latitude columns'''
         return self._lonlat
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        lon, lat = self.lonlat
+        return f'{name}(..., {lon!r}, {lat!r})'
 
     def __call__(self, page):
         '''filter catalog page'''

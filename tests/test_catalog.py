@@ -235,7 +235,11 @@ def test_invalid_value_filter(catalog):
     with pytest.raises(ValueError):
         page.get('y')
 
-    catalog.add_filter(InvalidValueFilter('x', 'y'))
+    filt = InvalidValueFilter('x', 'y')
+
+    assert repr(filt) == "InvalidValueFilter('x', 'y', weight=None, warn=True)"
+
+    catalog.add_filter(filt)
 
     with pytest.warns(UserWarning):
         page = next(iter(catalog))
@@ -257,7 +261,11 @@ def test_footprint_filter(catalog):
     catalog.DATA['x'] = lon = np.random.uniform(-180, 180, size=catalog.SIZE)
     catalog.DATA['y'] = lat = np.degrees(np.arcsin(np.random.uniform(-1, 1, size=catalog.SIZE)))
 
-    catalog.add_filter(FootprintFilter(m, 'x', 'y'))
+    filt = FootprintFilter(m, 'x', 'y')
+
+    assert repr(filt) == "FootprintFilter(..., 'x', 'y')"
+
+    catalog.add_filter(filt)
 
     good = (m[ang2pix(nside, lon, lat, lonlat=True)] != 0)
     assert good.sum() != good.size
