@@ -269,8 +269,8 @@ class PositionMap(HealpixMap, RandomizableMap):
         return pos
 
 
-class RealMap(HealpixMap, NormalizableMap):
-    '''Create HEALPix maps from real values in a catalogue.'''
+class ScalarMap(HealpixMap, NormalizableMap):
+    '''Create HEALPix maps from real scalar values in a catalogue.'''
 
     def __init__(self, nside: int, lon: str, lat: str, value: str,
                  weight: t.Optional[str] = None, *, normalize: bool = True

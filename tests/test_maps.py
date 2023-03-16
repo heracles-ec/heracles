@@ -145,11 +145,11 @@ def test_position_map(nside, catalog, vmap):
     assert m.dtype.metadata == {'spin': 0, 'nbar': 4./vmap.mean(), 'kernel': 'healpix', 'power': 1}
 
 
-def test_real_map(nside, catalog):
+def test_scalar_map(nside, catalog):
 
-    from le3_pk_wl.maps import RealMap
+    from le3_pk_wl.maps import ScalarMap
 
-    m = map_catalog(RealMap(nside, 'ra', 'dec', 'g1', 'w'), catalog)
+    m = map_catalog(ScalarMap(nside, 'ra', 'dec', 'g1', 'w'), catalog)
 
     w = next(iter(catalog))['w']
     w = w.reshape(w.size//4, 4).sum(axis=-1)
@@ -159,7 +159,7 @@ def test_real_map(nside, catalog):
     assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
     np.testing.assert_array_almost_equal(m, 0)
 
-    m = map_catalog(RealMap(nside, 'ra', 'dec', 'g1', 'w', normalize=False), catalog)
+    m = map_catalog(ScalarMap(nside, 'ra', 'dec', 'g1', 'w', normalize=False), catalog)
 
     assert m.shape == (12*nside**2,)
     assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
