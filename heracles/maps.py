@@ -11,9 +11,8 @@ import numpy as np
 import healpy as hp
 from numba import njit
 
-from typing import Optional, Tuple, Dict, Any, Union, Generator as GeneratorT
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
+import typing as t
+if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
 
 logger = logging.getLogger(__name__)
@@ -78,7 +77,7 @@ def update_metadata(array, **metadata):
 MapData = np.ndarray
 
 # type hint for map generators
-MapGenerator = GeneratorT[None, 'CatalogPage', MapData]
+MapGenerator = t.Generator[None, 'CatalogPage', MapData]
 
 
 class Map(metaclass=ABCMeta):
@@ -89,18 +88,18 @@ class Map(metaclass=ABCMeta):
 
     '''
 
-    def __init__(self, columns: Tuple[Optional[str]]) -> None:
+    def __init__(self, columns: t.Tuple[t.Optional[str]]) -> None:
         '''Initialise the map.'''
         self._columns = columns
         super().__init__()
 
     @property
-    def columns(self) -> Tuple[Optional[str]]:
+    def columns(self) -> t.Tuple[t.Optional[str]]:
         '''Return the catalogue columns used by this map.'''
         return self._columns
 
     @abstractmethod
-    def __call__(self, catalog: 'Catalog') -> Union[MapData, MapGenerator]:
+    def __call__(self, catalog: 'Catalog') -> t.Union[MapData, MapGenerator]:
         '''Implementation for mapping a catalogue.'''
         ...
 
@@ -274,7 +273,7 @@ class RealMap(HealpixMap, NormalizableMap):
     '''Create HEALPix maps from real values in a catalogue.'''
 
     def __init__(self, nside: int, lon: str, lat: str, value: str,
-                 weight: Optional[str] = None, *, normalize: bool = True
+                 weight: t.Optional[str] = None, *, normalize: bool = True
                  ) -> None:
         '''Create a new real map.'''
 
@@ -350,7 +349,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
     '''
 
     def __init__(self, nside: int, lon: str, lat: str, real: str, imag: str,
-                 weight: Optional[str] = None, *, spin: int = 0,
+                 weight: t.Optional[str] = None, *, spin: int = 0,
                  conjugate: bool = False, normalize: bool = True,
                  randomize: bool = False
                  ) -> None:
@@ -555,9 +554,9 @@ def _items(obj):
         return (((), v) for v in [obj])
 
 
-def map_catalogs(maps: Dict[Any, Map],
-                 catalogs: Dict[Any, 'Catalog']
-                 ) -> Union[MapData, Dict[Tuple[Any, ...], MapData]]:
+def map_catalogs(maps: t.Dict[t.Any, Map],
+                 catalogs: t.Dict[t.Any, 'Catalog'],
+                 ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, ...], MapData]]:
     '''Make maps for a set of catalogues.
 
     The output is a single map, if both ``maps`` and ``catalogs`` are single
@@ -634,10 +633,10 @@ def map_catalogs(maps: Dict[Any, Map],
     return m
 
 
-def transform_maps(maps: Dict[Tuple[Any, Any], MapData],
-                   names: Dict[Any, Any] = {},
+def transform_maps(maps: t.Dict[t.Tuple[t.Any, t.Any], MapData],
+                   names: t.Dict[t.Any, t.Any] = {},
                    **kwargs
-                   ) -> Dict[Tuple[Any, Any], np.ndarray]:
+                   ) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
     '''transform a set of maps to alms'''
 
     logger.info('transforming %d map(s) to alms', len(maps))
