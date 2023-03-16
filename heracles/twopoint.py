@@ -308,18 +308,16 @@ def binned_cl(cl, bins, cmblike=False):
     return binned_statistic(ell, cl, bins=bins, statistic='mean')[0]
 
 
-def random_noisebias(maps, catalogs, *, lmax=None, repeat=1, full=False):
+def random_noisebias(maps, catalogs, names={}, *,
+                     repeat=1, full=False, **kwargs):
     '''noise bias estimate from randomised position and shear maps'''
-
-    if not maps:
-        raise ValueError('no maps given')
-
-    if lmax is None:
-        lmax = max(getattr(m, 'nside', 1) for m in maps)
 
     logger.info('estimating two-point noise bias for %d catalog(s)', len(catalogs))
     logger.info('randomising %s maps', ', '.join(map(str, maps)))
     t = time.monotonic()
+
+    # grab lmax parameter if given
+    lmax = kwargs.get('lmax', None)
 
     # include will be set below after we have the first set of alms
     include = None
@@ -340,7 +338,7 @@ def random_noisebias(maps, catalogs, *, lmax=None, repeat=1, full=False):
             logger.info('estimating noise bias from randomised maps%s', '' if n == 0 else f' (repeat {n+1})')
 
             data = _map_catalogs(maps, catalogs)
-            alms = _transform_maps(data, lmax=lmax)
+            alms = _transform_maps(data, names, **kwargs)
 
             # set the includes cls if full is false now that we know the alms
             if not full and include is None:
