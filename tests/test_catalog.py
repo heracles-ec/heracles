@@ -215,6 +215,7 @@ def test_catalog_copy():
 
     assert isinstance(copied, TestCatalog)
     assert copied is not catalog
+    assert copied.__dict__ == catalog.__dict__
     assert copied.visibility is catalog.visibility
     assert copied.names is catalog.names
     assert copied.size is catalog.size
@@ -276,21 +277,26 @@ def test_array_catalog():
     for name in arr.dtype.names:
         arr[name] = np.random.rand(len(arr))
 
-    # y not in catalogue, should not show up in pages
-    cat = ArrayCatalog(arr)
+    catalog = ArrayCatalog(arr)
 
-    assert cat.size == len(arr)
-    assert cat.names == arr.dtype.names
+    assert catalog.size == len(arr)
+    assert catalog.names == arr.dtype.names
 
-    cat.page_size = len(arr)
+    catalog.page_size = len(arr)
 
-    for i, page in enumerate(cat):
+    for i, page in enumerate(catalog):
         assert page.size == 100
         assert len(page) == 4
         assert page.names == list(arr.dtype.names)
         for k in arr.dtype.names:
             npt.assert_array_equal(page[k], arr[k])
     assert i == 0
+
+    copied = catalog.__copy__()
+
+    assert isinstance(copied, ArrayCatalog)
+    assert copied is not catalog
+    assert copied.__dict__ == catalog.__dict__
 
 
 def test_fits_catalog(tmp_path):
@@ -353,3 +359,9 @@ def test_fits_catalog(tmp_path):
     assert len(page) == 2
     np.testing.assert_array_equal(page['RA'], ra[sel])
     np.testing.assert_array_equal(page['DEC'], dec[sel])
+
+    copied = catalog.__copy__()
+
+    assert isinstance(copied, FitsCatalog)
+    assert copied is not catalog
+    assert copied.__dict__ == catalog.__dict__

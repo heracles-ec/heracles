@@ -106,6 +106,19 @@ class Catalog(metaclass=ABCMeta):
         self._names = None
         self._size = None
 
+    def __copy__(self):
+        '''return a shallow copy of the catalogue'''
+
+        other = self.__class__.__new__(self.__class__)
+
+        other._page_size = self._page_size
+        other._filters = self._filters.copy()
+        other._visibility = self._visibility
+        other._names = self._names
+        other._size = self._size
+
+        return other
+
     @property
     def page_size(self):
         '''number of rows per page (default: 100_000)'''
@@ -167,19 +180,6 @@ class Catalog(metaclass=ABCMeta):
 
             # yield the filtered page
             yield page
-
-    def __copy__(self):
-        '''return a shallow copy of the catalogue'''
-
-        other = self.__class__.__new__(self.__class__)
-
-        other._page_size = self._page_size
-        other._filters = self._filters.copy()
-        other._visibility = self._visibility
-        other._names = self._names
-        other._size = self._size
-
-        return other
 
 
 class InvalidValueFilter:
@@ -249,6 +249,12 @@ class ArrayCatalog(Catalog):
         self._size = len(arr)
         self._names = arr.dtype.names
 
+    def __copy__(self):
+        '''return a copy of this catalogue'''
+        other = super().__copy__()
+        other._arr = self._arr
+        return other
+
     def _pages(self):
         '''iterate the rows of the array in pages'''
         arr = self._arr
@@ -285,6 +291,15 @@ class FitsCatalog(Catalog):
         self._columns = columns
         self._ext = ext
         self._query = query
+
+    def __copy__(self):
+        '''return a copy of this catalog'''
+        other = super().__copy__()
+        other._filename = self._filename
+        other._columns = self._columns
+        other._ext = self._ext
+        other._query = self._query
+        return other
 
     def __repr__(self):
         '''string representation of FitsCatalog'''
