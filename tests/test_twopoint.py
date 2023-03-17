@@ -215,3 +215,14 @@ def test_random_noisebias(full):
         keys += [('AB', 0, 0), ('AB', 1, 1), ('AB', 0, 1), ('AB', 1, 0)]
 
     assert set(nbs.keys()) == set(keys)
+
+    # filter with include and exclude
+
+    nbs = random_noisebias(maps, catalogs, repeat=5, full=full,
+                           include=[('A', 0), ('B', ...)], exclude=[('B', 0)])
+
+    keys = [('AA', 0, 0), ('BB', 1, 1)]
+    if full:
+        keys += [('AB', 0, 1)]
+
+    assert set(nbs.keys()) == set(keys)

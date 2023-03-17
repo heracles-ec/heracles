@@ -309,8 +309,13 @@ def binned_cl(cl, bins, cmblike=False):
 
 
 def random_noisebias(maps, catalogs, names={}, *,
-                     repeat=1, full=False, **kwargs):
-    '''noise bias estimate from randomised position and shear maps'''
+                     repeat=1, full=False, include=None, exclude=None,
+                     **kwargs):
+    '''noise bias estimate from randomised position and shear maps
+
+    The ``include`` and ``exclude`` selection is applied to the maps.
+
+    '''
 
     logger.info('estimating two-point noise bias for %d catalog(s)', len(catalogs))
     logger.info('randomising %s maps', ', '.join(map(str, maps)))
@@ -320,7 +325,7 @@ def random_noisebias(maps, catalogs, names={}, *,
     lmax = kwargs.get('lmax', None)
 
     # include will be set below after we have the first set of alms
-    include = None
+    include_cls = None
     if full:
         logger.info('estimating cross-noise biases')
 
@@ -337,14 +342,14 @@ def random_noisebias(maps, catalogs, names={}, *,
 
             logger.info('estimating noise bias from randomised maps%s', '' if n == 0 else f' (repeat {n+1})')
 
-            data = _map_catalogs(maps, catalogs)
+            data = _map_catalogs(maps, catalogs, include=include, exclude=exclude)
             alms = _transform_maps(data, names, **kwargs)
 
             # set the includes cls if full is false now that we know the alms
-            if not full and include is None:
-                include = [(f'{k}{k}', ..., ...) for k, _ in alms]
+            if not full and include_cls is None:
+                include_cls = [(f'{k}{k}', ..., ...) for k, _ in alms]
 
-            cls = angular_power_spectra(alms, lmax=lmax, include=include)
+            cls = angular_power_spectra(alms, lmax=lmax, include=include_cls)
 
             for k, cl in cls.items():
                 ell = np.arange(2, cl.shape[-1])

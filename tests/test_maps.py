@@ -310,7 +310,7 @@ class MockCatalog:
 
 
 @pytest.mark.parametrize('Map', [MockMap, MockMapGen])
-def test_map_catalogs(Map, nside):
+def test_map_catalogs(Map):
 
     from itertools import product
     from le3_pk_wl.maps import map_catalogs
@@ -380,3 +380,20 @@ def test_map_catalogs(Map, nside):
             else:
                 maps.assert_called_with(catalogs)
                 assert data[None, None] is maps.return_value
+
+
+@pytest.mark.parametrize('Map', [MockMap, MockMapGen])
+def test_map_catalogs_match(Map):
+
+    from le3_pk_wl.maps import map_catalogs
+
+    maps = {'a': Map(), 'b': Map(), 'c': Map()}
+    catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
+
+    data = map_catalogs(maps, catalogs, include=[(..., 'y')])
+
+    assert set(data.keys()) == {('a', 'y'), ('b', 'y'), ('c', 'y')}
+
+    data = map_catalogs(maps, catalogs, exclude=[('a', ...)])
+
+    assert set(data.keys()) == {('b', 'x'), ('b', 'y'), ('c', 'x'), ('c', 'y')}

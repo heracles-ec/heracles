@@ -9,7 +9,7 @@ import numpy as np
 import healpy as hp
 from numba import njit
 
-from .util import Progress
+from .util import toc_match, Progress
 
 import typing as t
 if t.TYPE_CHECKING:
@@ -556,8 +556,10 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
                  catalogs: t.Mapping[t.Any, 'Catalog'],
                  *,
                  out: t.MutableMapping[t.Any, t.Any] = None,
+                 include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
+                 exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
                  progress: bool = False,
-                 ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, ...], MapData]]:
+                 ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, t.Any], MapData]]:
     '''Make maps for a set of catalogues.
 
     The output is a single map, if both ``maps`` and ``catalogs`` are single
@@ -587,7 +589,8 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
         # apply the maps to the catalogue
         results = {}
         for k, v in _items(maps):
-            results[k] = v(catalog)
+            if toc_match((k, i), include, exclude):
+                results[k] = v(catalog)
             if progress:
                 prog.update()
 
