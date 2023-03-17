@@ -1,8 +1,6 @@
 '''module for map-making'''
 
 import warnings
-import time
-from datetime import timedelta
 from abc import ABCMeta, abstractmethod
 from collections.abc import Generator, Sequence, Mapping
 from functools import wraps, partial
@@ -10,6 +8,8 @@ import logging
 import numpy as np
 import healpy as hp
 from numba import njit
+
+from .util import Progress
 
 import typing as t
 if t.TYPE_CHECKING:
@@ -556,6 +556,7 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
                  catalogs: t.Mapping[t.Any, 'Catalog'],
                  *,
                  out: t.MutableMapping[t.Any, t.Any] = None,
+                 progress: bool = False,
                  ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, ...], MapData]]:
     '''Make maps for a set of catalogues.
 
@@ -565,20 +566,30 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
 
     '''
 
-    t = time.monotonic()
-
     # the toc dict of maps
     if out is None:
         out = {}
 
+    # display a progress bar if asked to
+    if progress:
+        prog = Progress()
+        try:
+            nmaps = len(maps)
+        except TypeError:
+            nmaps = 1
+
     # for computation, go through catalogues first and maps second
     for i, catalog in _items(catalogs):
 
-        logger.info('mapping catalog %s', i or '')
-        ti = time.monotonic()
+        if progress:
+            prog.start(nmaps, i)
 
         # apply the maps to the catalogue
-        results = {k: v(catalog) for k, v in _items(maps)}
+        results = {}
+        for k, v in _items(maps):
+            results[k] = v(catalog)
+            if progress:
+                prog.update()
 
         # collect generators from results
         gen = {k: v for k, v in results.items() if isinstance(v, Generator)}
@@ -590,12 +601,17 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
             for g in gen.values():
                 g.send(None)
 
+            if progress:
+                prog.start(catalog.size, i)
+
             # go through catalogue pages once
             # give each page to each generator
             # make copies to that generators can delete() etc.
             for page in catalog:
                 for g in gen.values():
                     g.send(page.copy())
+                if progress:
+                    prog.update(catalog.page_size)
 
             # close generators and store results
             for k, g in gen.items():
@@ -613,11 +629,8 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
         # results are no longer needed
         del results
 
-        logger.info('mapped catalog %s in %s', i or '',
-                    timedelta(seconds=(time.monotonic() - ti)))
-
-    logger.info('created %d map(s) in %s', len(out),
-                timedelta(seconds=(time.monotonic() - t)))
+        if progress:
+            prog.stop()
 
     # return the toc dict
     return out
@@ -627,16 +640,19 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
                    names: t.Mapping[t.Any, t.Any] = {},
                    *,
                    out: t.MutableMapping[t.Any, t.Any] = None,
+                   progress: bool = False,
                    **kwargs
                    ) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
     '''transform a set of maps to alms'''
 
-    logger.info('transforming %d map(s) to alms', len(maps))
-    t = time.monotonic()
-
     # the output toc dict
     if out is None:
         out = {}
+
+    # display a progress bar if asked to
+    if progress:
+        prog = Progress()
+        prog.start(len(maps), 'transforming')
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():
@@ -674,7 +690,11 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
 
         del m, alms, alm
 
-    logger.info('transformed %d map(s) in %s', len(out), timedelta(seconds=(time.monotonic() - t)))
+        if progress:
+            prog.update()
+
+    if progress:
+        prog.stop()
 
     # return the toc dict of alms
     return out
