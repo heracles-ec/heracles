@@ -127,6 +127,19 @@ def test_catalog_page_get():
     npt.assert_array_equal(page.get('a', 'b'), [a, b])
 
 
+def test_catalog_page_immutable():
+
+    from le3_pk_wl.catalog import CatalogPage
+
+    a = [1., 2., 3., 4.]
+    b = [5., 6., 7., 8.]
+
+    page = CatalogPage({'a': a, 'b': b})
+
+    with pytest.raises(ValueError):
+        page['a'][0] = 0.
+
+
 def test_catalog_abc(catalog):
 
     from le3_pk_wl.catalog import Catalog

@@ -32,6 +32,8 @@ class CatalogPage:
     def __init__(self, data: Mapping) -> None:
         '''Create a new catalogue page from given data.'''
         self._data = {k: np.asanyarray(v) for k, v in data.items()}
+        for v in self._data.values():
+            v.flags.writeable = False
         self._update()
 
     def __getitem__(self, col):
