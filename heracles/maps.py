@@ -2,7 +2,7 @@
 
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Generator, Sequence, Mapping
+from collections.abc import Sequence, Mapping
 from functools import wraps, partial
 import logging
 import numpy as np
@@ -10,6 +10,7 @@ import healpy as hp
 from numba import njit
 
 from .util import toc_match, Progress
+from ._cofunctions import cofunction
 
 import typing as t
 if t.TYPE_CHECKING:
@@ -76,8 +77,11 @@ def update_metadata(array, **metadata):
 # type alias for map data
 MapData = np.ndarray
 
+# type hint for functions returned by map generators
+MapFunction = t.Callable[['CatalogPage'], None]
+
 # type hint for map generators
-MapGenerator = t.Generator[None, 'CatalogPage', MapData]
+MapGenerator = t.Generator[MapFunction, None, MapData]
 
 
 class Map(metaclass=ABCMeta):
@@ -200,6 +204,7 @@ class PositionMap(HealpixMap, RandomizableMap):
     def overdensity(self, overdensity: bool) -> None:
         self._overdensity = overdensity
 
+    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map the given catalogue.'''
 
@@ -215,20 +220,19 @@ class PositionMap(HealpixMap, RandomizableMap):
         # keep track of the total number of galaxies
         ngal = 0
 
-        # catalogue pages to map
-        while True:
-            try:
-                page = yield
-            except GeneratorExit:
-                break
+        # function to map catalogue data
+        def mapper(page: 'CatalogPage') -> None:
+            nonlocal ngal
 
             if not self._randomize:
                 lon, lat = page.get(*col)
                 ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
                 _map_pos(pos, ipix)
-                del lon, lat
 
             ngal += page.size
+
+        # call yields here to apply mapper over entire catalogue
+        yield mapper
 
         # get visibility map if present in catalogue
         vmap = catalog.visibility
@@ -280,6 +284,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         super().__init__(columns=(lon, lat, value, weight), nside=nside,
                          normalize=normalize)
 
+    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map real values from catalogue to HEALPix map.'''
 
@@ -287,19 +292,15 @@ class ScalarMap(HealpixMap, NormalizableMap):
         *col, wcol = self.columns
 
         # number of pixels for nside
-        npix = hp.nside2npix(self.nside)
+        nside = self.nside
+        npix = hp.nside2npix(nside)
 
         # create the weight and value map
         wht = np.zeros(npix)
         val = np.zeros(npix)
 
         # go through pages in catalogue and map values
-        while True:
-            try:
-                page = yield
-            except GeneratorExit:
-                break
-
+        def mapper(page: 'CatalogPage') -> None:
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -310,11 +311,12 @@ class ScalarMap(HealpixMap, NormalizableMap):
             else:
                 w = page.get(wcol)
 
-            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_real(wht, val, ipix, w, v)
 
-            del lon, lat, v, w
+        # call yields here to apply mapper over entire catalogue
+        yield mapper
 
         # compute average weight in nonzero pixels
         wbar = wht.mean()
@@ -380,14 +382,20 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         '''Set the conjugate flag.'''
         self._conjugate = conjugate
 
+    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map shears from catalogue to HEALPix map.'''
 
         # get the column definition of the catalogue
         *col, wcol = self.columns
 
+        # get the map properties
+        conjugate = self.conjugate
+        randomize = self.randomize
+
         # number of pixels for nside
-        npix = hp.nside2npix(self.nside)
+        nside = self.nside
+        npix = hp.nside2npix(nside)
 
         # create the weight and shear map
         wht = np.zeros(npix)
@@ -395,12 +403,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
         # go through pages in catalogue and get the shear values,
         # randomise if asked to, and do the mapping
-        while True:
-            try:
-                page = yield
-            except GeneratorExit:
-                break
-
+        def mapper(page: 'CatalogPage') -> None:
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -411,20 +414,21 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
             else:
                 w = page.get(wcol)
 
-            if self._conjugate:
+            if conjugate:
                 im = -im
 
-            if self.randomize:
+            if randomize:
                 a = np.random.uniform(0., 2*np.pi, size=page.size)
                 r = np.hypot(re, im)
                 re, im = r*np.cos(a), r*np.sin(a)
                 del a, r
 
-            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_complex(wht, val, ipix, w, re, im)
 
-            del lon, lat, re, im, w
+        # call yields here to apply mapper over entire catalogue
+        yield mapper
 
         # compute average weight in nonzero pixels
         wbar = wht.mean()
@@ -487,6 +491,7 @@ class WeightMap(HealpixMap, NormalizableMap):
         super().__init__(columns=(lon, lat, weight), nside=nside,
                          normalize=normalize)
 
+    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map catalogue weights.'''
 
@@ -494,18 +499,14 @@ class WeightMap(HealpixMap, NormalizableMap):
         *col, wcol = self.columns
 
         # number of pixels for nside
-        npix = hp.nside2npix(self.nside)
+        nside = self.nside
+        npix = hp.nside2npix(nside)
 
         # create the weight map
         wht = np.zeros(npix)
 
         # map catalogue
-        while True:
-            try:
-                page = yield
-            except GeneratorExit:
-                break
-
+        def mapper(page: 'CatalogPage') -> None:
             lon, lat = page.get(*col)
 
             if wcol is None:
@@ -513,11 +514,12 @@ class WeightMap(HealpixMap, NormalizableMap):
             else:
                 w = page.get(wcol)
 
-            ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
+            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_weight(wht, ipix, w)
 
-            del lon, lat, w
+        # call yields here to apply mapper over entire catalogue
+        yield mapper
 
         # compute average weight in nonzero pixels
         wbar = wht.mean()
@@ -594,36 +596,30 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
             if progress:
                 prog.update()
 
-        # collect generators from results
-        gen = {k: v for k, v in results.items() if isinstance(v, Generator)}
+        # collect functions from results
+        fns = {k: v for k, v in results.items() if callable(v)}
 
-        # if there are any generators, feed them the catalogue pages
-        if gen:
-
-            # prime the generators for mapping
-            for g in gen.values():
-                g.send(None)
+        # if there are any functions, feed them the catalogue pages
+        if fns:
 
             if progress:
                 prog.start(catalog.size, i)
 
             # go through catalogue pages once
-            # give each page to each generator
+            # give each page to each function
             # make copies to that generators can delete() etc.
             for page in catalog:
-                for g in gen.values():
-                    g.send(page.copy())
+                for k, fn in fns.items():
+                    results[k] = fn(page.copy())
                 if progress:
                     prog.update(catalog.page_size)
 
-            # close generators and store results
-            for k, g in gen.items():
+            # terminate cofunctions and store results
+            for k, fn in fns.items():
                 try:
-                    g.throw(GeneratorExit)
-                except StopIteration as e:
-                    results[k] = e.value
-                else:
-                    results[k] = None
+                    results[k] = fn.finish()
+                except AttributeError:
+                    pass
 
         # store results
         for k, v in results.items():
