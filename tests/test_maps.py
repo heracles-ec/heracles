@@ -307,74 +307,17 @@ class MockCatalog:
 @pytest.mark.parametrize('Map', [MockMap, MockMapGen])
 def test_map_catalogs(Map):
 
-    from itertools import product
     from le3_pk_wl.maps import map_catalogs
 
-    test_maps = [
-        Map(),
-        [Map(), Map(), Map()],
-        {'a': Map(), 'b': Map(), 'z': Map()},
-    ]
+    maps = {'a': Map(), 'b': Map(), 'z': Map()}
+    catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
 
-    test_catalogs = [
-        MockCatalog(),
-        [MockCatalog(), MockCatalog()],
-        {'x': MockCatalog(), 'y': MockCatalog()},
-    ]
+    data = map_catalogs(maps, catalogs)
 
-    for maps, catalogs in product(test_maps, test_catalogs):
-
-        data = map_catalogs(maps, catalogs)
-
-        if isinstance(maps, list):
-
-            if isinstance(catalogs, list):
-                for k, i in product(range(len(maps)), range(len(catalogs))):
-                    maps[k].assert_any_call(catalogs[i])
-                    assert data[k, i] is maps[k].return_value
-
-            elif isinstance(catalogs, dict):
-                for k, i in product(range(len(maps)), catalogs.keys()):
-                    maps[k].assert_any_call(catalogs[i])
-                    assert data[k, i] is maps[k].return_value
-
-            else:
-                for k in range(len(maps)):
-                    maps[k].assert_called_with(catalogs)
-                    assert data[k, None] is maps[k].return_value
-
-        elif isinstance(maps, dict):
-
-            if isinstance(catalogs, list):
-                for k, i in product(maps.keys(), range(len(catalogs))):
-                    maps[k].assert_any_call(catalogs[i])
-                    assert data[k, i] is maps[k].return_value
-
-            elif isinstance(catalogs, dict):
-                for k, i in product(maps.keys(), catalogs.keys()):
-                    maps[k].assert_any_call(catalogs[i])
-                    assert data[k, i] is maps[k].return_value
-
-            else:
-                for k in maps.keys():
-                    maps[k].assert_called_with(catalogs)
-                    assert data[k, None] is maps[k].return_value
-
-        else:
-
-            if isinstance(catalogs, list):
-                for i in range(len(catalogs)):
-                    maps.assert_any_call(catalogs[i])
-                    assert data[None, i] is maps.return_value
-
-            elif isinstance(catalogs, dict):
-                for i in catalogs.keys():
-                    maps.assert_any_call(catalogs[i])
-                    assert data[None, i] is maps.return_value
-
-            else:
-                maps.assert_called_with(catalogs)
-                assert data[None, None] is maps.return_value
+    for k in maps:
+        for i in catalogs:
+            maps[k].assert_any_call(catalogs[i])
+            assert data[k, i] is maps[k].return_value
 
 
 @pytest.mark.parametrize('Map', [MockMap, MockMapGen])

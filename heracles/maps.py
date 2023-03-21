@@ -2,7 +2,6 @@
 
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Sequence, Mapping
 from functools import wraps, partial
 import logging
 import numpy as np
@@ -543,17 +542,6 @@ ShearMap = Spin2Map
 EllipticityMap = Spin2Map
 
 
-def _items(obj):
-    '''Create an iterator over items for mapping, sequence, or object.'''
-
-    if isinstance(obj, Mapping):
-        return obj.items()
-    elif isinstance(obj, Sequence):
-        return enumerate(obj)
-    else:
-        return zip([None], [obj])
-
-
 def map_catalogs(maps: t.Mapping[t.Any, Map],
                  catalogs: t.Mapping[t.Any, 'Catalog'],
                  *,
@@ -561,14 +549,8 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
                  include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
                  exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
                  progress: bool = False,
-                 ) -> t.Union[MapData, t.Dict[t.Tuple[t.Any, t.Any], MapData]]:
-    '''Make maps for a set of catalogues.
-
-    The output is a single map, if both ``maps`` and ``catalogs`` are single
-    objects, or a dict where the keys are the broadcast of ``maps`` and
-    ``catalogs``.
-
-    '''
+                 ) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
+    '''Make maps for a set of catalogues.'''
 
     # the toc dict of maps
     if out is None:
@@ -583,14 +565,14 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
             nmaps = 1
 
     # for computation, go through catalogues first and maps second
-    for i, catalog in _items(catalogs):
+    for i, catalog in catalogs.items():
 
         if progress:
             prog.start(nmaps, i)
 
         # apply the maps to the catalogue
         results = {}
-        for k, v in _items(maps):
+        for k, v in maps.items():
             if toc_match((k, i), include, exclude):
                 results[k] = v(catalog)
             if progress:
