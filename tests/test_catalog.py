@@ -5,7 +5,7 @@ import numpy.testing as npt
 
 @pytest.fixture
 def catalog():
-    from le3_pk_wl.catalog import Catalog, CatalogPage
+    from le3_pk_wl.catalog import CatalogBase, CatalogPage
 
     # fix a set of rows to be returned for testing
     size = 100
@@ -13,17 +13,24 @@ def catalog():
     y = np.random.rand(size)
     z = np.random.rand(size)
 
-    class TestCatalog(Catalog):
+    class TestCatalog(CatalogBase):
         SIZE = size
         DATA = dict(x=x, y=y, z=z)
 
         def __init__(self):
             super().__init__()
-            self._size = self.SIZE
-            self._names = list(self.DATA.keys())
+
+        def _names(self):
+            return list(self.DATA.keys())
+
+        def _size(self, selection):
+            return self.SIZE
+
+        def _join(self, *where):
+            return where
 
         # implement abstract method
-        def _pages(self):
+        def _pages(self, selection):
             size = self.SIZE
             page_size = self.page_size
             for i in range(0, size, page_size):
@@ -140,30 +147,36 @@ def test_catalog_page_immutable():
         page['a'][0] = 0.
 
 
-def test_catalog_abc(catalog):
+def test_catalog_base(catalog):
 
-    from le3_pk_wl.catalog import Catalog
+    from le3_pk_wl.catalog import Catalog, CatalogBase
 
     # ABC cannot be instantiated directly
     with pytest.raises(TypeError):
-        Catalog()
+        CatalogBase()
 
     # fixture has tested concrete implementation
+    assert isinstance(catalog, CatalogBase)
+
+    # check that CatalogBase implements the Catalog protocol
     assert isinstance(catalog, Catalog)
 
 
-def test_catalog_properties(catalog):
+def test_catalog_base_properties(catalog):
 
-    from le3_pk_wl.catalog import Catalog
+    from le3_pk_wl.catalog import CatalogBase
 
     assert catalog.size == catalog.SIZE
     assert catalog.names == list(catalog.DATA.keys())
 
-    assert catalog.page_size == Catalog.default_page_size
+    assert catalog.base is None
+    assert catalog.selection is None
+
+    assert catalog.page_size == CatalogBase.default_page_size
     catalog.page_size = 1
     assert catalog.page_size == 1
-    catalog.page_size = Catalog.default_page_size
-    assert catalog.page_size == Catalog.default_page_size
+    catalog.page_size = CatalogBase.default_page_size
+    assert catalog.page_size == CatalogBase.default_page_size
 
     filt = object()
     assert catalog.filters == []
@@ -180,7 +193,7 @@ def test_catalog_properties(catalog):
     assert catalog.visibility is None
 
 
-def test_catalog_pagination(catalog):
+def test_catalog_base_pagination(catalog):
 
     size = catalog.SIZE
 
@@ -194,12 +207,21 @@ def test_catalog_pagination(catalog):
         assert i*page_size + page.size == size
 
 
-def test_catalog_empty_page():
+def test_catalog_base_empty_page():
 
-    from le3_pk_wl.catalog import Catalog, CatalogPage
+    from le3_pk_wl.catalog import CatalogBase, CatalogPage
 
-    class TestCatalogEmpty(Catalog):
-        def _pages(self):
+    class TestCatalogEmpty(CatalogBase):
+        def _names(self):
+            return ['lon', 'lat']
+
+        def _size(self, selection):
+            return 0
+
+        def _join(self, *where):
+            return where
+
+        def _pages(self, selection):
             yield CatalogPage({'lon': [], 'lat': []})
 
     c = TestCatalogEmpty()
@@ -208,18 +230,25 @@ def test_catalog_empty_page():
         next(iter(c))
 
 
-def test_catalog_copy():
+def test_catalog_base_copy():
 
-    from le3_pk_wl.catalog import Catalog
+    from le3_pk_wl.catalog import CatalogBase
 
-    class TestCatalog(Catalog):
+    class TestCatalog(CatalogBase):
         def __init__(self):
             super().__init__()
             self._visibility = object()
-            self._names = object()
-            self._size = object()
 
-        def _pages(self):
+        def _names(self):
+            return []
+
+        def _size(self, selection):
+            return 0
+
+        def _join(self, *where):
+            return where
+
+        def _pages(self, selection):
             return iter([])
 
     catalog = TestCatalog()
@@ -230,9 +259,50 @@ def test_catalog_copy():
     assert copied is not catalog
     assert copied.__dict__ == catalog.__dict__
     assert copied.visibility is catalog.visibility
-    assert copied.names is catalog.names
-    assert copied.size is catalog.size
     assert copied.filters is not catalog.filters
+
+
+def test_catalog_view(catalog):
+
+    from le3_pk_wl.catalog import Catalog
+
+    catalog.visibility = cvis = object()
+
+    where = object()
+
+    view = catalog[where]
+
+    assert isinstance(view, Catalog)
+
+    assert view is not catalog
+    assert catalog.base is None
+    assert catalog.selection is None
+    assert view.base is catalog
+    assert view.selection is where
+    assert view.visibility is catalog.visibility
+
+    view.visibility = vvis = object()
+
+    assert view.visibility is not catalog.visibility
+    assert view.visibility is vvis
+    assert catalog.visibility is cvis
+
+    view = catalog.where(where, vvis)
+
+    assert view is not catalog
+    assert catalog.base is None
+    assert catalog.selection is None
+    assert view.base is catalog
+    assert view.selection is where
+    assert view.visibility is not catalog.visibility
+    assert view.visibility is vvis
+    assert catalog.visibility is cvis
+
+    sub = object()
+
+    subview = view[sub]
+
+    assert subview.selection == (where, sub)
 
 
 def test_invalid_value_filter(catalog):
@@ -291,7 +361,7 @@ def test_footprint_filter(catalog):
 
 def test_array_catalog():
 
-    from le3_pk_wl.catalog import ArrayCatalog
+    from le3_pk_wl.catalog import ArrayCatalog, Catalog
 
     arr = np.empty(100, [('lon', float), ('lat', float),
                          ('x', float), ('y', float)])
@@ -299,6 +369,8 @@ def test_array_catalog():
         arr[name] = np.random.rand(len(arr))
 
     catalog = ArrayCatalog(arr)
+
+    assert isinstance(catalog, Catalog)
 
     assert catalog.size == len(arr)
     assert catalog.names == arr.dtype.names
@@ -313,6 +385,18 @@ def test_array_catalog():
             npt.assert_array_equal(page[k], arr[k])
     assert i == 0
 
+    sel1 = (arr['x'] > 0.5)
+    sel2 = (arr['y'] < 0.5)
+    view = catalog[sel1, sel2]
+
+    for i, page in enumerate(view):
+        assert page.size == len(arr[sel1 & sel2])
+        assert len(page) == 4
+        assert page.names == list(arr.dtype.names)
+        for k in arr.dtype.names:
+            npt.assert_array_equal(page[k], arr[sel1 & sel2][k])
+    assert i == 0
+
     copied = catalog.__copy__()
 
     assert isinstance(copied, ArrayCatalog)
@@ -323,7 +407,7 @@ def test_array_catalog():
 def test_fits_catalog(tmp_path):
 
     import fitsio
-    from le3_pk_wl.catalog import FitsCatalog
+    from le3_pk_wl.catalog import FitsCatalog, Catalog
 
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
@@ -337,10 +421,7 @@ def test_fits_catalog(tmp_path):
 
     catalog = FitsCatalog(filename)
 
-    assert catalog.size is None
-    assert catalog.names is None
-
-    catalog.peek()
+    assert isinstance(catalog, Catalog)
 
     assert catalog.size == size
     assert catalog.names == ['RA', 'DEC']
@@ -351,31 +432,27 @@ def test_fits_catalog(tmp_path):
     np.testing.assert_array_equal(page['RA'], ra)
     np.testing.assert_array_equal(page['DEC'], dec)
 
-    catalog = FitsCatalog(filename, query='RA > 0')
+    view = catalog['RA > 0']
 
     sel = np.where(ra > 0)[0]
 
-    page = next(iter(catalog))
+    assert view.size == sel.size
+    assert view.names == ['RA', 'DEC']
+
+    page = next(iter(view))
     assert page.size == len(sel)
     assert len(page) == 2
     np.testing.assert_array_equal(page['RA'], ra[sel])
     np.testing.assert_array_equal(page['DEC'], dec[sel])
 
-    catalog = FitsCatalog(filename).query('RA > 0')
-
-    sel = np.where(ra > 0)[0]
-
-    page = next(iter(catalog))
-    assert page.size == len(sel)
-    assert len(page) == 2
-    np.testing.assert_array_equal(page['RA'], ra[sel])
-    np.testing.assert_array_equal(page['DEC'], dec[sel])
-
-    catalog = FitsCatalog(filename).query('RA > 0').query('DEC < 0')
+    vview = view['DEC < 0']
 
     sel = np.where((ra > 0) & (dec < 0))[0]
 
-    page = next(iter(catalog))
+    assert vview.size == sel.size
+    assert vview.names == ['RA', 'DEC']
+
+    page = next(iter(vview))
     assert page.size == len(sel)
     assert len(page) == 2
     np.testing.assert_array_equal(page['RA'], ra[sel])

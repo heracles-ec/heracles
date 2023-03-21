@@ -3,7 +3,9 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from types import MappingProxyType
-from copy import copy
+from typing import Protocol, runtime_checkable
+from contextlib import contextmanager
+from functools import lru_cache
 import warnings
 
 import numpy as np
@@ -93,8 +95,139 @@ class CatalogPage:
         self._update()
 
 
-class Catalog(metaclass=ABCMeta):
-    '''abstract base class for catalogues'''
+@runtime_checkable
+class Catalog(Protocol):
+    '''protocol for catalogues'''
+
+    def __getitem__(self, where):
+        '''create a view with the given selection'''
+        ...
+
+    @property
+    def base(self):
+        '''return the base catalogue of a view, or ``None`` if not a view'''
+        ...
+
+    @property
+    def selection(self):
+        '''return the selection of a view, or ``None`` if not a view'''
+        ...
+
+    @property
+    def names(self):
+        '''columns in the catalogue, or ``None`` if not known'''
+        ...
+
+    @property
+    def size(self):
+        '''rows in the catalogue, or ``None`` if not known'''
+        ...
+
+    @property
+    def visibility(self):
+        '''visibility map of the catalogue'''
+        ...
+
+    def where(self, selection, visibility=None):
+        '''create a view on this catalogue with the given selection'''
+        ...
+
+    @property
+    def page_size(self):
+        '''page size for iteration'''
+        ...
+
+    def __iter__(self):
+        '''iterate over pages of rows in the catalogue'''
+        ...
+
+    def select(self, selection):
+        '''iterate over pages of rows with the given selection'''
+        ...
+
+
+class CatalogView:
+    '''a view of a catalogue with some selection applied'''
+
+    def __init__(self, catalog, selection, visibility=None):
+        '''create a new view'''
+        self._catalog = catalog
+        self._selection = selection
+        self._visibility = visibility
+
+    def __repr__(self):
+        '''object representation of this view'''
+        return f'{self._catalog!r}[{self._selection!r}]'
+
+    def __str__(self):
+        '''string representation of this view'''
+        return f'{self._catalog!s}[{self._selection!s}]'
+
+    def __getitem__(self, where):
+        '''return a view with a subselection of this view'''
+        return self.where(where)
+
+    @property
+    def base(self):
+        '''base catalogue of this view'''
+        return self._catalog
+
+    @property
+    def selection(self):
+        '''selection of this view'''
+        return self._selection
+
+    @property
+    def names(self):
+        '''column names of this view'''
+        return self._catalog.names
+
+    @property
+    def size(self):
+        '''size of this view, might not take selection into account'''
+        return self._catalog._size(self._selection)
+
+    @property
+    def visibility(self):
+        '''the visibility of this view'''
+        if self._visibility is None:
+            return self._catalog.visibility
+        return self._visibility
+
+    @visibility.setter
+    def visibility(self, visibility):
+        self._visibility = visibility
+
+    def where(self, selection, visibility=None):
+        '''return a view with a subselection of this view'''
+        if isinstance(selection, (tuple, list)):
+            joined = (self._selection, *selection)
+        else:
+            joined = (self._selection, selection)
+        if visibility is None:
+            visibility = self._visibility
+        return self._catalog.where(joined, visibility)
+
+    @property
+    def page_size(self):
+        '''page size for iterating this view'''
+        return self._catalog.page_size
+
+    def __iter__(self):
+        '''iterate the catalogue with the selection of this view'''
+        yield from self._catalog.select(self._selection)
+
+    def select(self, selection):
+        '''iterate over pages of rows with the given selection'''
+        if isinstance(selection, (tuple, list)):
+            joined = (self._selection, *selection)
+        else:
+            joined = (self._selection, selection)
+        yield from self._catalog.select(joined)
+
+
+class CatalogBase(metaclass=ABCMeta):
+    '''abstract base class for base catalogues (not views)'''
 
     default_page_size: int = 100_000
     '''default value for page size'''
@@ -105,30 +238,35 @@ class Catalog(metaclass=ABCMeta):
         self._page_size = self.default_page_size
         self._filters = []
         self._visibility = None
-        self._names = None
-        self._size = None
 
     def __copy__(self):
         '''return a shallow copy of the catalogue'''
 
         other = self.__class__.__new__(self.__class__)
-
         other._page_size = self._page_size
         other._filters = self._filters.copy()
         other._visibility = self._visibility
-        other._names = self._names
-        other._size = self._size
-
         return other
 
-    @property
-    def page_size(self):
-        '''number of rows per page (default: 100_000)'''
-        return self._page_size
+    @abstractmethod
+    def _names(self):
+        '''abstract method to return the columns in the catalogue'''
+        ...
 
-    @page_size.setter
-    def page_size(self, value):
-        self._page_size = value
+    @abstractmethod
+    def _size(self, selection):
+        '''abstract method to return the size of the catalogue or selection'''
+        ...
+
+    @abstractmethod
+    def _join(self, *where):
+        '''abstract method to join selections'''
+        ...
+
+    @abstractmethod
+    def _pages(self, selection):
+        '''abstract method to iterate selected pages from the catalogue'''
+        ...
 
     @property
     def filters(self):
@@ -139,6 +277,34 @@ class Catalog(metaclass=ABCMeta):
     def filters(self, filters):
         self._filters = filters
 
+    def add_filter(self, filt):
+        '''add a filter to catalogue'''
+        self.filters.append(filt)
+
+    def __getitem__(self, where):
+        '''create a view on this catalogue with the given selection'''
+        return self.where(where)
+
+    @property
+    def base(self):
+        '''returns ``None`` since this is not a view of another catalogue'''
+        return None
+
+    @property
+    def selection(self):
+        '''returns ``None`` since this is not a view of another catalogue'''
+        return None
+
+    @property
+    def names(self):
+        '''columns in the catalogue, or ``None`` if not known'''
+        return self._names()
+
+    @property
+    def size(self):
+        '''total rows in the catalogue, or ``None`` if not known'''
+        return self._size(None)
+
     @property
     def visibility(self):
         '''optional visibility map for catalogue'''
@@ -148,29 +314,32 @@ class Catalog(metaclass=ABCMeta):
     def visibility(self, visibility):
         self._visibility = visibility
 
-    @property
-    def names(self):
-        '''columns in the catalogue, if known, or None'''
-        return self._names
+    def where(self, selection, visibility=None):
+        '''create a view on this catalogue with the given selection'''
+        if isinstance(selection, (tuple, list)):
+            selection = self._join(*selection)
+        return CatalogView(self, selection, visibility)
 
     @property
-    def size(self):
-        '''total rows in the catalogue, if known, or None'''
-        return self._size
+    def page_size(self):
+        '''number of rows per page (default: 100_000)'''
+        return self._page_size
 
-    def add_filter(self, filt):
-        '''add a filter to catalogue'''
-        self.filters.append(filt)
-
-    @abstractmethod
-    def _pages(self):
-        '''abstract method to retrieve pages of rows from the catalogue'''
-        ...
+    @page_size.setter
+    def page_size(self, value):
+        self._page_size = value
 
     def __iter__(self):
         '''iterate over pages of rows in the catalogue'''
+        yield from self.select(None)
 
-        for page in self._pages():
+    def select(self, selection):
+        '''iterate over pages of rows with the given selection'''
+
+        if isinstance(selection, (tuple, list)):
+            selection = self._join(*selection)
+
+        for page in self._pages(selection):
 
             # skip empty pages
             if page.size == 0:
@@ -253,15 +422,13 @@ class FootprintFilter:
         page.delete(exclude)
 
 
-class ArrayCatalog(Catalog):
+class ArrayCatalog(CatalogBase):
     '''catalogue reader for arrays'''
 
     def __init__(self, arr):
         '''create a new array catalogue reader'''
         super().__init__()
         self._arr = arr
-        self._size = len(arr)
-        self._names = arr.dtype.names
 
     def __copy__(self):
         '''return a copy of this catalogue'''
@@ -269,9 +436,28 @@ class ArrayCatalog(Catalog):
         other._arr = self._arr
         return other
 
-    def _pages(self):
+    def _names(self):
+        return self._arr.dtype.names
+
+    def _size(self, selection):
+        if selection is None:
+            return len(self._arr)
+        else:
+            return len(self._arr[selection])
+
+    def _join(self, first, *other):
+        '''join boolean masks'''
+        mask = first
+        for a in other:
+            mask = mask & a
+        return mask
+
+    def _pages(self, selection):
         '''iterate the rows of the array in pages'''
-        arr = self._arr
+        if selection is None:
+            arr = self._arr
+        else:
+            arr = self._arr[selection]
         nrows = len(arr)
         page_size = self.page_size
         names = arr.dtype.names
@@ -280,31 +466,24 @@ class ArrayCatalog(Catalog):
             yield CatalogPage(page)
 
 
-def _fits_table_hdu(fits):
-    '''get the first FITS extension with table data'''
-    try:
-        hdu = next(hdu for hdu in fits if hdu.has_data())
-    except StopIteration:
-        raise TypeError('cannot find FITS extension with table data') from None
-    return hdu
+def _is_table_hdu(hdu):
+    '''return true if HDU is a table with data'''
+    return isinstance(hdu, fitsio.hdu.TableHDU) and hdu.has_data()
 
 
-class FitsCatalog(Catalog):
+class FitsCatalog(CatalogBase):
     '''flexible reader for catalogues from FITS files'''
 
-    def __init__(self, filename, *, columns=None, ext=None, query=None):
+    def __init__(self, filename, *, columns=None, ext=None):
         '''create a new FITS catalogue reader
 
         Neither opens the FITS file nor reads the catalogue immediately.
 
         '''
-
         super().__init__()
-
         self._filename = filename
         self._columns = columns
         self._ext = ext
-        self._query = query
 
     def __copy__(self):
         '''return a copy of this catalog'''
@@ -312,7 +491,6 @@ class FitsCatalog(Catalog):
         other._filename = self._filename
         other._columns = self._columns
         other._ext = self._ext
-        other._query = self._query
         return other
 
     def __repr__(self):
@@ -320,72 +498,70 @@ class FitsCatalog(Catalog):
         s = self._filename
         if self._ext is not None:
             s = s + f'[{self._ext!r}]'
-        if self._query is not None:
-            s = s + f'[{self._query!r}]'
         return s
 
-    def query(self, query):
-        '''return a new FitsCatalog instance with an additional query'''
+    @contextmanager
+    def hdu(self):
+        '''context manager to get the HDU for catalogue data'''
 
-        copied = copy(self)
-
-        if self._query is None:
-            copied._query = query
-        else:
-            copied._query = f'({self._query}) && ({query})'
-
-        copied._size = None
-
-        return copied
-
-    def _open(self, fits):
-        '''open FITS for reading'''
-
-        # find or get the extension
-        if self._ext is None:
-            hdu = _fits_table_hdu(fits)
-        else:
-            hdu = fits[self._ext]
-
-        # use all columns or the selected ones
-        if self._columns is None:
-            names = hdu.get_colnames()
-        else:
-            names = self._columns
-
-        # use all rows or select from query if one is given
-        if self._query is None:
-            selected = None
-            size = hdu.get_nrows()
-        else:
-            selected = hdu.where(self._query)
-            size = len(selected)
-
-        return hdu, names, selected, size
-
-    def peek(self):
-        '''read the FITS file information'''
+        # use FITS as inner context manager to ensure file is closed
         with fitsio.FITS(self._filename) as fits:
-            _, names, _, size = self._open(fits)
-            self._size = size
-            self._names = names
+            if self._ext is None:
+                try:
+                    # find table data extension
+                    hdu = next(filter(_is_table_hdu, fits))
+                except StopIteration:
+                    raise TypeError('no extension with table data') from None
+            else:
+                hdu = fits[self._ext]
+            try:
+                yield hdu
+            finally:
+                pass
 
-    def _pages(self):
+    def _names(self):
+        '''column names in FITS catalogue'''
+        # store column names on first access
+        if self._columns is None:
+            with self.hdu() as hdu:
+                self._columns = hdu.get_colnames()
+        return self._columns
+
+    @lru_cache
+    def _size(self, selection):
+        '''size of FITS catalogue or selection'''
+        with self.hdu() as hdu:
+            if selection is None:
+                return hdu.get_nrows()
+            else:
+                return len(hdu.where(selection))
+
+    def _join(self, *where):
+        '''join rowfilter expressions'''
+        if not where:
+            return 'true'
+        return '(' + ') && ('.join(map(str, where)) + ')'
+
+    def _pages(self, selection):
         '''iterate pages of rows in FITS file, optionally using the query'''
 
         # keep an unchanging local copy of the page size
         page_size = self.page_size
 
-        with fitsio.FITS(self._filename) as fits:
+        with self.hdu() as hdu:
 
-            hdu, names, selected, nrows = self._open(fits)
+            names = self._names()
 
-            # set catalogue info
-            self._size = nrows
-            self._names = names
+            # use all rows or selection if one is given
+            if selection is None:
+                selected = None
+                size = hdu.get_nrows()
+            else:
+                selected = hdu.where(selection)
+                size = len(selected)
 
             # now iterate the (selected) rows in batches
-            for i in range(0, nrows, page_size):
+            for i in range(0, size, page_size):
                 if selected is None:
                     rows = hdu[names][i:i+page_size]
                 else:
