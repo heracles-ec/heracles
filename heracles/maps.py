@@ -2,6 +2,7 @@
 
 import warnings
 from abc import ABCMeta, abstractmethod
+from collections.abc import Generator
 from functools import wraps, partial
 import logging
 import numpy as np
@@ -9,7 +10,6 @@ import healpy as hp
 from numba import njit
 
 from .util import toc_match, Progress
-from ._cofunctions import cofunction
 
 import typing as t
 if t.TYPE_CHECKING:
@@ -203,7 +203,6 @@ class PositionMap(HealpixMap, RandomizableMap):
     def overdensity(self, overdensity: bool) -> None:
         self._overdensity = overdensity
 
-    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map the given catalogue.'''
 
@@ -283,7 +282,6 @@ class ScalarMap(HealpixMap, NormalizableMap):
         super().__init__(columns=(lon, lat, value, weight), nside=nside,
                          normalize=normalize)
 
-    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map real values from catalogue to HEALPix map.'''
 
@@ -381,7 +379,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         '''Set the conjugate flag.'''
         self._conjugate = conjugate
 
-    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map shears from catalogue to HEALPix map.'''
 
@@ -490,7 +487,6 @@ class WeightMap(HealpixMap, NormalizableMap):
         super().__init__(columns=(lon, lat, weight), nside=nside,
                          normalize=normalize)
 
-    @cofunction
     def __call__(self, catalog: 'Catalog') -> MapGenerator:
         '''Map catalogue weights.'''
 
@@ -542,6 +538,15 @@ ShearMap = Spin2Map
 EllipticityMap = Spin2Map
 
 
+def _close_and_return(generator):
+    try:
+        next(generator)
+    except StopIteration as end:
+        return end.value
+    else:
+        raise RuntimeError('generator did not stop')
+
+
 def map_catalogs(maps: t.Mapping[t.Any, Map],
                  catalogs: t.Mapping[t.Any, 'Catalog'],
                  *,
@@ -578,30 +583,36 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
             if progress:
                 prog.update()
 
-        # collect functions from results
-        fns = {k: v for k, v in results.items() if callable(v)}
+        # collect map generators from results
+        gen = {k: v for k, v in results.items() if isinstance(v, Generator)}
 
-        # if there are any functions, feed them the catalogue pages
-        if fns:
+        # if there are any generators, feed them the catalogue pages
+        if gen:
 
             if progress:
                 prog.start(catalog.size, i)
 
+            # get the mapping functions from each generator
+            fns = {k: next(g) for k, g in gen.items()}
+
             # go through catalogue pages once
-            # give each page to each function
+            # give each page to each generator
             # make copies to that generators can delete() etc.
             for page in catalog:
                 for k, fn in fns.items():
-                    results[k] = fn(page.copy())
+                    fn(page.copy())
                 if progress:
                     prog.update(catalog.page_size)
 
-            # terminate cofunctions and store results
-            for k, fn in fns.items():
-                try:
-                    results[k] = fn.finish()
-                except AttributeError:
-                    pass
+            # done with the mapping functions
+            del fn, fns
+
+            # terminate generators and store results
+            for k, g in gen.items():
+                results[k] = _close_and_return(g)
+
+            # done with the generators
+            del gen
 
         # store results
         for k, v in results.items():

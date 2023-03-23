@@ -6,10 +6,16 @@ from .conftest import warns
 
 
 def map_catalog(m, catalog):
-    fn = m(catalog)
+    g = m(catalog)
+    fn = next(g)
     for page in catalog:
         fn(page)
-    return fn.finish()
+    try:
+        next(g)
+    except StopIteration as stop:
+        return stop.value
+    else:
+        raise RuntimeError('generator did not stop')
 
 
 @pytest.fixture
@@ -289,9 +295,6 @@ class MockMap:
 
 class MockMapGen(MockMap):
 
-    from le3_pk_wl._cofunctions import cofunction
-
-    @cofunction
     def __call__(self, catalog):
         def f(page):
             pass
