@@ -407,7 +407,8 @@ def test_array_catalog():
 def test_fits_catalog(tmp_path):
 
     import fitsio
-    from le3_pk_wl.catalog import FitsCatalog, Catalog
+    from le3_pk_wl.catalog import Catalog
+    from le3_pk_wl.catalog.fits import FitsCatalog
 
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
@@ -462,4 +463,57 @@ def test_fits_catalog(tmp_path):
 
     assert isinstance(copied, FitsCatalog)
     assert copied is not catalog
-    assert copied.__dict__ == catalog.__dict__
+    assert copied._filename == catalog._filename
+    assert copied._columns == catalog._columns
+    assert copied._ext == catalog._ext
+
+
+def test_fits_catalog_caching(tmp_path):
+
+    import gc
+    import fitsio
+    from le3_pk_wl.catalog.fits import FitsCatalog
+
+    size = 100
+    ra = np.random.uniform(-180, 180, size=size)
+    dec = np.random.uniform(-90, 90, size=size)
+
+    filename = str(tmp_path / 'cached.fits')
+
+    with fitsio.FITS(filename, 'rw') as fits:
+        fits.write(None)
+        fits.write_table([ra, dec], names=['RA', 'DEC'], extname='MYEXT')
+
+    catalog = FitsCatalog(filename)
+
+    hdu = catalog.hdu()
+    assert catalog.hdu() is hdu
+
+    assert catalog._hdu() is not None
+
+    _fits = hdu._FITS
+
+    assert _fits.filename() == filename
+
+    del hdu
+    gc.collect()
+
+    assert catalog._hdu() is None
+
+    with pytest.raises(ValueError):
+        _fits.filename()
+
+    catalog.page_size = size//2
+
+    it1 = iter(catalog)
+    it2 = iter(catalog)
+
+    page1 = next(it1)
+    page2 = next(it2)
+    assert page1 is page2
+
+    page1 = next(it1)
+    assert page1 is not page2
+
+    page2 = next(it2)
+    assert page1 is page2
