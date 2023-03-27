@@ -1,6 +1,5 @@
 '''module for catalogue processing'''
 
-from functools import lru_cache
 from weakref import ref, finalize
 import fitsio
 
@@ -10,6 +9,11 @@ from .base import CatalogBase, CatalogPage
 def _is_table_hdu(hdu):
     '''return true if HDU is a table with data'''
     return isinstance(hdu, fitsio.hdu.TableHDU) and hdu.has_data()
+
+
+def rowfilter(array, expr):
+    '''filter the rows of a structured array'''
+    return eval(expr, None, {name: array[name] for name in array.dtype.names})
 
 
 class FitsCatalog(CatalogBase):
@@ -90,19 +94,15 @@ class FitsCatalog(CatalogBase):
             self._columns = self.hdu().get_colnames()
         return self._columns
 
-    @lru_cache
     def _size(self, selection):
-        '''size of FITS catalogue or selection'''
-        if selection is None:
-            return self.hdu().get_nrows()
-        else:
-            return len(self.hdu().where(selection))
+        '''size of FITS catalogue; selection is ignored'''
+        return self.hdu().get_nrows()
 
     def _join(self, *where):
         '''join rowfilter expressions'''
         if not where:
-            return 'true'
-        return '(' + ') && ('.join(map(str, where)) + ')'
+            return None
+        return '(' + ') & ('.join(map(str, filter(None, where))) + ')'
 
     def _pages(self, selection):
         '''iterate pages of rows in FITS file, optionally using the query'''
@@ -114,39 +114,34 @@ class FitsCatalog(CatalogBase):
         names = self._names()
 
         # use all rows or selection if one is given
-        if selection is None:
-            selected = None
-            size = hdu.get_nrows()
-        else:
-            selected = hdu.where(selection)
-            size = len(selected)
+        nrows = hdu.get_nrows()
 
         # information for caching
         hduid = id(hdu)
 
-        # now iterate the (selected) rows in batches
-        for start in range(0, size, page_size):
+        # now iterate all rows in batches
+        for start in range(0, nrows, page_size):
             stop = start + page_size
 
-            # see if page was cached
+            # see if rows were cached
             try:
-                if self._pageinfo == (hduid, start, stop):
-                    page = self._page()
+                if self._rowinfo == (hduid, start, stop):
+                    rows = self._rows
                 else:
-                    page = None
+                    rows = None
             except AttributeError:
-                page = None
+                rows = None
 
-            # retrieve page if not cached
-            if page is None:
-                if selected is None:
-                    rows = hdu[names][start:stop]
-                else:
-                    rows = hdu[names][selected[start:stop]]
+            # retrieve rows if not cached
+            if rows is None:
+                rows = hdu[names][start:stop]
 
-                page = CatalogPage({name: rows[name] for name in names})
+                # update row cache
+                self._rowinfo = (hduid, start, stop)
+                self._rows = rows
 
-                self._pageinfo = (hduid, start, stop)
-                self._page = ref(page)
+            # apply selection if given
+            if selection is not None:
+                rows = rows[rowfilter(rows, selection)]
 
-            yield page
+            yield CatalogPage({name: rows[name] for name in names})

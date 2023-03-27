@@ -437,7 +437,7 @@ def test_fits_catalog(tmp_path):
 
     sel = np.where(ra > 0)[0]
 
-    assert view.size == sel.size
+    assert view.size == catalog.size
     assert view.names == ['RA', 'DEC']
 
     page = next(iter(view))
@@ -450,7 +450,7 @@ def test_fits_catalog(tmp_path):
 
     sel = np.where((ra > 0) & (dec < 0))[0]
 
-    assert vview.size == sel.size
+    assert vview.size == catalog.size
     assert vview.names == ['RA', 'DEC']
 
     page = next(iter(vview))
@@ -510,10 +510,10 @@ def test_fits_catalog_caching(tmp_path):
 
     page1 = next(it1)
     page2 = next(it2)
-    assert page1 is page2
+    assert page1['RA'].base is page2['RA'].base
 
     page1 = next(it1)
-    assert page1 is not page2
+    assert page1['RA'].base is not page2['RA'].base
 
     page2 = next(it2)
-    assert page1 is page2
+    assert page1['RA'].base is page2['RA'].base
