@@ -303,19 +303,24 @@ class MockMapGen(MockMap):
 
 
 class MockCatalog:
+    size = 10
+    page_size = 1
+
     def __iter__(self):
-        yield {}
+        for i in range(0, self.size, self.page_size):
+            yield {}
 
 
 @pytest.mark.parametrize('Map', [MockMap, MockMapGen])
-def test_map_catalogs(Map):
+@pytest.mark.parametrize('parallel', [False, True])
+def test_map_catalogs(Map, parallel):
 
     from le3_pk_wl.maps import map_catalogs
 
     maps = {'a': Map(), 'b': Map(), 'z': Map()}
     catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
 
-    data = map_catalogs(maps, catalogs)
+    data = map_catalogs(maps, catalogs, parallel=parallel)
 
     for k in maps:
         for i in catalogs:

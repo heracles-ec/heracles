@@ -207,29 +207,6 @@ def test_catalog_base_pagination(catalog):
         assert i*page_size + page.size == size
 
 
-def test_catalog_base_empty_page():
-
-    from le3_pk_wl.catalog import CatalogBase, CatalogPage
-
-    class TestCatalogEmpty(CatalogBase):
-        def _names(self):
-            return ['lon', 'lat']
-
-        def _size(self, selection):
-            return 0
-
-        def _join(self, *where):
-            return where
-
-        def _pages(self, selection):
-            yield CatalogPage({'lon': [], 'lat': []})
-
-    c = TestCatalogEmpty()
-
-    with pytest.raises(StopIteration):
-        next(iter(c))
-
-
 def test_catalog_base_copy():
 
     from le3_pk_wl.catalog import CatalogBase

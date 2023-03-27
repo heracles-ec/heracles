@@ -550,6 +550,7 @@ def _close_and_return(generator):
 def map_catalogs(maps: t.Mapping[t.Any, Map],
                  catalogs: t.Mapping[t.Any, 'Catalog'],
                  *,
+                 parallel: bool = False,
                  out: t.MutableMapping[t.Any, t.Any] = None,
                  include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
                  exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
@@ -564,65 +565,95 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
     # display a progress bar if asked to
     if progress:
         prog = Progress()
-        try:
-            nmaps = len(maps)
-        except TypeError:
-            nmaps = 1
 
-    # for computation, go through catalogues first and maps second
-    for i, catalog in catalogs.items():
+    # collect groups of catalogues to go through if parallel
+    if parallel:
+        groups = {}
+        for i, catalog in catalogs.items():
+            if (catalog.size, catalog.page_size) not in groups:
+                groups[catalog.size, catalog.page_size] = {}
+            groups[catalog.size, catalog.page_size][i] = catalog
+        # unnamed groups of catalogues
+        items = ((None, group) for group in groups.values())
+    else:
+        # consider each catalogue its own named group
+        items = ((i, {i: catalog}) for i, catalog in catalogs.items())
 
-        if progress:
-            prog.start(nmaps, i)
+    # map each group: run through catalogues and maps
+    for name, group in items:
 
-        # apply the maps to the catalogue
+        # apply the maps to each catalogue in the group
         results = {}
-        for k, v in maps.items():
-            if toc_match((k, i), include, exclude):
-                results[k] = v(catalog)
-            if progress:
-                prog.update()
+        if progress:
+            prog.start(len(maps)*len(group), name)
+        for i, catalog in group.items():
+            for k, mapper in maps.items():
+                if toc_match((k, i), include, exclude):
+                    results[k, i] = mapper(catalog)
+                if progress:
+                    prog.update()
+        if progress:
+            prog.stop()
 
         # collect map generators from results
-        gen = {k: v for k, v in results.items() if isinstance(v, Generator)}
+        gen = {ki: v for ki, v in results.items() if isinstance(v, Generator)}
 
         # if there are any generators, feed them the catalogue pages
         if gen:
 
-            if progress:
-                prog.start(catalog.size, i)
+            # get an iterator over each catalogue
+            # by construction, these have all the same length and page size
+            its = {i: iter(catalog) for i, catalog in group.items()}
+
+            # get the iteration limits of this group from first catalog
+            size, page_size = next((c.size, c.page_size)
+                                   for c in group.values())
 
             # get the mapping functions from each generator
-            fns = {k: next(g) for k, g in gen.items()}
+            fns = {ki: next(g) for ki, g in gen.items()}
 
-            # go through catalogue pages once
+            # go through each page of each catalogue once
             # give each page to each generator
             # make copies to that generators can delete() etc.
-            for page in catalog:
-                for k, fn in fns.items():
-                    fn(page.copy())
+            if progress:
+                prog.start(size, name)
+            for rownum in range(0, size, page_size):
+                for i, it in its.items():
+                    try:
+                        page = next(it)
+                    except StopIteration:
+                        raise RuntimeError(f'catalog {i} finished prematurely'
+                                           f' in page started at row {rownum}')
+                    for k in maps:
+                        if (fn := fns.get((k, i))) is not None:
+                            fn(page.copy())
                 if progress:
-                    prog.update(catalog.page_size)
+                    prog.update(page_size)
+            if progress:
+                prog.stop()
 
             # done with the mapping functions
             del fn, fns
 
             # terminate generators and store results
-            for k, g in gen.items():
-                results[k] = _close_and_return(g)
+            if progress:
+                prog.start(len(gen), name)
+            for ki, g in gen.items():
+                results[ki] = _close_and_return(g)
+                if progress:
+                    prog.update()
+            if progress:
+                prog.stop()
 
             # done with the generators
             del gen
 
         # store results
-        for k, v in results.items():
-            out[k, i] = v
+        for ki, v in results.items():
+            out[ki] = v
 
         # results are no longer needed
         del results
-
-        if progress:
-            prog.stop()
 
     # return the toc dict
     return out
@@ -644,7 +675,7 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
     # display a progress bar if asked to
     if progress:
         prog = Progress()
-        prog.start(len(maps), 'transforming')
+        prog.start(len(maps))
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():

@@ -309,7 +309,8 @@ def binned_cl(cl, bins, cmblike=False):
 
 
 def random_noisebias(maps, catalogs, names={}, *,
-                     repeat=1, full=False, include=None, exclude=None,
+                     repeat=1, full=False, parallel=False,
+                     include=None, exclude=None, progress=False,
                      **kwargs):
     '''noise bias estimate from randomised position and shear maps
 
@@ -342,8 +343,10 @@ def random_noisebias(maps, catalogs, names={}, *,
 
             logger.info('estimating noise bias from randomised maps%s', '' if n == 0 else f' (repeat {n+1})')
 
-            data = _map_catalogs(maps, catalogs, include=include, exclude=exclude)
-            alms = _transform_maps(data, names, **kwargs)
+            data = _map_catalogs(maps, catalogs, parallel=parallel,
+                                 include=include, exclude=exclude,
+                                 progress=progress)
+            alms = _transform_maps(data, names, progress=progress, **kwargs)
 
             # set the includes cls if full is false now that we know the alms
             if not full and include_cls is None:

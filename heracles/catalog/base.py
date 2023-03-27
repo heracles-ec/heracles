@@ -335,10 +335,6 @@ class CatalogBase(metaclass=ABCMeta):
 
         for page in self._pages(selection):
 
-            # skip empty pages
-            if page.size == 0:
-                continue
-
             # apply filters
             for filt in self._filters:
                 filt(page)
