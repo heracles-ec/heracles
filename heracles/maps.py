@@ -660,7 +660,6 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
 
 
 def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
-                   names: t.Mapping[t.Any, t.Any] = {},
                    *,
                    out: t.MutableMapping[t.Any, t.Any] = None,
                    progress: bool = False,
@@ -698,18 +697,14 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
         alms = hp.map2alm(m, pol=pol, **kwargs)
 
         if spin == 0:
-            j = names.get(k, k)
-            alms = {(j, i): alms}
+            alms = {(k, i): alms}
         elif spin == 2:
-            j1, j2 = names.get(k, ('E', 'B'))
-            alms = {(j1, i): alms[1], (j2, i): alms[2]}
+            alms = {(f'{k}_E', i): alms[1], (f'{k}_B', i): alms[2]}
 
-        for j, alm in alms.items():
-            if j in out:
-                raise KeyError(f'duplicate alm {j}, set `names=` manually')
+        for ki, alm in alms.items():
             if md:
                 update_metadata(alm, nside=nside, **md)
-            out[j] = alm
+            out[ki] = alm
 
         del m, alms, alm
 

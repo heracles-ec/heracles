@@ -235,29 +235,29 @@ def test_transform_maps():
     alms = transform_maps(maps)
 
     assert len(alms) == 2
-    assert alms.keys() == {('E', 0), ('B', 0)}
-    assert alms['E', 0].dtype.metadata['spin'] == 2
-    assert alms['B', 0].dtype.metadata['spin'] == 2
-    assert alms['E', 0].dtype.metadata['b'] == 2
-    assert alms['B', 0].dtype.metadata['b'] == 2
-    assert alms['E', 0].dtype.metadata['nside'] == nside
-    assert alms['B', 0].dtype.metadata['nside'] == nside
+    assert alms.keys() == {('P_E', 0), ('P_B', 0)}
+    assert alms['P_E', 0].dtype.metadata['spin'] == 2
+    assert alms['P_B', 0].dtype.metadata['spin'] == 2
+    assert alms['P_E', 0].dtype.metadata['b'] == 2
+    assert alms['P_B', 0].dtype.metadata['b'] == 2
+    assert alms['P_E', 0].dtype.metadata['nside'] == nside
+    assert alms['P_B', 0].dtype.metadata['nside'] == nside
 
     # mixed
     maps = {('T', 0): t, ('P', 1): p}
     alms = transform_maps(maps)
 
     assert len(alms) == 3
-    assert alms.keys() == {('T', 0), ('E', 1), ('B', 1)}
+    assert alms.keys() == {('T', 0), ('P_E', 1), ('P_B', 1)}
     assert alms['T', 0].dtype.metadata['spin'] == 0
-    assert alms['E', 1].dtype.metadata['spin'] == 2
-    assert alms['B', 1].dtype.metadata['spin'] == 2
+    assert alms['P_E', 1].dtype.metadata['spin'] == 2
+    assert alms['P_B', 1].dtype.metadata['spin'] == 2
     assert alms['T', 0].dtype.metadata['a'] == 1
-    assert alms['E', 1].dtype.metadata['b'] == 2
-    assert alms['B', 1].dtype.metadata['b'] == 2
+    assert alms['P_E', 1].dtype.metadata['b'] == 2
+    assert alms['P_B', 1].dtype.metadata['b'] == 2
     assert alms['T', 0].dtype.metadata['nside'] == nside
-    assert alms['E', 1].dtype.metadata['nside'] == nside
-    assert alms['B', 1].dtype.metadata['nside'] == nside
+    assert alms['P_E', 1].dtype.metadata['nside'] == nside
+    assert alms['P_B', 1].dtype.metadata['nside'] == nside
 
 
 def test_update_metadata():

@@ -22,7 +22,7 @@ def mock_alms(zbins):
 
     Nlm = (lmax + 1) * (lmax + 2) // 2
 
-    names = ['P', 'E', 'B']
+    names = ['P', 'G_E', 'G_B']
 
     alms = {}
     for n in names:
@@ -40,7 +40,8 @@ def test_angular_power_spectra(mock_alms):
 
     # alms cross themselves
 
-    comb = set((f'{n1}{n2}', i1, i2) for (n1, i1), (n2, i2) in combinations_with_replacement(mock_alms, 2))
+    comb = {(k1, k2, i1, i2)
+            for (k1, i1), (k2, i2) in combinations_with_replacement(mock_alms, 2)}
 
     cls = angular_power_spectra(mock_alms)
 
@@ -54,23 +55,29 @@ def test_angular_power_spectra(mock_alms):
 
     # explicit include
 
-    cls = angular_power_spectra(mock_alms, include=[('PP', ..., ...), ('PE', ..., ...)])
+    cls = angular_power_spectra(mock_alms, include=[('P', 'P', ..., ...), ('P', 'G_E', ..., ...)])
 
-    assert cls.keys() == {(n, i1, i2) for n, i1, i2 in comb if n in ['PP', 'PE']}
+    assert cls.keys() == {(k1, k2, i1, i2)
+                          for k1, k2, i1, i2 in comb
+                          if (k1, k2) in [('P', 'P'), ('P', 'G_E')]}
 
-    cls = angular_power_spectra(mock_alms, include=[('PP', 0), ('PE', 1)])
+    cls = angular_power_spectra(mock_alms, include=[('P', 'P', 0), ('P', 'G_E', 1)])
 
-    assert cls.keys() == {(n, i1, i2) for n, i1, i2 in comb if (n, i1) in [('PP', 0), ('PE', 1)]}
+    assert cls.keys() == {(k1, k2, i1, i2)
+                          for k1, k2, i1, i2 in comb
+                          if (k1, k2, i1) in [('P', 'P', 0), ('P', 'G_E', 1)]}
 
     # explicit exclude
 
-    cls = angular_power_spectra(mock_alms, exclude=[('PP',), ('PE',), ('PB',)])
+    cls = angular_power_spectra(mock_alms, exclude=[('P', 'P'), ('P', 'G_E'), ('P', 'G_B')])
 
-    assert cls.keys() == {(n, i1, i2) for n, i1, i2 in comb if n not in ['PP', 'PE', 'PB']}
+    assert cls.keys() == {(k1, k2, i1, i2)
+                          for k1, k2, i1, i2 in comb
+                          if (k1, k2) not in [('P', 'P'), ('P', 'G_E'), ('P', 'G_B')]}
 
-    cls = angular_power_spectra(mock_alms, exclude=[(..., 1, ...)])
+    cls = angular_power_spectra(mock_alms, exclude=[(..., ..., 1, ...)])
 
-    assert cls.keys() == {(n, i1, i2) for n, i1, i2 in comb if i1 != 1}
+    assert cls.keys() == {(k1, k2, i1, i2) for k1, k2, i1, i2 in comb if i1 != 1}
 
 
 def test_debias_cls():
@@ -101,20 +108,20 @@ def test_mixing_matrices():
     cl = np.random.randn(lmax+1)
 
     # compute pos-pos
-    cls = {('VV', 0, 1): cl}
+    cls = {('V', 'V', 0, 1): cl}
     mms = mixing_matrices(cls)
     assert len(mms) == 1
     assert mms['00', 0, 1].shape == (lmax+1, lmax+1)
 
     # compute pos-she
-    cls = {('VW', 0, 1): cl, ('WV', 0, 1): cl}
+    cls = {('V', 'W', 0, 1): cl, ('W', 'V', 0, 1): cl}
     mms = mixing_matrices(cls)
     assert len(mms) == 2
     assert mms['0+', 0, 1].shape == (lmax+1, lmax+1)
     assert mms['0+', 1, 0].shape == (lmax+1, lmax+1)
 
     # compute she-she
-    cls = {('WW', 0, 1): cl}
+    cls = {('W', 'W', 0, 1): cl}
     mms = mixing_matrices(cls)
     assert len(mms) == 3
     assert mms['++', 0, 1].shape == (lmax+1, lmax+1)
@@ -123,7 +130,7 @@ def test_mixing_matrices():
     np.testing.assert_allclose(mms['+-', 0, 1], mms['++', 0, 1] + mms['--', 0, 1])
 
     # compute unknown
-    cls = {('XY', 0, 1): cl}
+    cls = {('X', 'Y', 0, 1): cl}
     mms = mixing_matrices(cls)
     assert len(mms) == 1
     assert mms['XY', 0, 1].shape == (lmax+1, lmax+1)
@@ -209,10 +216,11 @@ def test_random_noisebias(full):
     for m, r in zip(maps.values(), initial_randomize):
         assert m.randomize is r
 
-    keys = [('AA', 0, 0), ('AA', 0, 1), ('AA', 1, 1),
-            ('BB', 0, 0), ('BB', 0, 1), ('BB', 1, 1)]
+    keys = [('A', 'A', 0, 0), ('A', 'A', 1, 1),
+            ('B', 'B', 0, 0), ('B', 'B', 1, 1)]
     if full:
-        keys += [('AB', 0, 0), ('AB', 1, 1), ('AB', 0, 1), ('AB', 1, 0)]
+        keys += [('A', 'A', 0, 1), ('A', 'B', 0, 0), ('A', 'B', 1, 1),
+                 ('A', 'B', 0, 1), ('A', 'B', 1, 0), ('B', 'B', 0, 1)]
 
     assert set(nbs.keys()) == set(keys)
 
@@ -221,8 +229,8 @@ def test_random_noisebias(full):
     nbs = random_noisebias(maps, catalogs, repeat=5, full=full,
                            include=[('A', 0), ('B', ...)], exclude=[('B', 0)])
 
-    keys = [('AA', 0, 0), ('BB', 1, 1)]
+    keys = [('A', 'A', 0, 0), ('B', 'B', 1, 1)]
     if full:
-        keys += [('AB', 0, 1)]
+        keys += [('A', 'B', 0, 1)]
 
     assert set(nbs.keys()) == set(keys)

@@ -36,23 +36,21 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
     # compute cls for all alm pairs
     # do not compute duplicates
     cls = {}
-    for ((n1, i1), alm1), ((n2, i2), alm2) in alm_pairs:
+    for ((k1, i1), alm1), ((k2, i2), alm2) in alm_pairs:
         # get the two-point code in standard order
-        xy, yx = f'{n1}{n2}', f'{n2}{n1}'
-        if xy not in twopoint_names and yx in twopoint_names:
-            xy, yx = yx, xy
+        if (k1, k2) not in twopoint_names and (k2, k1) in twopoint_names:
             i1, i2 = i2, i1
-            n1, n2 = n2, n1
+            k1, k2 = k2, k1
 
         # skip duplicate cls in any order
-        if (xy, i1, i2) in cls or (yx, i2, i1) in cls:
+        if (k1, k2, i1, i2) in cls or (k2, k1, i2, i1) in cls:
             continue
 
         # check if cl is skipped by explicit include or exclude list
-        if not toc_match((xy, i1, i2), include, exclude):
+        if not toc_match((k1, k2, i1, i2), include, exclude):
             continue
 
-        logger.info('computing %s cl for bins %s, %s', xy, i1, i2)
+        logger.info('computing %s x %s cl for bins %s, %s', k1, k2, i1, i2)
 
         # compute the raw cl from the alms
         cl = hp.alm2cl(alm1, alm2, lmax_out=lmax)
@@ -62,7 +60,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         if alm1.dtype.metadata:
             for key, value in alm1.dtype.metadata.items():
                 if key == 'noisbias':
-                    md[key] = value if n1 == n2 and i1 == i2 else 0.
+                    md[key] = value if k1 == k2 and i1 == i2 else 0.
                 else:
                     md[f'{key}_1'] = value
         if alm2.dtype.metadata:
@@ -74,10 +72,10 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         update_metadata(cl, **md)
 
         # add cl to the set
-        cls[xy, i1, i2] = cl
+        cls[k1, k2, i1, i2] = cl
 
         # keep track of names
-        twopoint_names.add(xy)
+        twopoint_names.add((k1, k2))
 
     logger.info('computed %d cl(s) in %s', len(cls), timedelta(seconds=(time.monotonic() - t)))
 
@@ -215,29 +213,29 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
 
     # go through the toc dict of cls and compute mixing matrices
     # which mixing matrix is computed depends on the combination of V/W maps
-    for (xy, i1, i2), cl in cls.items():
-        if xy == 'VV':
+    for (k1, k2, i1, i2), cl in cls.items():
+        if k1 == 'V' and k2 == 'V':
             logger.info('computing 00 mixing matrix for bins %s, %s', i1, i2)
             w00 = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
             mms['00', i1, i2] = w00
-        elif xy == 'VW':
+        elif k1 == 'V' and k2 == 'W':
             logger.info('computing 0+ mixing matrix for bins %s, %s', i1, i2)
             w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(0, 2))
             mms['0+', i1, i2] = w0p
-        elif xy == 'WV':
+        elif k1 == 'W' and k2 == 'V':
             logger.info('computing 0+ mixing matrix for bins %s, %s', i2, i1)
             w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 0))
             mms['0+', i2, i1] = w0p
-        elif xy == 'WW':
+        elif k1 == 'W' and k2 == 'W':
             logger.info('computing ++, --, +- mixing matrices for bins %s, %s', i1, i2)
             wpp, wmm, wpm = mixmat_eb(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 2))
             mms['++', i1, i2] = wpp
             mms['--', i1, i2] = wmm
             mms['+-', i1, i2] = wpm
         else:
-            logger.warning('computing unknown %s mixing matrix for bins %s, %s', xy, i1, i2)
+            logger.warning('computing unknown %s x %s mixing matrix for bins %s, %s', k1, k2, i1, i2)
             w = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
-            mms[xy, i1, i2] = w
+            mms[f'{k1}{k2}', i1, i2] = w
 
     logger.info('computed %d mm(s) in %s', len(mms), timedelta(seconds=(time.monotonic() - t)))
 
@@ -308,7 +306,7 @@ def binned_cl(cl, bins, cmblike=False):
     return binned_statistic(ell, cl, bins=bins, statistic='mean')[0]
 
 
-def random_noisebias(maps, catalogs, names={}, *,
+def random_noisebias(maps, catalogs, *,
                      repeat=1, full=False, parallel=False,
                      include=None, exclude=None, progress=False,
                      **kwargs):
@@ -346,11 +344,11 @@ def random_noisebias(maps, catalogs, names={}, *,
             data = _map_catalogs(maps, catalogs, parallel=parallel,
                                  include=include, exclude=exclude,
                                  progress=progress)
-            alms = _transform_maps(data, names, progress=progress, **kwargs)
+            alms = _transform_maps(data, progress=progress, **kwargs)
 
             # set the includes cls if full is false now that we know the alms
             if not full and include_cls is None:
-                include_cls = [(f'{k}{k}', ..., ...) for k, _ in alms]
+                include_cls = [(k, k, i, i) for k, i in alms]
 
             cls = angular_power_spectra(alms, lmax=lmax, include=include_cls)
 

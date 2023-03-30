@@ -355,8 +355,8 @@ def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclud
 
         # write a new TOC extension if FITS doesn't already contain one
         if 'CLTOC' not in fits:
-            fits.create_table_hdu(names=['EXT', 'NAME', 'BIN1', 'BIN2'],
-                                  formats=['10A', '10A', 'I', 'I'],
+            fits.create_table_hdu(names=['EXT', 'NAME1', 'NAME2', 'BIN1', 'BIN2'],
+                                  formats=['10A', '10A', '10A', 'I', 'I'],
                                   extname='CLTOC')
 
         # get a recarray to write TOC entries with
@@ -368,13 +368,13 @@ def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclud
             cln += 1
 
         # write every cl
-        for (n, i1, i2), cl in cls.items():
+        for (k1, k2, i1, i2), cl in cls.items():
 
             # skip if not selected
-            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+            if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info('writing %s cl for bins %s, %s', n, i1, i2)
+            logger.info('writing %s x %s cl for bins %s, %s', k1, k2, i1, i2)
 
             # the cl extension name
             ext = f'CL{cln}'
@@ -387,7 +387,7 @@ def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclud
             _write_metadata(fits[ext], cl.dtype.metadata)
 
             # write the TOC entry
-            tocentry[0] = (ext, n, i1, i2)
+            tocentry[0] = (ext, k1, k2, i1, i2)
             fits['CLTOC'].append(tocentry)
 
     logger.info('done with %d cls', len(cls))
@@ -412,13 +412,13 @@ def read_cls(filename, workdir='.', *, include=None, exclude=None):
 
         # read every entry in the TOC, add it to the list, then read the cls
         for entry in fits_toc:
-            ext, n, i1, i2 = entry[['EXT', 'NAME', 'BIN1', 'BIN2']]
+            ext, k1, k2, i1, i2 = entry[['EXT', 'NAME1', 'NAME2', 'BIN1', 'BIN2']]
 
             # skip if not selected
-            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+            if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info('reading %s cl for bins %s, %s', n, i1, i2)
+            logger.info('reading %s x %s cl for bins %s, %s', k1, k2, i1, i2)
 
             # read the cl from the extension
             cl = fits[ext].read(columns=['CL'])['CL']
@@ -427,7 +427,7 @@ def read_cls(filename, workdir='.', *, include=None, exclude=None):
             cl.dtype = np.dtype(cl.dtype, metadata=_read_metadata(fits[ext]))
 
             # store in set of cls
-            cls[n, i1, i2] = cl
+            cls[k1, k2, i1, i2] = cl
 
     logger.info('done with %d cls', len(cls))
 
@@ -561,9 +561,11 @@ def write_cov(filename, cov, clobber=False, workdir='.', include=None, exclude=N
 
         # write a new TOC extension if FITS doesn't already contain one
         if 'COVTOC' not in fits:
-            fits.create_table_hdu(names=['EXT', 'NAME_1', 'BIN1_1', 'BIN2_1', 'NAME_2', 'BIN1_2', 'BIN2_2'],
-                                  formats=['10A', '10A', 'I', 'I', '10A', 'I', 'I'],
-                                  extname='COVTOC')
+            fits.create_table_hdu(
+                names=['EXT', 'NAME1_1', 'NAME2_1', 'BIN1_1', 'BIN2_1',
+                       'NAME1_2', 'NAME2_2', 'BIN1_2', 'BIN2_2'],
+                formats=['10A', '10A', '10A', 'I', 'I', '10A', '10A', 'I', 'I'],
+                extname='COVTOC')
 
         # get a recarray to write TOC entries with
         tocentry = np.empty(1, dtype=fits['COVTOC'].get_rec_dtype()[0])
@@ -619,8 +621,8 @@ def read_cov(filename, workdir='.', *, include=None, exclude=None):
         # read every entry in the TOC, add it to the list, then read the data
         for entry in fits_toc:
             ext = entry['EXT']
-            k1 = tuple(entry[['NAME_1', 'BIN1_1', 'BIN2_1']])
-            k2 = tuple(entry[['NAME_2', 'BIN1_2', 'BIN2_2']])
+            k1 = tuple(entry[['NAME1_1', 'NAME2_1', 'BIN1_1', 'BIN2_1']])
+            k2 = tuple(entry[['NAME1_2', 'NAME2_2', 'BIN1_2', 'BIN2_2']])
 
             # skip if not selected
             if not toc_match((k1, k2), include=include, exclude=exclude):
