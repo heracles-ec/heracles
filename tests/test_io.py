@@ -218,8 +218,12 @@ def test_write_read_cls(mock_cls, tmp_path):
 
     assert cls.keys() == mock_cls.keys()
     for key in mock_cls:
-        np.testing.assert_array_equal(cls[key], mock_cls[key])
-        assert cls[key].dtype.metadata == mock_cls[key].dtype.metadata
+        assert key in cls
+        cl = cls[key]
+        assert cl.dtype.names == ('L', 'CL', 'LMIN', 'LMAX', 'W')
+        np.testing.assert_array_equal(cl['L'], np.arange(len(mock_cls[key])))
+        np.testing.assert_array_equal(cl['CL'], mock_cls[key])
+        assert cl.dtype.metadata == mock_cls[key].dtype.metadata
 
 
 def test_write_read_mms(tmp_path):

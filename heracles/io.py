@@ -380,8 +380,21 @@ def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclud
             ext = f'CL{cln}'
             cln += 1
 
+            # get the data into the binned format if not already
+            if cl.dtype.names is None:
+                dt = np.dtype([('L', float), ('CL', float),
+                               ('LMIN', float), ('LMAX', float), ('W', float)],
+                              metadata=dict(cl.dtype.metadata))
+                cl_ = cl
+                cl = np.empty(len(cl_), dt)
+                cl['L'] = np.arange(len(cl_))
+                cl['CL'] = cl_
+                cl['LMIN'] = cl['L']
+                cl['LMAX'] = cl['L'] + 1
+                cl['W'] = 1
+
             # write the data column
-            fits.write_table([cl], names=['CL'], extname=ext)
+            fits.write_table(cl, extname=ext)
 
             # write the metadata
             _write_metadata(fits[ext], cl.dtype.metadata)
@@ -421,7 +434,7 @@ def read_cls(filename, workdir='.', *, include=None, exclude=None):
             logger.info('reading %s x %s cl for bins %s, %s', k1, k2, i1, i2)
 
             # read the cl from the extension
-            cl = fits[ext].read(columns=['CL'])['CL']
+            cl = fits[ext].read()
 
             # read and attach metadata
             cl.dtype = np.dtype(cl.dtype, metadata=_read_metadata(fits[ext]))

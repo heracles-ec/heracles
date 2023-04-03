@@ -7,7 +7,6 @@ from itertools import product, combinations_with_replacement
 
 import numpy as np
 import healpy as hp
-from scipy.stats import binned_statistic
 
 from ._mixmat import mixmat, mixmat_eb
 from .maps import update_metadata, map_catalogs as _map_catalogs, transform_maps as _transform_maps
@@ -294,16 +293,59 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
     return out
 
 
-def binned_cl(cl, bins, cmblike=False):
-    '''compute a binned angular power spectrum'''
+def binned_cls(cls, bins, *, weights=None, out=None):
+    '''compute binned angular power spectra'''
 
-    ell = np.arange(len(cl))
+    def norm(a, b):
+        '''divide a by b if a is nonzero'''
+        return np.divide(a, b, where=(a != 0), out=np.zeros_like(a))
 
-    # cmblike bins l(l + 1) C_l / 2pi
-    if cmblike:
-        cl = ell*(ell+1)*cl/(2*np.pi)
+    m = len(bins)
 
-    return binned_statistic(ell, cl, bins=bins, statistic='mean')[0]
+    if out is None:
+        out = {}
+
+    for key, cl in cls.items():
+        ell = np.arange(len(cl))
+
+        if weights is None:
+            w = np.ones_like(cl)
+        elif isinstance(weights, str):
+            if weights == 'l(l+1)':
+                w = ell*(ell+1)
+            elif weights == '2l+1':
+                w = 2*ell+1
+            else:
+                raise ValueError(f'unknown weights string: {weights}')
+        else:
+            w = weights[:len(cl)]
+
+        # create the output data
+        binned = np.empty(m-1, [('L', float), ('CL', float),
+                                ('LMIN', float), ('LMAX', float),
+                                ('W', float)])
+
+        # get the bin index for each ell
+        i = np.digitize(ell, bins)
+
+        # get the binned weights
+        wb = np.bincount(i, weights=w, minlength=m)[1:m]
+
+        # bin everything
+        binned['L'] = norm(np.bincount(i, weights=w*ell, minlength=m)[1:m], wb)
+        binned['CL'] = norm(np.bincount(i, weights=w*cl, minlength=m)[1:m], wb)
+
+        # add bin edges
+        binned['LMIN'] = bins[:-1]
+        binned['LMAX'] = bins[1:]
+
+        # add weights
+        binned['W'] = wb
+
+        # store result
+        out[key] = binned
+
+    return out
 
 
 def random_noisebias(maps, catalogs, *,

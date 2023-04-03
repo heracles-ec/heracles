@@ -165,31 +165,48 @@ def test_pixelate_mms_healpix():
     assert np.all(mms['ab', 0, 0] == np.diag(fl0*fl0))
 
 
-@pytest.mark.parametrize('cmblike', [False, True])
-def test_binned_cl(cmblike):
+@pytest.mark.parametrize('weights', [None, 'l(l+1)', '2l+1', '<rand>'])
+def test_binned_cls(weights):
 
-    from le3_pk_wl.twopoint import binned_cl
+    from le3_pk_wl.twopoint import binned_cls
 
-    cl = np.random.randn(21)
+    cls = {'key': np.random.randn(21)}
 
-    bins = [0, 5, 10, 15, 20]
+    bins = [2, 5, 10, 15, 20]
 
-    result = binned_cl(cl, bins, cmblike)
+    if weights == '<rand>':
+        weights_ = np.random.rand(40)
+    else:
+        weights_ = weights
 
-    ell = np.arange(len(cl))
+    result = binned_cls(cls, bins, weights=weights_)
 
-    if cmblike:
-        cl *= ell*(ell+1)/(2*np.pi)
+    for key, cl in cls.items():
+        ell = np.arange(len(cl))
 
-    begin = bins[:-1]
-    end = bins[1:]
-    end[-1] = np.nextafter(end[-1], end[-1]+1)
+        if weights is None:
+            w = np.ones_like(ell)
+        elif weights == 'l(l+1)':
+            w = ell*(ell+1)
+        elif weights == '2l+1':
+            w = 2*ell+1
+        else:
+            w = weights_[:len(ell)]
 
-    binned = []
-    for a, b in zip(begin, end):
-        binned.append(cl[(a <= ell) & (ell < b)].mean())
+        binned_ell = []
+        binned_cl = []
+        binned_w = []
+        for a, b in zip(bins[:-1], bins[1:]):
+            inbin = (a <= ell) & (ell < b)
+            binned_ell.append(np.average(ell[inbin], weights=w[inbin]))
+            binned_cl.append(np.average(cl[inbin], weights=w[inbin]))
+            binned_w.append(w[inbin].sum())
 
-    np.testing.assert_array_almost_equal(result, binned)
+        np.testing.assert_array_almost_equal(result[key]['L'], binned_ell)
+        np.testing.assert_array_almost_equal(result[key]['CL'], binned_cl)
+        np.testing.assert_array_equal(result[key]['LMIN'], bins[:-1])
+        np.testing.assert_array_equal(result[key]['LMAX'], bins[1:])
+        np.testing.assert_array_almost_equal(result[key]['W'], binned_w)
 
 
 @pytest.mark.parametrize('full', [False, True])
