@@ -26,33 +26,6 @@ _METADATA_COMMENTS = {
 }
 
 
-def _write_array(fits, ext, a):
-    '''write an array to a FITS table column'''
-
-    # write the array as a single column
-    fits.write_table([np.reshape(a, -1)], names=['ARRAY'], extname=ext)
-
-    # write metadata to reconstitute the array later
-    fits[ext].write_key('NDIM', np.ndim(a), 'dimensions of array')
-    for j, d in enumerate(np.shape(a)):
-        fits[ext].write_key(f'NDIM{j+1}', d, f'dimension {j+1} of array')
-
-
-def _read_array(hdu):
-    '''read an array from a FITS table HDU'''
-
-    # read the flattened array
-    a = hdu.read(columns=['ARRAY'])['ARRAY']
-
-    # recreate the shape of the array
-    h = hdu.read_header()
-    d = h['NDIM']
-    s = tuple(h[f'NDIM{j+1}'] for j in range(d))
-
-    # return the array data in the given shape
-    return np.reshape(a, s)
-
-
 def _write_metadata(hdu, metadata):
     '''write array metadata to FITS HDU'''
     md = metadata or {}
@@ -496,8 +469,17 @@ def write_mms(filename, mms, *, clobber=False, workdir='.', include=None, exclud
             ext = f'MM{mmn}'
             mmn += 1
 
-            # write the mixing matrix as a table column
-            _write_array(fits, ext, mm)
+            # write the mixing matrix as an image
+            fits.write_image(mm, extname=ext)
+
+            # write the WCS
+            fits[ext].write_key('WCSAXES', 2)
+            fits[ext].write_key('CNAME1', 'L_1')
+            fits[ext].write_key('CNAME2', 'L_2')
+            fits[ext].write_key('CTYPE1', ' ')
+            fits[ext].write_key('CTYPE2', ' ')
+            fits[ext].write_key('CUNIT1', ' ')
+            fits[ext].write_key('CUNIT2', ' ')
 
             # write the metadata
             _write_metadata(fits[ext], mm.dtype.metadata)
@@ -537,7 +519,7 @@ def read_mms(filename, workdir='.', *, include=None, exclude=None):
             logger.info('reading mixing matrix %s for bins %s, %s', n, i1, i2)
 
             # read the mixing matrix from the extension
-            mm = _read_array(fits[ext])
+            mm = fits[ext].read()
 
             # read and attach metadata
             mm.dtype = np.dtype(mm.dtype, metadata=_read_metadata(fits[ext]))
@@ -601,8 +583,17 @@ def write_cov(filename, cov, clobber=False, workdir='.', include=None, exclude=N
 
             logger.info('writing %s x %s covariance matrix', k1, k2)
 
-            # write the covariance matrix as a table column
-            _write_array(fits, ext, mat)
+            # write the covariance matrix as an image
+            fits.write_image(mat, extname=ext)
+
+            # write the WCS
+            fits[ext].write_key('WCSAXES', 2)
+            fits[ext].write_key('CNAME1', 'L_1')
+            fits[ext].write_key('CNAME2', 'L_2')
+            fits[ext].write_key('CTYPE1', ' ')
+            fits[ext].write_key('CTYPE2', ' ')
+            fits[ext].write_key('CUNIT1', ' ')
+            fits[ext].write_key('CUNIT2', ' ')
 
             # write the metadata
             _write_metadata(fits[ext], mat.dtype.metadata)
@@ -644,7 +635,7 @@ def read_cov(filename, workdir='.', *, include=None, exclude=None):
             logger.info('reading %s x %s covariance matrix', k1, k2)
 
             # read the covariance matrix from the extension
-            mat = _read_array(fits[ext])
+            mat = fits[ext].read()
 
             # read and attach metadata
             mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(fits[ext]))
