@@ -4,6 +4,7 @@ import sys
 import os
 import time
 from datetime import timedelta
+from collections.abc import Sequence, Mapping
 
 
 def toc_match(key, include=None, exclude=None):
@@ -19,6 +20,16 @@ def toc_match(key, include=None, exclude=None):
             if all(p is Ellipsis or p == k for p, k in zip(pattern, key)):
                 return False
     return True
+
+
+def toc_filter(obj, include=None, exclude=None):
+    '''return a filtered toc dict ``d``'''
+    if isinstance(obj, Sequence):
+        return [toc_filter(item, include, exclude) for item in obj]
+    elif isinstance(obj, Mapping):
+        return {k: v for k, v in obj.items() if toc_match(k, include, exclude)}
+    else:
+        raise TypeError('invalid input type')
 
 
 class Progress:

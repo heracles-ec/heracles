@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_toc_match():
     from le3_pk_wl.util import toc_match
 
@@ -18,6 +21,21 @@ def test_toc_match():
     assert not toc_match(('aa', 1, 2), None, [('aa',)])
     assert not toc_match(('aa', 1, 2), None, [(..., 1)])
     assert not toc_match(('aa', 1, 2), None, [(..., ..., 2)])
+
+
+def test_toc_filter():
+
+    from le3_pk_wl.util import toc_filter
+
+    full = {('a', 'b'): 1, ('c', 'd'): 2}
+
+    assert toc_filter(full, [('a',)]) == {('a', 'b'): 1}
+    assert toc_filter(full, [(..., 'b')]) == {('a', 'b'): 1}
+    assert toc_filter(full, [('a',), (..., 'd')]) == full
+    assert toc_filter([full]*2, [('a',)]) == [{('a', 'b'): 1}]*2
+
+    with pytest.raises(TypeError):
+        toc_filter(object())
 
 
 def test_progress():
