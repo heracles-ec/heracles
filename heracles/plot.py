@@ -161,7 +161,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
                         fontsize=8, labelcolor='linecolor', handlelength=0,
                         handletextpad=0, borderpad=0, borderaxespad=0.5,
                         labelspacing=0)
-        for hnd in leg.legendHandles:
+        try:
+            hnds = leg.legend_handles
+        except AttributeError:
+            hnds = leg.legendHandles
+        for hnd in hnds:
             hnd.set_visible(False)
         leg.set_zorder(2)
 
