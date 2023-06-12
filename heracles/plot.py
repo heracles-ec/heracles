@@ -17,10 +17,16 @@ def _dont_draw_zero_tick(tick):
 
     def wrap(*args, **kwargs):
         if tick.get_loc() == 0.:
-            tick.set_label('')
+            tick.set_label1('')
+            tick.set_label2('')
         draw(*args, **kwargs)
 
     return wrap
+
+
+def _pad_ylim(ymin, ymax):
+    '''pad the y axis range depending on signs'''
+    return (ymin * 10**(-np.sign(ymin)/2), ymax * 10**(np.sign(ymax)/2))
 
 
 def postage_stamps(plot=None, transpose=None, *, scale=None,
@@ -61,13 +67,14 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
         ny += shift_transpose
 
     fig, axes = plt.subplots(nx, ny, figsize=(ny*stampsize, nx*stampsize),
-                             squeeze=False, sharex=True, sharey=True)
+                             squeeze=False, sharex=False, sharey=False)
 
     prop_cycle = plt.rcParams['axes.prop_cycle']
     prop = defaultdict(lambda: cycle(prop_cycle))
 
     xmin, xmax = np.inf, -np.inf
     ymin, ymax = 0, 0
+    trymin, trymax = 0, 0
 
     for n, key in enumerate(chain(keys, trkeys)):
 
@@ -108,45 +115,72 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
                 cl = scale*cl
 
             xmin, xmax = min(xmin, np.min(ell)), max(xmax, np.max(ell))
-            ymin, ymax = min(ymin, np.min(cl)), max(ymax, np.max(cl))
+            clmin, clmax = np.min(cl), np.max(cl)
+            if n < len(keys):
+                ymin, ymax = min(ymin, clmin), max(ymax, clmax)
+            else:
+                trymin, trymax = min(trymin, clmin), max(trymax, clmax)
 
             ax.plot(ell, cl, lw=1.5, label=label, **oprop, **iprop)
 
             # prevent multiple labels with same colour
             label = None
 
-    ylin = 10**np.ceil(np.log10(max(abs(ymin), abs(ymax)) * linscale))
+    ymin, ymax = _pad_ylim(ymin, ymax)
+    trymin, trymax = _pad_ylim(trymin, trymax)
 
+    ylin = 10**np.ceil(np.log10(max(abs(ymin), abs(ymax)) * linscale))
+    trylin = 10**np.ceil(np.log10(max(abs(trymin), abs(trymax)) * linscale))
+
+    # scale the axes and transpose axes
+    for n, key in enumerate(chain(keys, trkeys)):
+
+        _, _, i, j = key
+
+        if n < len(keys):
+            idx = (sx.index(j), sy.index(i))
+            ymin_, ymax_, ylin_ = ymin, ymax, ylin
+        else:
+            idx = (sx.index(i), sy.index(j)+shift_transpose)
+            ymin_, ymax_, ylin_ = trymin, trymax, trylin
+
+        ax = axes[idx]
+
+        ax.axhline(0., c='k', lw=0.8, ls='--')
+
+        ax.tick_params(axis='both', which='both', direction='in',
+                       top=True, bottom=True, left=True, right=True,
+                       labeltop=(idx == (0, 0) or idx == (0, ny-1)),
+                       labelbottom=(idx == (nx-1, 0) or idx == (nx-1, ny-1)),
+                       labelleft=(idx == (0, 0) or idx == (nx-1, 0)),
+                       labelright=(idx == (0, ny-1) or idx == (nx-1, ny-1)))
+        ax.set_axisbelow(False)
+
+        leg = ax.legend(frameon=True, edgecolor='none', framealpha=0.8,
+                        fontsize=8, labelcolor='linecolor', handlelength=0,
+                        handletextpad=0, borderpad=0, borderaxespad=0.5,
+                        labelspacing=0)
+        for hnd in leg.legendHandles:
+            hnd.set_visible(False)
+        leg.set_zorder(2)
+
+        ax.set_xlim(xmin, xmax)
+        ax.set_xscale('symlog', linthresh=10, linscale=0.45,
+                      subs=[2, 3, 4, 5, 6, 7, 8, 9])
+
+        ax.set_ylim(ymin_, ymax_)
+        ax.set_yscale('symlog', linthresh=ylin_, linscale=0.45,
+                      subs=[2, 3, 4, 5, 6, 7, 8, 9])
+
+        for tick in ax.xaxis.get_major_ticks():
+            tick.draw = _dont_draw_zero_tick(tick)
+        for tick in ax.yaxis.get_major_ticks():
+            tick.draw = _dont_draw_zero_tick(tick)
+
+    # fill empty axes
     for i, ax in enumerate(axes.ravel()):
 
-        if ax.has_data():
-
-            ax.axhline(0., c='k', lw=0.8)
-
-            ax.tick_params(axis='both', which='both', direction='in',
-                           top=True, bottom=True, left=True, right=True,
-                           labeltop=(i == 0), labelbottom=False,
-                           labelleft=(i == 0), labelright=False)
-
-            ax.set_axisbelow(False)
-
-            leg = ax.legend(frameon=True, edgecolor='none', framealpha=0.8,
-                            fontsize=8, labelcolor='linecolor', handlelength=0,
-                            borderpad=0, borderaxespad=0.5, labelspacing=0)
-            leg.set_zorder(2)
-
-            ax.set_xlim(xmin, xmax)
-            ax.set_xscale('symlog', linthresh=10, linscale=0.45,
-                          subs=[2, 3, 4, 5, 6, 7, 8, 9])
-
-            ax.set_yscale('symlog', linthresh=ylin, linscale=0.45,
-                          subs=[2, 3, 4, 5, 6, 7, 8, 9])
-
-            for tick in ax.yaxis.get_major_ticks():
-                tick.draw = _dont_draw_zero_tick(tick)
-
-        else:
-
+        if not ax.has_data():
             if hatch_empty:
 
                 if isinstance(hatch_empty, str):
