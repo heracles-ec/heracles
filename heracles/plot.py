@@ -76,6 +76,9 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
     ymin, ymax = 0, 0
     trymin, trymax = 0, 0
 
+    axidx = set()
+    traxidx = set()
+
     for n, key in enumerate(chain(keys, trkeys)):
 
         ki, kj, i, j = key
@@ -83,9 +86,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
         if n < len(keys):
             idx = (sx.index(j), sy.index(i))
             cls = (x.get(key) for x in plot)
+            axidx.add(idx)
         else:
             idx = (sx.index(i), sy.index(j)+shift_transpose)
             cls = (x.get(key) for x in transpose)
+            traxidx.add(idx)
 
         # axis for plotting this key
         ax = axes[idx]
@@ -133,15 +138,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
     trylin = 10**np.ceil(np.log10(max(abs(trymin), abs(trymax)) * linscale))
 
     # scale the axes and transpose axes
-    for n, key in enumerate(chain(keys, trkeys)):
+    for n, idx in enumerate(chain(axidx, traxidx)):
 
-        _, _, i, j = key
-
-        if n < len(keys):
-            idx = (sx.index(j), sy.index(i))
+        if n < len(axidx):
             ymin_, ymax_, ylin_ = ymin, ymax, ylin
         else:
-            idx = (sx.index(i), sy.index(j)+shift_transpose)
             ymin_, ymax_, ylin_ = trymin, trymax, trylin
 
         ax = axes[idx]
