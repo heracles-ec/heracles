@@ -357,7 +357,7 @@ def write_cls(filename, cls, *, clobber=False, workdir='.', include=None, exclud
             if cl.dtype.names is None:
                 dt = np.dtype([('L', float), ('CL', float),
                                ('LMIN', float), ('LMAX', float), ('W', float)],
-                              metadata=dict(cl.dtype.metadata))
+                              metadata=dict(cl.dtype.metadata or {}))
                 cl_ = cl
                 cl = np.empty(len(cl_), dt)
                 cl['L'] = np.arange(len(cl_))
