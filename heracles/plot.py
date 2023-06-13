@@ -126,7 +126,7 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
             else:
                 trymin, trymax = min(trymin, clmin), max(trymax, clmax)
 
-            ax.plot(ell, cl, lw=1.5, label=label, **oprop, **iprop)
+            ax.plot(ell, cl, lw=1.5, label=label, **{**oprop, **iprop})
 
             # prevent multiple labels with same colour
             label = None
