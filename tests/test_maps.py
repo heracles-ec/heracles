@@ -81,7 +81,7 @@ def catalog(page):
 def test_visibility_map(nside, vmap):
 
     from unittest.mock import Mock
-    from le3_pk_wl.maps import VisibilityMap
+    from heracles.maps import VisibilityMap
 
     fsky = vmap.mean()
 
@@ -110,7 +110,7 @@ def test_visibility_map(nside, vmap):
 
 def test_position_map(nside, catalog, vmap):
 
-    from le3_pk_wl.maps import PositionMap
+    from heracles.maps import PositionMap
 
     # normal mode: compute overdensity maps with metadata
 
@@ -147,7 +147,7 @@ def test_position_map(nside, catalog, vmap):
 
 def test_scalar_map(nside, catalog):
 
-    from le3_pk_wl.maps import ScalarMap
+    from heracles.maps import ScalarMap
 
     m = map_catalog(ScalarMap(nside, 'ra', 'dec', 'g1', 'w'), catalog)
 
@@ -168,7 +168,7 @@ def test_scalar_map(nside, catalog):
 
 def test_complex_map(nside, catalog):
 
-    from le3_pk_wl.maps import ComplexMap
+    from heracles.maps import ComplexMap
 
     m = map_catalog(ComplexMap(nside, 'ra', 'dec', 'g1', 'g2', 'w', spin=2), catalog)
 
@@ -189,7 +189,7 @@ def test_complex_map(nside, catalog):
 
 def test_weight_map(nside, catalog):
 
-    from le3_pk_wl.maps import WeightMap
+    from heracles.maps import WeightMap
 
     m = map_catalog(WeightMap(nside, 'ra', 'dec', 'w'), catalog)
 
@@ -210,7 +210,7 @@ def test_weight_map(nside, catalog):
 
 def test_transform_maps():
 
-    from le3_pk_wl.maps import transform_maps, update_metadata
+    from heracles.maps import transform_maps, update_metadata
 
     nside = 32
     npix = 12*nside**2
@@ -261,7 +261,7 @@ def test_transform_maps():
 
 
 def test_update_metadata():
-    from le3_pk_wl.maps import update_metadata
+    from heracles.maps import update_metadata
 
     a = np.empty(0)
 
@@ -315,7 +315,7 @@ class MockCatalog:
 @pytest.mark.parametrize('parallel', [False, True])
 def test_map_catalogs(Map, parallel):
 
-    from le3_pk_wl.maps import map_catalogs
+    from heracles.maps import map_catalogs
 
     maps = {'a': Map(), 'b': Map(), 'z': Map()}
     catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
@@ -331,7 +331,7 @@ def test_map_catalogs(Map, parallel):
 @pytest.mark.parametrize('Map', [MockMap, MockMapGen])
 def test_map_catalogs_match(Map):
 
-    from le3_pk_wl.maps import map_catalogs
+    from heracles.maps import map_catalogs
 
     maps = {'a': Map(), 'b': Map(), 'c': Map()}
     catalogs = {'x': MockCatalog(), 'y': MockCatalog()}

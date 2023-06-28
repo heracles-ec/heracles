@@ -25,8 +25,8 @@ from itertools import product, combinations_with_replacement
 
 import numpy as np
 import healpy as hp
+from convolvecl import mixmat, mixmat_eb
 
-from ._mixmat import mixmat, mixmat_eb
 from .maps import update_metadata, map_catalogs as _map_catalogs, transform_maps as _transform_maps
 from .util import toc_match
 

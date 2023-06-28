@@ -2,7 +2,7 @@ import pytest
 
 
 def test_toc_match():
-    from le3_pk_wl.util import toc_match
+    from heracles.util import toc_match
 
     assert toc_match(('a',))
     assert toc_match(('a',), None, [])
@@ -25,7 +25,7 @@ def test_toc_match():
 
 def test_toc_filter():
 
-    from le3_pk_wl.util import toc_filter
+    from heracles.util import toc_filter
 
     full = {('a', 'b'): 1, ('c', 'd'): 2}
 
@@ -41,7 +41,7 @@ def test_toc_filter():
 def test_progress():
 
     from io import StringIO
-    from le3_pk_wl.util import Progress
+    from heracles.util import Progress
 
     f = StringIO()
     prog = Progress(f)

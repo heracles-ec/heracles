@@ -153,7 +153,7 @@ def test_write_read_maps(tmp_path):
 
     import numpy as np
     import healpy as hp
-    from le3_pk_wl.io import write_maps, read_maps
+    from heracles.io import write_maps, read_maps
 
     nside = 4
     npix = 12*nside**2
@@ -189,7 +189,7 @@ def test_write_read_maps(tmp_path):
 def test_write_read_alms(mock_alms, tmp_path):
 
     import numpy as np
-    from le3_pk_wl.io import write_alms, read_alms
+    from heracles.io import write_alms, read_alms
 
     write_alms('alms.fits', mock_alms, workdir=str(tmp_path))
     assert (tmp_path / 'alms.fits').exists()
@@ -203,7 +203,7 @@ def test_write_read_alms(mock_alms, tmp_path):
 
 def test_write_read_cls(mock_cls, tmp_path):
 
-    from le3_pk_wl.io import write_cls, read_cls
+    from heracles.io import write_cls, read_cls
 
     import numpy as np
 
@@ -228,7 +228,7 @@ def test_write_read_cls(mock_cls, tmp_path):
 
 def test_write_read_mms(tmp_path):
 
-    from le3_pk_wl.io import write_mms, read_mms
+    from heracles.io import write_mms, read_mms
 
     import numpy as np
 
@@ -255,7 +255,7 @@ def test_write_read_mms(tmp_path):
 def test_write_read_cov(mock_cls, tmp_path):
     from itertools import combinations_with_replacement
     import numpy as np
-    from le3_pk_wl.io import write_cov, read_cov
+    from heracles.io import write_cov, read_cov
 
     workdir = str(tmp_path)
 
@@ -279,7 +279,7 @@ def test_write_read_cov(mock_cls, tmp_path):
 
 def test_read_mask_partial(mock_mask_fields, mock_writemask_partial, nside):
 
-    from le3_pk_wl.io import read_mask
+    from heracles.io import read_mask
     import healpy as hp
 
     maps = mock_mask_fields[0]
@@ -299,7 +299,7 @@ def test_read_mask_partial(mock_mask_fields, mock_writemask_partial, nside):
 
 def test_read_mask_full(mock_mask_fields, mock_writemask_full, nside):
 
-    from le3_pk_wl.io import read_mask
+    from heracles.io import read_mask
     import healpy as hp
 
     maps = mock_mask_fields[0]
@@ -324,7 +324,7 @@ def test_read_mask_full(mock_mask_fields, mock_writemask_full, nside):
 
 def test_read_mask_extra(mock_mask_fields, mock_mask_extra, mock_writemask_full, nside, mock_writemask_extra):
 
-    from le3_pk_wl.io import read_mask
+    from heracles.io import read_mask
 
     maps = mock_mask_fields[0]
     maps_extra = mock_mask_extra[0]

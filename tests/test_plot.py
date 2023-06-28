@@ -3,7 +3,7 @@ def test_postage_stamps():
     import numpy as np
     import matplotlib.pyplot as plt
 
-    from le3_pk_wl.plot import postage_stamps
+    from heracles.plot import postage_stamps
 
     cl = [1, 2, 3, 4]
 

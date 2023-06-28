@@ -5,7 +5,7 @@ import numpy.testing as npt
 
 @pytest.fixture
 def catalog():
-    from le3_pk_wl.catalog import CatalogBase, CatalogPage
+    from heracles.catalog import CatalogBase, CatalogPage
 
     # fix a set of rows to be returned for testing
     size = 100
@@ -42,7 +42,7 @@ def catalog():
 
 def test_catalog_page():
 
-    from le3_pk_wl.catalog import CatalogPage
+    from heracles.catalog import CatalogPage
 
     a = [1., 2., 3., 4.]
     b = [5., 6., 7., 8.]
@@ -104,7 +104,7 @@ def test_catalog_page():
 
 def test_catalog_page_get():
 
-    from le3_pk_wl.catalog import CatalogPage
+    from heracles.catalog import CatalogPage
 
     a = [np.nan, 2., 3., 4.]
     b = [5., 6., 7., 8.]
@@ -136,7 +136,7 @@ def test_catalog_page_get():
 
 def test_catalog_page_immutable():
 
-    from le3_pk_wl.catalog import CatalogPage
+    from heracles.catalog import CatalogPage
 
     a = [1., 2., 3., 4.]
     b = [5., 6., 7., 8.]
@@ -149,7 +149,7 @@ def test_catalog_page_immutable():
 
 def test_catalog_base(catalog):
 
-    from le3_pk_wl.catalog import Catalog, CatalogBase
+    from heracles.catalog import Catalog, CatalogBase
 
     # ABC cannot be instantiated directly
     with pytest.raises(TypeError):
@@ -164,7 +164,7 @@ def test_catalog_base(catalog):
 
 def test_catalog_base_properties(catalog):
 
-    from le3_pk_wl.catalog import CatalogBase
+    from heracles.catalog import CatalogBase
 
     assert catalog.size == catalog.SIZE
     assert catalog.names == list(catalog.DATA.keys())
@@ -209,7 +209,7 @@ def test_catalog_base_pagination(catalog):
 
 def test_catalog_base_copy():
 
-    from le3_pk_wl.catalog import CatalogBase
+    from heracles.catalog import CatalogBase
 
     class TestCatalog(CatalogBase):
         def __init__(self):
@@ -241,7 +241,7 @@ def test_catalog_base_copy():
 
 def test_catalog_view(catalog):
 
-    from le3_pk_wl.catalog import Catalog
+    from heracles.catalog import Catalog
 
     catalog.visibility = cvis = object()
 
@@ -284,7 +284,7 @@ def test_catalog_view(catalog):
 
 def test_invalid_value_filter(catalog):
 
-    from le3_pk_wl.catalog import InvalidValueFilter
+    from heracles.catalog import InvalidValueFilter
 
     catalog.DATA['x'][0] = np.nan
     catalog.DATA['y'][1] = np.nan
@@ -310,7 +310,7 @@ def test_invalid_value_filter(catalog):
 
 def test_footprint_filter(catalog):
 
-    from le3_pk_wl.catalog import FootprintFilter
+    from heracles.catalog import FootprintFilter
     from healpy import ang2pix
 
     # footprint for northern hemisphere
@@ -338,7 +338,7 @@ def test_footprint_filter(catalog):
 
 def test_array_catalog():
 
-    from le3_pk_wl.catalog import ArrayCatalog, Catalog
+    from heracles.catalog import ArrayCatalog, Catalog
 
     arr = np.empty(100, [('lon', float), ('lat', float),
                          ('x', float), ('y', float)])
@@ -384,8 +384,8 @@ def test_array_catalog():
 def test_fits_catalog(tmp_path):
 
     import fitsio
-    from le3_pk_wl.catalog import Catalog
-    from le3_pk_wl.catalog.fits import FitsCatalog
+    from heracles.catalog import Catalog
+    from heracles.catalog.fits import FitsCatalog
 
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
@@ -449,7 +449,7 @@ def test_fits_catalog_caching(tmp_path):
 
     import gc
     import fitsio
-    from le3_pk_wl.catalog.fits import FitsCatalog
+    from heracles.catalog.fits import FitsCatalog
 
     size = 100
     ra = np.random.uniform(-180, 180, size=size)

@@ -3,7 +3,7 @@ import pytest
 
 
 def test_sample_covariance():
-    from le3_pk_wl.covariance import SampleCovariance, add_sample
+    from heracles.covariance import SampleCovariance, add_sample
 
     n = 10
     size = 3
@@ -55,7 +55,7 @@ def test_sample_covariance():
 
 def test_update_covariance():
     from itertools import combinations_with_replacement
-    from le3_pk_wl.covariance import update_covariance
+    from heracles.covariance import update_covariance
 
     n = 4
 
@@ -82,7 +82,7 @@ def test_update_covariance():
 
 def test_jackknife_regions_kmeans():
 
-    from le3_pk_wl.covariance import jackknife_regions_kmeans
+    from heracles.covariance import jackknife_regions_kmeans
 
     nside = 64
 

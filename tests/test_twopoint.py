@@ -36,7 +36,7 @@ def mock_alms(zbins):
 
 def test_angular_power_spectra(mock_alms):
     from itertools import combinations_with_replacement
-    from le3_pk_wl.twopoint import angular_power_spectra
+    from heracles.twopoint import angular_power_spectra
 
     # alms cross themselves
 
@@ -82,7 +82,7 @@ def test_angular_power_spectra(mock_alms):
 
 def test_debias_cls():
 
-    from le3_pk_wl.twopoint import debias_cls
+    from heracles.twopoint import debias_cls
 
     cls = {
         ('PP', 0, 0): np.zeros(100),
@@ -99,7 +99,7 @@ def test_debias_cls():
 
 def test_mixing_matrices():
 
-    from le3_pk_wl.twopoint import mixing_matrices
+    from heracles.twopoint import mixing_matrices
 
     # this only tests the function logic
     # the mixing matrix computation itself is tested elsewhere
@@ -139,7 +139,7 @@ def test_mixing_matrices():
 def test_pixelate_mms_healpix():
 
     import healpy as hp
-    from le3_pk_wl.twopoint import pixelate_mms_healpix
+    from heracles.twopoint import pixelate_mms_healpix
 
     nside = 512
     lmax = 1000
@@ -168,7 +168,7 @@ def test_pixelate_mms_healpix():
 @pytest.mark.parametrize('weights', [None, 'l(l+1)', '2l+1', '<rand>'])
 def test_binned_cls(weights):
 
-    from le3_pk_wl.twopoint import binned_cls
+    from heracles.twopoint import binned_cls
 
     cls = {'key': np.random.randn(21)}
 
@@ -212,7 +212,7 @@ def test_binned_cls(weights):
 @pytest.mark.parametrize('full', [False, True])
 def test_random_noisebias(full):
 
-    from le3_pk_wl.twopoint import random_noisebias
+    from heracles.twopoint import random_noisebias
 
     nside = 64
     npix = 12*nside**2
