@@ -16,3 +16,8 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
+
+try:
+    from ._version import __version__, __version_tuple__  # noqa: F401
+except ModuleNotFoundError:
+    pass

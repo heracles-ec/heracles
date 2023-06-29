@@ -1,0 +1,11 @@
+channels: [conda-forge]
+dependencies:
+  - fitsio
+  - healpy
+  - numba
+  - numpy
+  - pip
+  - pip:
+      - convolvecl
+      - threej
+  - pytest

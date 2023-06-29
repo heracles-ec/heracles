@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "heracles"
+description = "Harmonic-space statistics on the sphere"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "LGPL-3.0-or-later"
+authors = [
+    {name = "Nicolas Tessore", email = "n.tessore@ucl.ac.uk"},
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+dependencies = [
+  "fitsio",
+  "healpy",
+  "numba",
+  "numpy",
+  "convolvecl",
+
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+docs = [
+    "sphinx",
+    "furo",
+    "sphinxcontrib-katex",
+    "numpydoc",
+    "matplotlib",
+]
+
+[project.urls]
+Homepage = "https://github.com/heracles-ec/heracles"
+Documentation = "https://heracles.readthedocs.io/"
+Issues = "https://github.com/heracles-ec/heracles/issues"
+
+[tool.hatch]
+version.source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "heracles/_version.py"
