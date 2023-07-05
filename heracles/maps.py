@@ -92,8 +92,6 @@ def update_metadata(array, **metadata):
     dt = array.dtype
     if dt.fields is not None:
         dt = dt.fields
-    elif dt.subdtype is not None:
-        dt = dt.subdtype
     else:
         dt = dt.str
     dt = np.dtype(dt, metadata=md)
