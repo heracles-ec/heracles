@@ -275,6 +275,10 @@ def test_update_metadata():
 
     assert a.dtype.metadata == {'x': 1, 'y': 2}
 
+    update_metadata(a, x=3)
+
+    assert a.dtype.metadata == {'x': 3, 'y': 2}
+
     # check dtype fields are preserved
 
     a = np.array([('Alice', 37, 56.0), ('Bob', 25, 73.0)], dtype=[('f0', 'U10'), ('f1', 'i4'), ('f2', 'f4')])
