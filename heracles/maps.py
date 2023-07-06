@@ -88,7 +88,18 @@ def update_metadata(array, **metadata):
     if array.dtype.metadata is not None:
         md.update(array.dtype.metadata)
     md.update(metadata)
-    array.dtype = np.dtype(array.dtype, metadata=md)
+    # create the new dtype with only the new metadata
+    dt = array.dtype
+    if dt.fields is not None:
+        dt = dt.fields
+    else:
+        dt = dt.str
+    dt = np.dtype(dt, metadata=md)
+    # check that new dtype is compatible with old one
+    if not np.can_cast(dt, array.dtype, casting='no'):
+        raise ValueError('array with unsupported dtype')
+    # set the new dtype in array
+    array.dtype = dt
 
 
 # type alias for map data
