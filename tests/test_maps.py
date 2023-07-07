@@ -293,7 +293,7 @@ def test_update_metadata():
     update_metadata(a, y=2)
 
     assert a.dtype.fields == a_fields_original
-    assert a.dtype.metadata == {'x': 1, 'y':2}
+    assert a.dtype.metadata == {'x': 1, 'y': 2}
 
 
 class MockMap:
