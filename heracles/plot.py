@@ -150,10 +150,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
             label = None
 
     ymin, ymax = _pad_ylim(ymin, ymax)
-    trymin, trymax = _pad_ylim(trymin, trymax)
+    ylin = 10**np.ceil(np.log10(max(abs(ymin), abs(ymax))*linscale))
 
-    ylin = 10**np.ceil(np.log10(max(abs(ymin), abs(ymax)) * linscale))
-    trylin = 10**np.ceil(np.log10(max(abs(trymin), abs(trymax)) * linscale))
+    if trkeys:
+        trymin, trymax = _pad_ylim(trymin, trymax)
+        trylin = 10**np.ceil(np.log10(max(abs(trymin), abs(trymax))*linscale))
 
     # scale the axes and transpose axes
     for n, idx in enumerate(chain(axidx, traxidx)):
@@ -225,5 +226,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
 
     fig.tight_layout(pad=0.)
     fig.subplots_adjust(wspace=0, hspace=0)
+
+    # adjust figure size for spacing
+    fig.set_size_inches(
+        ny*stampsize/(fig.subplotpars.right - fig.subplotpars.left),
+        nx*stampsize/(fig.subplotpars.top - fig.subplotpars.bottom),
+    )
 
     return fig
