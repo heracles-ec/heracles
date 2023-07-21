@@ -126,9 +126,9 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
             cl = np.asanyarray(cl)
 
             if cl.dtype.names is None:
-                ell = np.arange(len(cl))
+                ell = np.arange(len(cl), dtype=float)
             else:
-                ell, cl = cl['L'], cl['CL']
+                ell, cl = cl['L'].astype(float), cl['CL']
 
             if scale is None:
                 pass
@@ -137,12 +137,14 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
             else:
                 cl = scale*cl
 
-            xmin, xmax = min(xmin, np.min(ell)), max(xmax, np.max(ell))
-            clmin, clmax = np.min(cl), np.max(cl)
+            xmin = np.nanmin(ell, initial=xmin)
+            xmax = np.nanmax(ell, initial=xmax)
             if n < len(keys):
-                ymin, ymax = min(ymin, clmin), max(ymax, clmax)
+                ymin = np.nanmin(cl, initial=ymin)
+                ymax = np.nanmax(cl, initial=ymax)
             else:
-                trymin, trymax = min(trymin, clmin), max(trymax, clmax)
+                trymin = np.nanmin(cl, initial=trymin)
+                trymax = np.nanmax(cl, initial=trymax)
 
             ax.plot(ell, cl, lw=1.5, label=label, **{**oprop, **iprop})
 
