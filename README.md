@@ -1,5 +1,3 @@
-*Heracles* — Harmonic-space statistics on the sphere
-====================================================
+# _Heracles_ — Harmonic-space statistics on the sphere
 
-The *Heracles* code was developed in the *Euclid* Science Ground Segment.
-
+The _Heracles_ code was developed in the _Euclid_ Science Ground Segment.

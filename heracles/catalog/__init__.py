@@ -16,7 +16,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-'''module for catalogue processing'''
+"""module for catalogue processing"""
 
 from .base import Catalog, CatalogBase, CatalogView, CatalogPage  # noqa: F401
 from .filters import InvalidValueFilter, FootprintFilter  # noqa: F401

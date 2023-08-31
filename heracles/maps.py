@@ -16,7 +16,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-'''module for map-making'''
+"""module for map-making"""
 
 import warnings
 from abc import ABCMeta, abstractmethod
@@ -30,6 +30,7 @@ from numba import njit
 from .util import toc_match, Progress
 
 import typing as t
+
 if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
 
@@ -37,14 +38,14 @@ logger = logging.getLogger(__name__)
 
 
 def _nativebyteorder(fn):
-    '''utility decorator to convert inputs to native byteorder'''
+    """utility decorator to convert inputs to native byteorder"""
 
     @wraps(fn)
     def wrapper(*inputs):
         native = []
         for a in inputs:
-            if a.dtype.byteorder != '=':
-                a = a.byteswap().newbyteorder('=')
+            if a.dtype.byteorder != "=":
+                a = a.byteswap().newbyteorder("=")
             native.append(a)
         return fn(*native)
 
@@ -63,7 +64,7 @@ def _map_pos(pos, ipix):
 def _map_real(wht, val, ipix, w, v):
     for i, w_i, v_i in zip(ipix, w, v):
         wht[i] += w_i
-        val[i] += w_i/wht[i]*(v_i - val[i])
+        val[i] += w_i / wht[i] * (v_i - val[i])
 
 
 @_nativebyteorder
@@ -71,8 +72,8 @@ def _map_real(wht, val, ipix, w, v):
 def _map_complex(wht, val, ipix, w, re, im):
     for i, w_i, re_i, im_i in zip(ipix, w, re, im):
         wht[i] += w_i
-        val[0, i] += w_i/wht[i]*(re_i - val[0, i])
-        val[1, i] += w_i/wht[i]*(im_i - val[1, i])
+        val[0, i] += w_i / wht[i] * (re_i - val[0, i])
+        val[1, i] += w_i / wht[i] * (im_i - val[1, i])
 
 
 @_nativebyteorder
@@ -83,7 +84,7 @@ def _map_weight(wht, ipix, w):
 
 
 def update_metadata(array, **metadata):
-    '''update metadata of an array dtype'''
+    """update metadata of an array dtype"""
     md = {}
     if array.dtype.metadata is not None:
         md.update(array.dtype.metadata)
@@ -96,8 +97,8 @@ def update_metadata(array, **metadata):
         dt = dt.str
     dt = np.dtype(dt, metadata=md)
     # check that new dtype is compatible with old one
-    if not np.can_cast(dt, array.dtype, casting='no'):
-        raise ValueError('array with unsupported dtype')
+    if not np.can_cast(dt, array.dtype, casting="no"):
+        raise ValueError("array with unsupported dtype")
     # set the new dtype in array
     array.dtype = dt
 
@@ -106,70 +107,70 @@ def update_metadata(array, **metadata):
 MapData = np.ndarray
 
 # type hint for functions returned by map generators
-MapFunction = t.Callable[['CatalogPage'], None]
+MapFunction = t.Callable[["CatalogPage"], None]
 
 # type hint for map generators
 MapGenerator = t.Generator[MapFunction, None, MapData]
 
 
 class Map(metaclass=ABCMeta):
-    '''Abstract base class for map making from catalogues.
+    """Abstract base class for map making from catalogues.
 
     Concrete classes must implement the `__call__()` method which takes a
     catalogue instance and returns a generator for mapping.
 
-    '''
+    """
 
     def __init__(self, columns: t.Tuple[t.Optional[str]]) -> None:
-        '''Initialise the map.'''
+        """Initialise the map."""
         self._columns = columns
         super().__init__()
 
     @property
     def columns(self) -> t.Tuple[t.Optional[str]]:
-        '''Return the catalogue columns used by this map.'''
+        """Return the catalogue columns used by this map."""
         return self._columns
 
     @abstractmethod
-    def __call__(self, catalog: 'Catalog') -> t.Union[MapData, MapGenerator]:
-        '''Implementation for mapping a catalogue.'''
+    def __call__(self, catalog: "Catalog") -> t.Union[MapData, MapGenerator]:
+        """Implementation for mapping a catalogue."""
         ...
 
 
 class HealpixMap(Map):
-    '''Abstract base class for HEALPix map making.
+    """Abstract base class for HEALPix map making.
 
     HEALPix maps have a resolution parameter, available as the ``nside``
     property.
 
-    '''
+    """
 
     def __init__(self, nside: int, **kwargs) -> None:
-        '''Initialize map with the given nside parameter.'''
+        """Initialize map with the given nside parameter."""
         self._nside: int = nside
         super().__init__(**kwargs)
 
     @property
     def nside(self) -> int:
-        '''The resolution parameter of the HEALPix map.'''
+        """The resolution parameter of the HEALPix map."""
         return self._nside
 
     @nside.setter
     def nside(self, nside: int) -> None:
-        '''Set the resolution parameter of the HEALPix map.'''
+        """Set the resolution parameter of the HEALPix map."""
         self._nside = nside
 
 
 class RandomizableMap(Map):
-    '''Abstract base class for randomisable maps.
+    """Abstract base class for randomisable maps.
 
     Randomisable maps have a ``randomize`` property that determines
     whether or not the maps are randomised.
 
-    '''
+    """
 
     def __init__(self, randomize: bool, **kwargs) -> None:
-        '''Initialise map with the given randomize property.'''
+        """Initialise map with the given randomize property."""
         self._randomize = randomize
         super().__init__(**kwargs)
 
@@ -179,22 +180,22 @@ class RandomizableMap(Map):
 
     @randomize.setter
     def randomize(self, randomize: bool) -> None:
-        '''Set the randomize flag.'''
+        """Set the randomize flag."""
         self._randomize = randomize
 
 
 class NormalizableMap(Map):
-    '''Abstract base class for normalisable maps.
+    """Abstract base class for normalisable maps.
 
     A normalised map is a map that is divided by its mean weight.
 
     Normalisable maps have a ``normalize`` property that determines
     whether or not the maps are normalised.
 
-    '''
+    """
 
     def __init__(self, normalize: bool, **kwargs) -> None:
-        '''Initialise map with the given normalize property.'''
+        """Initialise map with the given normalize property."""
         self._normalize = normalize
         super().__init__(**kwargs)
 
@@ -204,36 +205,42 @@ class NormalizableMap(Map):
 
     @normalize.setter
     def normalize(self, normalize: bool) -> None:
-        '''Set the normalize flag.'''
+        """Set the normalize flag."""
         self._normalize = normalize
 
 
 class PositionMap(HealpixMap, RandomizableMap):
-    '''Create HEALPix maps from positions in a catalogue.
+    """Create HEALPix maps from positions in a catalogue.
 
     Can produce both overdensity maps and number count maps, depending
     on the ``overdensity`` property.
 
-    '''
+    """
 
-    def __init__(self, nside: int, lon: str, lat: str, *,
-                 overdensity: bool = True, randomize: bool = False
-                 ) -> None:
-        '''Create a position map with the given properties.'''
+    def __init__(
+        self,
+        nside: int,
+        lon: str,
+        lat: str,
+        *,
+        overdensity: bool = True,
+        randomize: bool = False,
+    ) -> None:
+        """Create a position map with the given properties."""
         super().__init__(columns=(lon, lat), nside=nside, randomize=randomize)
         self._overdensity: bool = overdensity
 
     @property
     def overdensity(self) -> bool:
-        '''Flag to create overdensity maps.'''
+        """Flag to create overdensity maps."""
         return self._overdensity
 
     @overdensity.setter
     def overdensity(self, overdensity: bool) -> None:
         self._overdensity = overdensity
 
-    def __call__(self, catalog: 'Catalog') -> MapGenerator:
-        '''Map the given catalogue.'''
+    def __call__(self, catalog: "Catalog") -> MapGenerator:
+        """Map the given catalogue."""
 
         # get catalogue column definition
         col = self.columns
@@ -248,7 +255,7 @@ class PositionMap(HealpixMap, RandomizableMap):
         ngal = 0
 
         # function to map catalogue data
-        def mapper(page: 'CatalogPage') -> None:
+        def mapper(page: "CatalogPage") -> None:
             nonlocal ngal
 
             if not self._randomize:
@@ -266,19 +273,19 @@ class PositionMap(HealpixMap, RandomizableMap):
 
         # match resolution of visibility map if present
         if vmap is not None and hp.get_nside(vmap) != self.nside:
-            warnings.warn('position and visibility maps have different NSIDE')
+            warnings.warn("position and visibility maps have different NSIDE")
             vmap = hp.ud_grade(vmap, self.nside)
 
         # randomise position map if asked to
         if self._randomize:
             if vmap is None:
-                p = np.full(npix, 1/npix)
+                p = np.full(npix, 1 / npix)
             else:
-                p = vmap/np.sum(vmap)
+                p = vmap / np.sum(vmap)
             pos[:] = np.random.multinomial(ngal, p)
 
         # compute average number density
-        nbar = ngal/npix
+        nbar = ngal / npix
         if vmap is not None:
             nbar /= np.mean(vmap)
 
@@ -294,25 +301,33 @@ class PositionMap(HealpixMap, RandomizableMap):
             power = 1
 
         # set metadata of array
-        update_metadata(pos, spin=0, nbar=nbar, kernel='healpix', power=power)
+        update_metadata(pos, spin=0, nbar=nbar, kernel="healpix", power=power)
 
         # return the position map
         return pos
 
 
 class ScalarMap(HealpixMap, NormalizableMap):
-    '''Create HEALPix maps from real scalar values in a catalogue.'''
+    """Create HEALPix maps from real scalar values in a catalogue."""
 
-    def __init__(self, nside: int, lon: str, lat: str, value: str,
-                 weight: t.Optional[str] = None, *, normalize: bool = True
-                 ) -> None:
-        '''Create a new real map.'''
+    def __init__(
+        self,
+        nside: int,
+        lon: str,
+        lat: str,
+        value: str,
+        weight: t.Optional[str] = None,
+        *,
+        normalize: bool = True,
+    ) -> None:
+        """Create a new real map."""
 
-        super().__init__(columns=(lon, lat, value, weight), nside=nside,
-                         normalize=normalize)
+        super().__init__(
+            columns=(lon, lat, value, weight), nside=nside, normalize=normalize
+        )
 
-    def __call__(self, catalog: 'Catalog') -> MapGenerator:
-        '''Map real values from catalogue to HEALPix map.'''
+    def __call__(self, catalog: "Catalog") -> MapGenerator:
+        """Map real values from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
         *col, wcol = self.columns
@@ -326,7 +341,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         val = np.zeros(npix)
 
         # go through pages in catalogue and map values
-        def mapper(page: 'CatalogPage') -> None:
+        def mapper(page: "CatalogPage") -> None:
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -359,14 +374,14 @@ class ScalarMap(HealpixMap, NormalizableMap):
         val *= wht
 
         # set metadata of array
-        update_metadata(val, spin=0, wbar=wbar, kernel='healpix', power=power)
+        update_metadata(val, spin=0, wbar=wbar, kernel="healpix", power=power)
 
         # return the value map
         return val
 
 
 class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
-    '''Create HEALPix maps from complex values in a catalogue.
+    """Create HEALPix maps from complex values in a catalogue.
 
     Complex maps can have non-zero spin weight, set using the ``spin=``
     parameter.
@@ -374,42 +389,55 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
     Can optionally flip the sign of the second shear component,
     depending on the ``conjugate`` property.
 
-    '''
+    """
 
-    def __init__(self, nside: int, lon: str, lat: str, real: str, imag: str,
-                 weight: t.Optional[str] = None, *, spin: int = 0,
-                 conjugate: bool = False, normalize: bool = True,
-                 randomize: bool = False
-                 ) -> None:
-        '''Create a new shear map.'''
+    def __init__(
+        self,
+        nside: int,
+        lon: str,
+        lat: str,
+        real: str,
+        imag: str,
+        weight: t.Optional[str] = None,
+        *,
+        spin: int = 0,
+        conjugate: bool = False,
+        normalize: bool = True,
+        randomize: bool = False,
+    ) -> None:
+        """Create a new shear map."""
 
         self._spin: int = spin
         self._conjugate: bool = conjugate
-        super().__init__(columns=(lon, lat, real, imag, weight), nside=nside,
-                         normalize=normalize, randomize=randomize)
+        super().__init__(
+            columns=(lon, lat, real, imag, weight),
+            nside=nside,
+            normalize=normalize,
+            randomize=randomize,
+        )
 
     @property
     def spin(self) -> int:
-        '''Spin weight of map.'''
+        """Spin weight of map."""
         return self._spin
 
     @spin.setter
     def spin(self, spin: int) -> None:
-        '''Set the spin weight.'''
+        """Set the spin weight."""
         self._spin = spin
 
     @property
     def conjugate(self) -> bool:
-        '''Flag to conjugate shear maps.'''
+        """Flag to conjugate shear maps."""
         return self._conjugate
 
     @conjugate.setter
     def conjugate(self, conjugate: bool) -> None:
-        '''Set the conjugate flag.'''
+        """Set the conjugate flag."""
         self._conjugate = conjugate
 
-    def __call__(self, catalog: 'Catalog') -> MapGenerator:
-        '''Map shears from catalogue to HEALPix map.'''
+    def __call__(self, catalog: "Catalog") -> MapGenerator:
+        """Map shears from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
         *col, wcol = self.columns
@@ -428,7 +456,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
         # go through pages in catalogue and get the shear values,
         # randomise if asked to, and do the mapping
-        def mapper(page: 'CatalogPage') -> None:
+        def mapper(page: "CatalogPage") -> None:
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -443,9 +471,9 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
                 im = -im
 
             if randomize:
-                a = np.random.uniform(0., 2*np.pi, size=page.size)
+                a = np.random.uniform(0.0, 2 * np.pi, size=page.size)
                 r = np.hypot(re, im)
-                re, im = r*np.cos(a), r*np.sin(a)
+                re, im = r * np.cos(a), r * np.sin(a)
                 del a, r
 
             ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
@@ -470,54 +498,55 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         val *= wht
 
         # set metadata of array
-        update_metadata(val, spin=self.spin, wbar=wbar, kernel='healpix',
-                        power=power)
+        update_metadata(val, spin=self.spin, wbar=wbar, kernel="healpix", power=power)
 
         # return the shear map
         return val
 
 
 class VisibilityMap(HealpixMap):
-    '''Copy visibility map from catalogue at given resolution.'''
+    """Copy visibility map from catalogue at given resolution."""
 
     def __init__(self, nside: int) -> None:
-        '''Create visibility map at given NSIDE parameter.'''
+        """Create visibility map at given NSIDE parameter."""
         super().__init__(columns=(), nside=nside)
 
-    def __call__(self, catalog: 'Catalog') -> MapData:
-        '''Create a visibility map from the given catalogue.'''
+    def __call__(self, catalog: "Catalog") -> MapData:
+        """Create a visibility map from the given catalogue."""
 
         # make sure that catalogue has a visibility map
         vmap = catalog.visibility
         if vmap is None:
-            raise ValueError('no visibility map in catalog')
+            raise ValueError("no visibility map in catalog")
 
         # warn if visibility is changing resolution
         vmap_nside = hp.get_nside(vmap)
         if vmap_nside != self.nside:
-            warnings.warn(f'changing NSIDE of visibility map '
-                          f'from {vmap_nside} to {self.nside}')
+            warnings.warn(
+                f"changing NSIDE of visibility map "
+                f"from {vmap_nside} to {self.nside}"
+            )
             vmap = hp.ud_grade(vmap, self.nside)
         else:
             # make a copy for updates to metadata
             vmap = np.copy(vmap)
 
-        update_metadata(vmap, spin=0, kernel='healpix', power=0)
+        update_metadata(vmap, spin=0, kernel="healpix", power=0)
 
         return vmap
 
 
 class WeightMap(HealpixMap, NormalizableMap):
-    '''Create a HEALPix weight map from a catalogue.'''
+    """Create a HEALPix weight map from a catalogue."""
 
-    def __init__(self, nside: int, lon: str, lat: str, weight: str, *,
-                 normalize=True) -> None:
-        '''Create a new weight map.'''
-        super().__init__(columns=(lon, lat, weight), nside=nside,
-                         normalize=normalize)
+    def __init__(
+        self, nside: int, lon: str, lat: str, weight: str, *, normalize=True
+    ) -> None:
+        """Create a new weight map."""
+        super().__init__(columns=(lon, lat, weight), nside=nside, normalize=normalize)
 
-    def __call__(self, catalog: 'Catalog') -> MapGenerator:
-        '''Map catalogue weights.'''
+    def __call__(self, catalog: "Catalog") -> MapGenerator:
+        """Map catalogue weights."""
 
         # get the columns for this map
         *col, wcol = self.columns
@@ -530,7 +559,7 @@ class WeightMap(HealpixMap, NormalizableMap):
         wht = np.zeros(npix)
 
         # map catalogue
-        def mapper(page: 'CatalogPage') -> None:
+        def mapper(page: "CatalogPage") -> None:
             lon, lat = page.get(*col)
 
             if wcol is None:
@@ -556,7 +585,7 @@ class WeightMap(HealpixMap, NormalizableMap):
             power = 1
 
         # set metadata of arrays
-        update_metadata(wht, spin=0, wbar=wbar, kernel='healpix', power=power)
+        update_metadata(wht, spin=0, wbar=wbar, kernel="healpix", power=power)
 
         # return the weight map
         return wht
@@ -573,19 +602,20 @@ def _close_and_return(generator):
     except StopIteration as end:
         return end.value
     else:
-        raise RuntimeError('generator did not stop')
+        raise RuntimeError("generator did not stop")
 
 
-def map_catalogs(maps: t.Mapping[t.Any, Map],
-                 catalogs: t.Mapping[t.Any, 'Catalog'],
-                 *,
-                 parallel: bool = False,
-                 out: t.MutableMapping[t.Any, t.Any] = None,
-                 include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
-                 exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
-                 progress: bool = False,
-                 ) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
-    '''Make maps for a set of catalogues.'''
+def map_catalogs(
+    maps: t.Mapping[t.Any, Map],
+    catalogs: t.Mapping[t.Any, "Catalog"],
+    *,
+    parallel: bool = False,
+    out: t.MutableMapping[t.Any, t.Any] = None,
+    include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
+    exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
+    progress: bool = False,
+) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
+    """Make maps for a set of catalogues."""
 
     # the toc dict of maps
     if out is None:
@@ -610,11 +640,10 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
 
     # map each group: run through catalogues and maps
     for name, group in items:
-
         # apply the maps to each catalogue in the group
         results = {}
         if progress:
-            prog.start(len(maps)*len(group), name)
+            prog.start(len(maps) * len(group), name)
         for i, catalog in group.items():
             for k, mapper in maps.items():
                 if toc_match((k, i), include, exclude):
@@ -629,14 +658,12 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
 
         # if there are any generators, feed them the catalogue pages
         if gen:
-
             # get an iterator over each catalogue
             # by construction, these have all the same length and page size
             its = {i: iter(catalog) for i, catalog in group.items()}
 
             # get the iteration limits of this group from first catalog
-            size, page_size = next((c.size, c.page_size)
-                                   for c in group.values())
+            size, page_size = next((c.size, c.page_size) for c in group.values())
 
             # get the mapping functions from each generator
             fns = {ki: next(g) for ki, g in gen.items()}
@@ -651,8 +678,10 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
                     try:
                         page = next(it)
                     except StopIteration:
-                        raise RuntimeError(f'catalog {i} finished prematurely'
-                                           f' in page started at row {rownum}')
+                        raise RuntimeError(
+                            f"catalog {i} finished prematurely"
+                            f" in page started at row {rownum}"
+                        )
                     for k in maps:
                         if (fn := fns.get((k, i))) is not None:
                             fn(page.copy())
@@ -688,13 +717,14 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
     return out
 
 
-def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
-                   *,
-                   out: t.MutableMapping[t.Any, t.Any] = None,
-                   progress: bool = False,
-                   **kwargs
-                   ) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
-    '''transform a set of maps to alms'''
+def transform_maps(
+    maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
+    *,
+    out: t.MutableMapping[t.Any, t.Any] = None,
+    progress: bool = False,
+    **kwargs,
+) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
+    """transform a set of maps to alms"""
 
     # the output toc dict
     if out is None:
@@ -707,13 +737,12 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():
-
         nside = hp.get_nside(m)
 
         md = m.dtype.metadata or {}
-        spin = md.get('spin', 0)
+        spin = md.get("spin", 0)
 
-        logger.info('transforming %s map (spin %s) for bin %s', k, spin, i)
+        logger.info("transforming %s map (spin %s) for bin %s", k, spin, i)
 
         if spin == 0:
             pol = False
@@ -721,14 +750,14 @@ def transform_maps(maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
             pol = True
             m = [np.zeros(np.shape(m)[-1]), m[0], m[1]]
         else:
-            raise NotImplementedError(f'spin-{spin} maps not yet supported')
+            raise NotImplementedError(f"spin-{spin} maps not yet supported")
 
         alms = hp.map2alm(m, pol=pol, **kwargs)
 
         if spin == 0:
             alms = {(k, i): alms}
         elif spin == 2:
-            alms = {(f'{k}_E', i): alms[1], (f'{k}_B', i): alms[2]}
+            alms = {(f"{k}_E", i): alms[1], (f"{k}_B", i): alms[2]}
 
         for ki, alm in alms.items():
             if md:
