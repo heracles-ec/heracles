@@ -16,14 +16,15 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for covariance matrix computation"""
+"""module for covariance matrix computation."""
 
 import logging
 import time
 from datetime import timedelta
 from itertools import combinations_with_replacement
-import numpy as np
+
 import healpy as hp
+import numpy as np
 
 from ._kmeans_radec import kmeans_sample
 
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class SampleCovariance(np.ndarray):
-    """array subclass for iterative sample covariance matrix computation"""
+    """array subclass for iterative sample covariance matrix computation."""
 
     def __new__(cls, nrows, ncols=None):
         if ncols is None:
@@ -54,12 +55,12 @@ class SampleCovariance(np.ndarray):
 
 
 def add_sample(cov, x, y=None):
-    """add a sample to a sample covariance matrix"""
-
+    """Add a sample to a sample covariance matrix."""
     x = np.reshape(x, -1)
     y = x if y is None else np.reshape(y, -1)
     if x.size != cov.sample_row_mean.size or y.size != cov.sample_col_mean.size:
-        raise ValueError("size mismatch between sample and covariance matrix")
+        msg = "size mismatch between sample and covariance matrix"
+        raise ValueError(msg)
 
     delta = x - cov.sample_row_mean
     cov.sample_count += 1
@@ -70,8 +71,7 @@ def add_sample(cov, x, y=None):
 
 
 def update_covariance(cov, sample):
-    """update a set of sample covariances given a sample"""
-
+    """Update a set of sample covariances given a sample."""
     logger.info(f"updating covariances for {len(sample)} item(s)")
     t = time.monotonic()
 
@@ -90,10 +90,15 @@ def update_covariance(cov, sample):
 
 
 def jackknife_regions_kmeans(
-    fpmap, n, *, maxrepeat=5, maxiter=1000, tol=1e-5, return_centers=False
+    fpmap,
+    n,
+    *,
+    maxrepeat=5,
+    maxiter=1000,
+    tol=1e-5,
+    return_centers=False,
 ):
-    """partition a footprint map into n regions using k-means"""
-
+    """Partition a footprint map into n regions using k-means."""
     nside = hp.get_nside(fpmap)
     npix = hp.nside2npix(nside)
 
@@ -112,7 +117,7 @@ def jackknife_regions_kmeans(
     for r in range(maxrepeat + 1):
         logger.info(
             f"constructing {n} regions using k-means"
-            f"{'' if r == 0 else f' (repeat {r})'}"
+            f"{'' if r == 0 else f' (repeat {r})'}",
         )
 
         km = kmeans_sample(radec, n, verbose=0)
@@ -120,11 +125,13 @@ def jackknife_regions_kmeans(
         if km.converged:
             logger.info("k-means converged")
             break
-        else:
-            logger.info("k-means not converged; repeat")
+        logger.info("k-means not converged; repeat")
     else:
-        raise RuntimeError(
+        msg = (
             f"k-means failed to partition map into {n} regions after repeat {maxrepeat}"
+        )
+        raise RuntimeError(
+            msg,
         )
 
     areas = 60**4 // 100 / np.pi / npix * np.bincount(km.labels)

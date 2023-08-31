@@ -16,12 +16,13 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""base definition for catalogue interface"""
+"""base definition for catalogue interface."""
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Protocol, runtime_checkable
+
 import numpy as np
 
 
@@ -36,11 +37,12 @@ class CatalogPage:
         """Update internal data after dictionary changes."""
         # get and check size of rows
         size: int = -1
-        for col, rows in self._data.items():
+        for _col, rows in self._data.items():
             if size == -1:
                 size = len(rows)
             elif size != len(rows):
-                raise ValueError("inconsistent row length")
+                msg = "inconsistent row length"
+                raise ValueError(msg)
         self._size = size
 
     def __init__(self, data: Mapping) -> None:
@@ -54,10 +56,9 @@ class CatalogPage:
         """Return one or more columns without checking."""
         if isinstance(col, (list, tuple)):
             return tuple(self._data[c] for c in col)
-        else:
-            return self._data[col]
+        return self._data[col]
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Number of columns in the page."""
         return len(self._data)
 
@@ -90,7 +91,8 @@ class CatalogPage:
         for c in col:
             v = self._data[c]
             if np.any(np.isnan(v)):
-                raise ValueError(f'invalid values in column "{c}"')
+                msg = f'invalid values in column "{c}"'
+                raise ValueError(msg)
             val.append(v)
         if len(val) == 1:
             val = val[0]
@@ -109,99 +111,99 @@ class CatalogPage:
 
 @runtime_checkable
 class Catalog(Protocol):
-    """protocol for catalogues"""
+    """protocol for catalogues."""
 
     def __getitem__(self, where):
-        """create a view with the given selection"""
+        """Create a view with the given selection."""
         ...
 
     @property
     def base(self):
-        """return the base catalogue of a view, or ``None`` if not a view"""
+        """Return the base catalogue of a view, or ``None`` if not a view."""
         ...
 
     @property
     def selection(self):
-        """return the selection of a view, or ``None`` if not a view"""
+        """Return the selection of a view, or ``None`` if not a view."""
         ...
 
     @property
     def names(self):
-        """columns in the catalogue, or ``None`` if not known"""
+        """Columns in the catalogue, or ``None`` if not known."""
         ...
 
     @property
     def size(self):
-        """rows in the catalogue, or ``None`` if not known"""
+        """Rows in the catalogue, or ``None`` if not known."""
         ...
 
     @property
     def visibility(self):
-        """visibility map of the catalogue"""
+        """Visibility map of the catalogue."""
         ...
 
     def where(self, selection, visibility=None):
-        """create a view on this catalogue with the given selection"""
+        """Create a view on this catalogue with the given selection."""
         ...
 
     @property
     def page_size(self):
-        """page size for iteration"""
+        """Page size for iteration."""
         ...
 
     def __iter__(self):
-        """iterate over pages of rows in the catalogue"""
+        """Iterate over pages of rows in the catalogue."""
         ...
 
     def select(self, selection):
-        """iterate over pages of rows with the given selection"""
+        """Iterate over pages of rows with the given selection."""
         ...
 
 
 class CatalogView:
-    """a view of a catalogue with some selection applied"""
+    """a view of a catalogue with some selection applied."""
 
-    def __init__(self, catalog, selection, visibility=None):
-        """create a new view"""
+    def __init__(self, catalog, selection, visibility=None) -> None:
+        """Create a new view."""
         self._catalog = catalog
         self._selection = selection
         self._visibility = visibility
 
-    def __repr__(self):
-        """object representation of this view"""
+    def __repr__(self) -> str:
+        """Object representation of this view."""
         return f"{self._catalog!r}[{self._selection!r}]"
 
-    def __str__(self):
-        """string representation of this view"""
+    def __str__(self) -> str:
+        """String representation of this view."""
         return f"{self._catalog!s}[{self._selection!s}]"
 
     def __getitem__(self, where):
-        """return a view with a subselection of this view"""
+        """Return a view with a subselection of this view."""
         return self.where(where)
 
     @property
     def base(self):
-        """base catalogue of this view"""
+        """Base catalogue of this view."""
         return self._catalog
 
     @property
     def selection(self):
-        """selection of this view"""
+        """Selection of this view."""
         return self._selection
 
     @property
     def names(self):
-        """column names of this view"""
+        """Column names of this view."""
         return self._catalog.names
 
     @property
     def size(self):
-        """size of this view, might not take selection into account"""
+        """Size of this view, might not take selection into account."""
         return self._catalog._size(self._selection)
 
     @property
     def visibility(self):
-        """the visibility of this view"""
+        """The visibility of this view."""
         if self._visibility is None:
             return self._catalog.visibility
         return self._visibility
@@ -211,7 +213,7 @@ class CatalogView:
         self._visibility = visibility
 
     def where(self, selection, visibility=None):
-        """return a view with a subselection of this view"""
+        """Return a view with a subselection of this view."""
         if isinstance(selection, (tuple, list)):
             joined = (self._selection, *selection)
         else:
@@ -222,15 +224,15 @@ class CatalogView:
 
     @property
     def page_size(self):
-        """page size for iterating this view"""
+        """Page size for iterating this view."""
         return self._catalog.page_size
 
     def __iter__(self):
-        """iterate the catalogue with the selection of this view"""
+        """Iterate the catalogue with the selection of this view."""
         yield from self._catalog.select(self._selection)
 
     def select(self, selection):
-        """iterate over pages of rows with the given selection"""
+        """Iterate over pages of rows with the given selection."""
         if isinstance(selection, (tuple, list)):
             joined = (self._selection, *selection)
         else:
@@ -239,21 +241,19 @@ class CatalogView:
 
 
 class CatalogBase(metaclass=ABCMeta):
-    """abstract base class for base catalogues (not views)"""
+    """abstract base class for base catalogues (not views)."""
 
     default_page_size: int = 100_000
     """default value for page size"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Create a new catalogue instance."""
-
         self._page_size = self.default_page_size
         self._filters = []
         self._visibility = None
 
     def __copy__(self):
-        """return a shallow copy of the catalogue"""
-
+        """Return a shallow copy of the catalogue."""
         other = self.__class__.__new__(self.__class__)
         other._page_size = self._page_size
         other._filters = self._filters.copy()
@@ -262,27 +262,27 @@ class CatalogBase(metaclass=ABCMeta):
 
     @abstractmethod
     def _names(self):
-        """abstract method to return the columns in the catalogue"""
+        """Abstract method to return the columns in the catalogue."""
         ...
 
     @abstractmethod
     def _size(self, selection):
-        """abstract method to return the size of the catalogue or selection"""
+        """Abstract method to return the size of the catalogue or selection."""
         ...
 
     @abstractmethod
     def _join(self, *where):
-        """abstract method to join selections"""
+        """Abstract method to join selections."""
         ...
 
     @abstractmethod
     def _pages(self, selection):
-        """abstract method to iterate selected pages from the catalogue"""
+        """Abstract method to iterate selected pages from the catalogue."""
         ...
 
     @property
     def filters(self):
-        """filters to apply to this catalogue"""
+        """Filters to apply to this catalogue."""
         return self._filters
 
     @filters.setter
@@ -290,36 +290,36 @@ class CatalogBase(metaclass=ABCMeta):
         self._filters = filters
 
     def add_filter(self, filt):
-        """add a filter to catalogue"""
+        """Add a filter to catalogue."""
         self.filters.append(filt)
 
     def __getitem__(self, where):
-        """create a view on this catalogue with the given selection"""
+        """Create a view on this catalogue with the given selection."""
         return self.where(where)
 
     @property
     def base(self):
-        """returns ``None`` since this is not a view of another catalogue"""
-        return None
+        """Returns ``None`` since this is not a view of another catalogue."""
+        return
 
     @property
     def selection(self):
-        """returns ``None`` since this is not a view of another catalogue"""
-        return None
+        """Returns ``None`` since this is not a view of another catalogue."""
+        return
 
     @property
     def names(self):
-        """columns in the catalogue, or ``None`` if not known"""
+        """Columns in the catalogue, or ``None`` if not known."""
         return self._names()
 
     @property
     def size(self):
-        """total rows in the catalogue, or ``None`` if not known"""
+        """Total rows in the catalogue, or ``None`` if not known."""
         return self._size(None)
 
     @property
     def visibility(self):
-        """optional visibility map for catalogue"""
+        """Optional visibility map for catalogue."""
         return self._visibility
 
     @visibility.setter
@@ -327,14 +327,14 @@ class CatalogBase(metaclass=ABCMeta):
         self._visibility = visibility
 
     def where(self, selection, visibility=None):
-        """create a view on this catalogue with the given selection"""
+        """Create a view on this catalogue with the given selection."""
         if isinstance(selection, (tuple, list)):
             selection = self._join(*selection)
         return CatalogView(self, selection, visibility)
 
     @property
     def page_size(self):
-        """number of rows per page (default: 100_000)"""
+        """Number of rows per page (default: 100_000)."""
         return self._page_size
 
     @page_size.setter
@@ -342,12 +342,11 @@ class CatalogBase(metaclass=ABCMeta):
         self._page_size = value
 
     def __iter__(self):
-        """iterate over pages of rows in the catalogue"""
+        """Iterate over pages of rows in the catalogue."""
         yield from self.select(None)
 
     def select(self, selection):
-        """iterate over pages of rows with the given selection"""
-
+        """Iterate over pages of rows with the given selection."""
         if isinstance(selection, (tuple, list)):
             selection = self._join(*selection)
 

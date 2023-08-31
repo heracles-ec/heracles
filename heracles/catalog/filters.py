@@ -16,28 +16,28 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for catalogue filters"""
+"""module for catalogue filters."""
 
 import warnings
-import numpy as np
+
 import healpy as hp
+import numpy as np
 
 
 class InvalidValueFilter:
     """Filter invalid values from a catalogue."""
 
-    def __init__(self, *columns, weight=None, warn=True):
+    def __init__(self, *columns, weight=None, warn=True) -> None:
         """Filter invalid values in the given columns.
 
         If ``warn`` is true, invalid values will emit a warning.
 
         """
-
         self.columns = columns
         self.weight = weight
         self.warn = warn
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         name = self.__class__.__name__
         args = list(map(repr, self.columns))
         args += [f"weight={self.weight!r}", f"warn={self.warn!r}"]
@@ -46,7 +46,6 @@ class InvalidValueFilter:
 
     def __call__(self, page):
         """Filter a catalog page."""
-
         invalid_mask = np.zeros(page.size, dtype=bool)
         for col in self.columns:
             invalid_mask |= np.isnan(page[col])
@@ -62,7 +61,7 @@ class InvalidValueFilter:
 class FootprintFilter:
     """Filter a catalogue using a footprint map."""
 
-    def __init__(self, footprint, lon, lat):
+    def __init__(self, footprint, lon, lat) -> None:
         """Filter using the given footprint map and position columns."""
         self._footprint = footprint
         self._nside = hp.get_nside(footprint)
@@ -70,22 +69,21 @@ class FootprintFilter:
 
     @property
     def footprint(self):
-        """footprint for filter"""
+        """Footprint for filter."""
         return self._footprint
 
     @property
     def lonlat(self):
-        """longitude and latitude columns"""
+        """Longitude and latitude columns."""
         return self._lonlat
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         name = self.__class__.__name__
         lon, lat = self.lonlat
         return f"{name}(..., {lon!r}, {lat!r})"
 
     def __call__(self, page):
-        """filter catalog page"""
-
+        """Filter catalog page."""
         lon, lat = self._lonlat
         ipix = hp.ang2pix(self._nside, page[lon], page[lat], lonlat=True)
         exclude = np.where(self._footprint[ipix] == 0)[0]

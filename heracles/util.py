@@ -16,17 +16,17 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for utilities"""
+"""module for utilities."""
 
-import sys
 import os
+import sys
 import time
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
-from collections.abc import Sequence, Mapping
 
 
 def toc_match(key, include=None, exclude=None):
-    """return whether a tocdict entry matches include/exclude criteria"""
+    """Return whether a tocdict entry matches include/exclude criteria."""
     if include is not None:
         for pattern in include:
             if all(p is Ellipsis or p == k for p, k in zip(pattern, key)):
@@ -41,20 +41,20 @@ def toc_match(key, include=None, exclude=None):
 
 
 def toc_filter(obj, include=None, exclude=None):
-    """return a filtered toc dict ``d``"""
+    """Return a filtered toc dict ``d``."""
     if isinstance(obj, Sequence):
         return [toc_filter(item, include, exclude) for item in obj]
-    elif isinstance(obj, Mapping):
+    if isinstance(obj, Mapping):
         return {k: v for k, v in obj.items() if toc_match(k, include, exclude)}
-    else:
-        raise TypeError("invalid input type")
+    msg = "invalid input type"
+    raise TypeError(msg)
 
 
 class Progress:
-    """simple progress bar for operations"""
+    """simple progress bar for operations."""
 
-    def __init__(self, out=sys.stdout):
-        """create a new progress bar"""
+    def __init__(self, out=sys.stdout) -> None:
+        """Create a new progress bar."""
         self.out = out
         self.time = 0
         self.progress = 0
@@ -62,7 +62,7 @@ class Progress:
         self.title = None
 
     def start(self, total, title=None):
-        """start new progress"""
+        """Start new progress."""
         self.time = time.monotonic()
         self.progress = 0
         self.total = total
@@ -70,7 +70,7 @@ class Progress:
         self.update(0)
 
     def update(self, step=1):
-        """update progress"""
+        """Update progress."""
         self.progress = min(self.progress + step, self.total)
         m = f"{self.title!s}: " if self.title is not None else ""
         p = self.progress / self.total
@@ -89,7 +89,7 @@ class Progress:
         self.out.flush()
 
     def stop(self, complete=True):
-        """stop progress and end line"""
+        """Stop progress and end line."""
         if complete:
             self.update(self.total - self.progress)
         self.out.write("\n")

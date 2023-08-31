@@ -19,8 +19,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
-"""
-k means on the sphere
+"""k means on the sphere.
 
 Adapted from this stack overflow answer
 
@@ -28,9 +27,9 @@ http://stackoverflow.com/questions/5529625/is-it-possible-to-specify-your-own-di
 
 """
 import random
-import numpy as np
-from numpy import deg2rad, rad2deg, pi, sin, cos, arccos, arctan2, newaxis, sqrt
 
+import numpy as np
+from numpy import arccos, arctan2, cos, deg2rad, newaxis, pi, rad2deg, sin, sqrt
 
 _TOL_DEF = 1e-5
 _MAXITER_DEF = 100
@@ -38,10 +37,9 @@ _VERBOSE_DEF = 1
 
 
 class KMeans:
-    """
-    A class to perform K-means on the input ra,dec using spherical distances
+    """A class to perform K-means on the input ra,dec using spherical distances.
 
-    parameters
+    Parameters
     ----------
     centers_guess: array
         [ncen, 2] starting guesses, where the two dimensions are ra and dec
@@ -108,7 +106,7 @@ class KMeans:
     labels = km.find_nearest(X)
     """
 
-    def __init__(self, centers, tol=_TOL_DEF, verbose=_VERBOSE_DEF):
+    def __init__(self, centers, tol=_TOL_DEF, verbose=_VERBOSE_DEF) -> None:
         self.set_centers(centers)
 
         self.tol = float(tol)
@@ -116,18 +114,16 @@ class KMeans:
         self.converged = False
 
     def run(self, x, maxiter=_MAXITER_DEF):
-        """
-        run k means, either until convergence is reached or the indicated
-        number of iterations are performed
+        """Run k means, either until convergence is reached or the indicated
+        number of iterations are performed.
 
-        parameters
+        Parameters
         ----------
         X: array
             [N, 2] array for ra,dec points
         maxiter: int, optional
             Max number of iterations to run.
         """
-
         centers = self.get_centers()
         _check_dims(x, self.centers)
 
@@ -137,7 +133,7 @@ class KMeans:
         if self.verbose:
             print(
                 f"X {x.shape} centers {centers.shape} "
-                f"tol = {self.tol:.2g}  maxiter = {maxiter}"
+                f"tol = {self.tol:.2g}  maxiter = {maxiter}",
             )
 
         xx, xy, xz = radec2xyz(x[:, 0], x[:, 1])
@@ -183,10 +179,9 @@ class KMeans:
             self._print_info()
 
     def set_centers(self, centers):
-        """
-        set starting centers
+        """Set starting centers.
 
-        parameters
+        Parameters
         ----------
         centers: array
             [Ncen,2] array of centers ra,dec
@@ -197,20 +192,16 @@ class KMeans:
         self.centers = centers.copy()
 
     def get_centers(self):
-        """
-        get a copy of the centers
-        """
-
+        """Get a copy of the centers."""
         centers = self.centers
         if centers is None:
-            raise ValueError("you must set centers first")
+            msg = "you must set centers first"
+            raise ValueError(msg)
 
         return centers.copy()
 
     def find_nearest(self, x):
-        """
-        find the nearest centers to the input points
-        """
+        """Find the nearest centers to the input points."""
         return find_nearest(x, self.centers)
 
     def _print_info(self):
@@ -233,15 +224,14 @@ class KMeans:
 
 
 def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
-    """
-    2-pass kmeans, fast for large N
+    """2-pass kmeans, fast for large N.
 
     - kmeans a smaller random sample from X
     - take starting guesses for the centers from a random sample
       of the input points
     - full kmeans, starting from the centers from pass 1
 
-    parameters
+    Parameters
     ----------
     x: array
         [N, 2] array of ra,dec points
@@ -257,7 +247,7 @@ def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
         How verbose.  0 silent, 1 minimal starting info, 2 prints running
         distances
 
-    returns
+    Returns
     -------
     A KMeans object, with attributes .centers, .labels, .distances etc.
 
@@ -270,7 +260,6 @@ def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
     .distances: array
         The distance to the closest center for each poit [N]
     """
-
     n, _ = x.shape
     if nsample is None:
         nsample = max(2 * np.sqrt(n), 10 * ncen)
@@ -297,12 +286,10 @@ _PIOVER2 = np.pi * 0.5
 
 
 def cdist_radec(a1, a2):
-    """
-    use broadcasting to get all distance pairs
+    """Use broadcasting to get all distance pairs.
 
     a represents [N,2] for ra,dec points
     """
-
     ra1 = a1[:, 0]
     dec1 = a1[:, 1]
     ra2 = a2[:, 0]
@@ -333,25 +320,22 @@ def cdist_radec(a1, a2):
 
 
 def random_sample(x, n):
-    """
-    random.sample of the rows of X
-    """
+    """random.sample of the rows of X."""
     sampleix = random.sample(range(x.shape[0]), int(n))
     return x[sampleix]
 
 
 def find_nearest(x, centers):
-    """
-    find the nearest center for each input point
+    """Find the nearest center for each input point.
 
-    parameters
+    Parameters
     ----------
     X: array
         [N,2] points array of ra,dec points
     centers: array
         [ncen,2] center points
 
-    returns
+    Returns
     -------
     labels: array
         The index of the nearest center for each input point
@@ -362,31 +346,30 @@ def find_nearest(x, centers):
 
 
 def _check_dims(x, centers):
-    """
-    check the dims are compatible
-    """
+    """Check the dims are compatible."""
     _, dim = x.shape
     ncen, cdim = centers.shape
     if dim != cdim:
-        raise ValueError(
+        msg = (
             f"X {x.shape} and centers {centers.shape} "
             "must have the same number of columns"
+        )
+        raise ValueError(
+            msg,
         )
 
 
 def get_mean_center(x, y, z):
-    """
-    parameters
+    """parameters
     ----------
     x: array
     y: array
-    z: array
+    z: array.
 
-    returns
+    Returns
     -------
     ramean, decmean
     """
-
     xmean = x.mean()
     ymean = y.mean()
     zmean = z.mean()

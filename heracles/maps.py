@@ -16,20 +16,20 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for map-making"""
+"""module for map-making."""
 
+import logging
+import typing as t
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Generator
-from functools import wraps, partial
-import logging
-import numpy as np
+from functools import partial, wraps
+
 import healpy as hp
+import numpy as np
 from numba import njit
 
-from .util import toc_match, Progress
-
-import typing as t
+from .util import Progress, toc_match
 
 if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def _nativebyteorder(fn):
-    """utility decorator to convert inputs to native byteorder"""
+    """Utility decorator to convert inputs to native byteorder."""
 
     @wraps(fn)
     def wrapper(*inputs):
@@ -84,7 +84,7 @@ def _map_weight(wht, ipix, w):
 
 
 def update_metadata(array, **metadata):
-    """update metadata of an array dtype"""
+    """Update metadata of an array dtype."""
     md = {}
     if array.dtype.metadata is not None:
         md.update(array.dtype.metadata)
@@ -95,7 +95,8 @@ def update_metadata(array, **metadata):
     dt = np.dtype(dt, metadata=md)
     # check that new dtype is compatible with old one
     if not np.can_cast(dt, array.dtype, casting="no"):
-        raise ValueError("array with unsupported dtype")
+        msg = "array with unsupported dtype"
+        raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
 
@@ -238,7 +239,6 @@ class PositionMap(HealpixMap, RandomizableMap):
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map the given catalogue."""
-
         # get catalogue column definition
         col = self.columns
 
@@ -312,14 +312,14 @@ class ScalarMap(HealpixMap, NormalizableMap):
         normalize: bool = True,
     ) -> None:
         """Create a new real map."""
-
         super().__init__(
-            columns=(lon, lat, value, weight), nside=nside, normalize=normalize
+            columns=(lon, lat, value, weight),
+            nside=nside,
+            normalize=normalize,
         )
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map real values from catalogue to HEALPix map."""
-
         # get the column definition of the catalogue
         *col, wcol = self.columns
 
@@ -393,7 +393,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         randomize: bool = False,
     ) -> None:
         """Create a new shear map."""
-
         self._spin: int = spin
         self._conjugate: bool = conjugate
         super().__init__(
@@ -425,7 +424,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map shears from catalogue to HEALPix map."""
-
         # get the column definition of the catalogue
         *col, wcol = self.columns
 
@@ -496,18 +494,18 @@ class VisibilityMap(HealpixMap):
 
     def __call__(self, catalog: "Catalog") -> MapData:
         """Create a visibility map from the given catalogue."""
-
         # make sure that catalogue has a visibility map
         vmap = catalog.visibility
         if vmap is None:
-            raise ValueError("no visibility map in catalog")
+            msg = "no visibility map in catalog"
+            raise ValueError(msg)
 
         # warn if visibility is changing resolution
         vmap_nside = hp.get_nside(vmap)
         if vmap_nside != self.nside:
             warnings.warn(
                 f"changing NSIDE of visibility map "
-                f"from {vmap_nside} to {self.nside}"
+                f"from {vmap_nside} to {self.nside}",
             )
             vmap = hp.ud_grade(vmap, self.nside)
         else:
@@ -523,14 +521,19 @@ class WeightMap(HealpixMap, NormalizableMap):
     """Create a HEALPix weight map from a catalogue."""
 
     def __init__(
-        self, nside: int, lon: str, lat: str, weight: str, *, normalize=True
+        self,
+        nside: int,
+        lon: str,
+        lat: str,
+        weight: str,
+        *,
+        normalize=True,
     ) -> None:
         """Create a new weight map."""
         super().__init__(columns=(lon, lat, weight), nside=nside, normalize=normalize)
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map catalogue weights."""
-
         # get the columns for this map
         *col, wcol = self.columns
 
@@ -581,7 +584,8 @@ def _close_and_return(generator):
     except StopIteration as end:
         return end.value
     else:
-        raise RuntimeError("generator did not stop")
+        msg = "generator did not stop"
+        raise RuntimeError(msg)
 
 
 def map_catalogs(
@@ -589,13 +593,12 @@ def map_catalogs(
     catalogs: t.Mapping[t.Any, "Catalog"],
     *,
     parallel: bool = False,
-    out: t.MutableMapping[t.Any, t.Any] = None,
+    out: t.Optional[t.MutableMapping[t.Any, t.Any]] = None,
     include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
     exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
     progress: bool = False,
 ) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
     """Make maps for a set of catalogues."""
-
     # the toc dict of maps
     if out is None:
         out = {}
@@ -655,9 +658,12 @@ def map_catalogs(
                     try:
                         page = next(it)
                     except StopIteration:
+                        msg = (
+                            f"catalog {i} finished prematurely in "
+                            f"page started at row {rownum}"
+                        )
                         raise RuntimeError(
-                            f"catalog {i} finished prematurely"
-                            f" in page started at row {rownum}"
+                            msg,
                         )
                     for k in maps:
                         if (fn := fns.get((k, i))) is not None:
@@ -697,12 +703,11 @@ def map_catalogs(
 def transform_maps(
     maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
     *,
-    out: t.MutableMapping[t.Any, t.Any] = None,
+    out: t.Optional[t.MutableMapping[t.Any, t.Any]] = None,
     progress: bool = False,
     **kwargs,
 ) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
-    """transform a set of maps to alms"""
-
+    """Transform a set of maps to alms."""
     # the output toc dict
     if out is None:
         out = {}
@@ -727,7 +732,8 @@ def transform_maps(
             pol = True
             m = [np.zeros(np.shape(m)[-1]), m[0], m[1]]
         else:
-            raise NotImplementedError(f"spin-{spin} maps not yet supported")
+            msg = f"spin-{spin} maps not yet supported"
+            raise NotImplementedError(msg)
 
         alms = hp.map2alm(m, pol=pol, **kwargs)
 

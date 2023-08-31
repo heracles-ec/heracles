@@ -16,21 +16,25 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for angular power spectrum estimation"""
+"""module for angular power spectrum estimation."""
 
 import logging
 import time
 from datetime import timedelta
-from itertools import product, combinations_with_replacement
+from itertools import combinations_with_replacement, product
 
-import numpy as np
 import healpy as hp
+import numpy as np
 from convolvecl import mixmat, mixmat_eb
 
 from .maps import (
-    update_metadata,
     map_catalogs as _map_catalogs,
+)
+from .maps import (
     transform_maps as _transform_maps,
+)
+from .maps import (
+    update_metadata,
 )
 from .util import toc_match
 
@@ -38,8 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=None):
-    """compute angular power spectra from a set of alms"""
-
+    """Compute angular power spectra from a set of alms."""
     logger.info(
         f"computing cls for {len(alms)}"
         f"{f'x{len(alms2)}' if alms2 is not None else ''} alm(s)",
@@ -100,7 +103,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         twopoint_names.add((k1, k2))
 
     logger.info(
-        f"computed {len(cls)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}"
+        f"computed {len(cls)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of cls
@@ -108,8 +111,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 
 
 def debias_cls(cls, noisebias=None, *, inplace=False):
-    """remove noise bias from cls"""
-
+    """Remove noise bias from cls."""
     logger.info(f"debiasing {len(cls)} cl(s){' in place' if inplace else ''}")
     t = time.monotonic()
 
@@ -146,7 +148,7 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
         out[key] = cl
 
     logger.info(
-        f"debiased {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}"
+        f"debiased {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of debiased cls
@@ -154,8 +156,7 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
 
 
 def depixelate_cls(cls, *, inplace=False):
-    """remove discretisation kernel from cls"""
-
+    """Remove discretisation kernel from cls."""
     logger.info(f"depixelate {len(cls)} cl(s){' in place' if inplace else ''}")
     t = time.monotonic()
 
@@ -204,11 +205,12 @@ def depixelate_cls(cls, *, inplace=False):
                 if fl is None:
                     logger.warning(
                         f"no HEALPix kernel for NSIDE = {nside}, "
-                        f"LMAX = {lmax}, SPIN = {spin}"
+                        f"LMAX = {lmax}, SPIN = {spin}",
                     )
                 a = hp.nside2pixarea(nside)
             else:
-                raise ValueError(f"unknown kernel: {kernel}")
+                msg = f"unknown kernel: {kernel}"
+                raise ValueError(msg)
             if fl is not None:
                 cl[lmin:] /= fl[lmin:]
             areas.append(a)
@@ -230,8 +232,7 @@ def depixelate_cls(cls, *, inplace=False):
 
 
 def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
-    """compute mixing matrices from a set of cls"""
-
+    """Compute mixing matrices from a set of cls."""
     logger.info(f"computing two-point mixing matrices for {len(cls)} cl(s)")
     t = time.monotonic()
 
@@ -258,7 +259,11 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
         elif k1 == "W" and k2 == "W":
             logger.info(f"computing ++, --, +- mixing matrices for bins {i1}, {i2}")
             wpp, wmm, wpm = mixmat_eb(
-                cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 2)
+                cl,
+                l1max=l1max,
+                l2max=l2max,
+                l3max=l3max,
+                spin=(2, 2),
             )
             mms["++", i1, i2] = wpp
             mms["--", i1, i2] = wmm
@@ -271,7 +276,7 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
             mms[f"{k1}{k2}", i1, i2] = w
 
     logger.info(
-        f"computed {len(mms)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}"
+        f"computed {len(mms)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of mixing matrices
@@ -279,8 +284,7 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
 
 
 def pixelate_mms_healpix(mms, nside, *, inplace=False):
-    """apply HEALPix pixel window function to mms"""
-
+    """Apply HEALPix pixel window function to mms."""
     logger.info(f"pixelate {len(mms)} mm(s){' in place' if inplace else ''}")
     logger.info(f"kernel: HEALPix, NSIDE={nside}")
     t = time.monotonic()
@@ -325,7 +329,7 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
         out[key] = mm
 
     logger.info(
-        f"pixelated {len(out)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}"
+        f"pixelated {len(out)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of modified cls
@@ -333,10 +337,10 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
 
 
 def binned_cls(cls, bins, *, weights=None, out=None):
-    """compute binned angular power spectra"""
+    """Compute binned angular power spectra."""
 
     def norm(a, b):
-        """divide a by b if a is nonzero"""
+        """Divide a by b if a is nonzero."""
         return np.divide(a, b, where=(a != 0), out=np.zeros_like(a))
 
     m = len(bins)
@@ -355,7 +359,8 @@ def binned_cls(cls, bins, *, weights=None, out=None):
             elif weights == "2l+1":
                 w = 2 * ell + 1
             else:
-                raise ValueError(f"unknown weights string: {weights}")
+                msg = f"unknown weights string: {weights}"
+                raise ValueError(msg)
         else:
             w = weights[: len(cl)]
 
@@ -406,12 +411,11 @@ def random_noisebias(
     progress=False,
     **kwargs,
 ):
-    """noise bias estimate from randomised position and shear maps
+    """Noise bias estimate from randomised position and shear maps.
 
     The ``include`` and ``exclude`` selection is applied to the maps.
 
     """
-
     logger.info(f"estimating two-point noise bias for {len(catalogs)} catalog(s)")
     logger.info(f"randomising {', '.join(map(str, maps))} maps")
     t = time.monotonic()
@@ -465,7 +469,7 @@ def random_noisebias(
 
     logger.info(
         f"estimated {len(nbs)} two-point noise biases in "
-        f"{timedelta(seconds=(time.monotonic() - t))}"
+        f"{timedelta(seconds=(time.monotonic() - t))}",
     )
 
     return nbs

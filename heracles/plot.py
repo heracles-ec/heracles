@@ -16,21 +16,21 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""utility functions for plotting"""
+"""utility functions for plotting."""
 
 from collections import defaultdict
 from collections.abc import Mapping
 from itertools import chain, count, cycle
-import numpy as np
-import matplotlib.pyplot as plt
-from cycler import cycler
 
+import matplotlib.pyplot as plt
+import numpy as np
+from cycler import cycler
 
 DEFAULT_CYCLER = cycler(linestyle=["-", "--", ":", "-."])
 
 
 def _dont_draw_zero_tick(tick):
-    """custom draw function for ticks that does not draw zero"""
+    """Custom draw function for ticks that does not draw zero."""
     draw = tick.draw
 
     def wrap(*args, **kwargs):
@@ -43,7 +43,7 @@ def _dont_draw_zero_tick(tick):
 
 
 def _pad_ylim(ymin, ymax):
-    """pad the y axis range depending on signs"""
+    """Pad the y axis range depending on signs."""
     return (ymin * 10 ** (-np.sign(ymin) / 2), ymax * 10 ** (np.sign(ymax) / 2))
 
 
@@ -58,13 +58,13 @@ def postage_stamps(
     linscale=0.01,
     cycler=None,
 ):
-    """create a postage stamp plot for cls"""
-
+    """Create a postage stamp plot for cls."""
     if cycler is None:
         cycler = DEFAULT_CYCLER
 
     if plot is None and transpose is None:
-        raise ValueError("missing plot data")
+        msg = "missing plot data"
+        raise ValueError(msg)
 
     if isinstance(plot, Mapping):
         plot = [plot]
@@ -73,7 +73,7 @@ def postage_stamps(
 
     keys = {k: None for x in plot for k in x} if plot is not None else {}
     trkeys = {} if transpose is None else {k: None for x in transpose for k in x}
-    stamps = sorted(({key[-2:] for key in keys} | {key[-2:][::-1] for key in trkeys}))
+    stamps = sorted({key[-2:] for key in keys} | {key[-2:][::-1] for key in trkeys})
 
     sx = list({i for i, _ in stamps})
     sy = list({j for _, j in stamps})
@@ -124,7 +124,7 @@ def postage_stamps(
         # label for first plot only, set to None after
         label = f"${ki}^{{{i}}} \\times {kj}^{{{j}}}$"
 
-        for m, cl, iprop in zip(count(), cls, cycle(cycler)):
+        for _m, cl, iprop in zip(count(), cls, cycle(cycler)):
             if cl is None:
                 continue
 
@@ -211,12 +211,18 @@ def postage_stamps(
 
         ax.set_xlim(xmin, xmax)
         ax.set_xscale(
-            "symlog", linthresh=10, linscale=0.45, subs=[2, 3, 4, 5, 6, 7, 8, 9]
+            "symlog",
+            linthresh=10,
+            linscale=0.45,
+            subs=[2, 3, 4, 5, 6, 7, 8, 9],
         )
 
         ax.set_ylim(ymin_, ymax_)
         ax.set_yscale(
-            "symlog", linthresh=ylin_, linscale=0.45, subs=[2, 3, 4, 5, 6, 7, 8, 9]
+            "symlog",
+            linthresh=ylin_,
+            linscale=0.45,
+            subs=[2, 3, 4, 5, 6, 7, 8, 9],
         )
 
         for tick in ax.xaxis.get_major_ticks():

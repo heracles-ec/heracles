@@ -1,5 +1,6 @@
 import warnings
 from contextlib import contextmanager
+
 import pytest
 from numba import config
 

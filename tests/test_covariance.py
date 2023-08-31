@@ -55,6 +55,7 @@ def test_sample_covariance():
 
 def test_update_covariance():
     from itertools import combinations_with_replacement
+
     from heracles.covariance import update_covariance
 
     n = 4

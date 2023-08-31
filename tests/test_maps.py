@@ -1,5 +1,5 @@
-import numpy as np
 import healpy as hp
+import numpy as np
 import pytest
 
 from .conftest import warns
@@ -15,31 +15,32 @@ def map_catalog(m, catalog):
     except StopIteration as stop:
         return stop.value
     else:
-        raise RuntimeError("generator did not stop")
+        msg = "generator did not stop"
+        raise RuntimeError(msg)
 
 
-@pytest.fixture
+@pytest.fixture()
 def nside():
     return 64
 
 
-@pytest.fixture
+@pytest.fixture()
 def sigma_e():
     return 0.1
 
 
-@pytest.fixture
+@pytest.fixture()
 def vmap(nside):
     return np.round(np.random.rand(12 * nside**2))
 
 
-@pytest.fixture
+@pytest.fixture()
 def page(nside):
     from unittest.mock import Mock
 
     ipix = np.ravel(
         4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis]
-        + [0, 1, 2, 3]
+        + [0, 1, 2, 3],
     )
 
     ra, dec = hp.pix2ang(nside * 2, ipix, nest=True, lonlat=True)
@@ -66,7 +67,7 @@ def page(nside):
     return page
 
 
-@pytest.fixture
+@pytest.fixture()
 def catalog(page):
     from unittest.mock import Mock
 
@@ -79,6 +80,7 @@ def catalog(page):
 
 def test_visibility_map(nside, vmap):
     from unittest.mock import Mock
+
     from heracles.maps import VisibilityMap
 
     fsky = vmap.mean()
@@ -342,7 +344,7 @@ def test_update_metadata():
 
 
 class MockMap:
-    def __init__(self):
+    def __init__(self) -> None:
         self.args = []
         self.return_value = object()
 

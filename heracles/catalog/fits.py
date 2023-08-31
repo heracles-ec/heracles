@@ -16,29 +16,30 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for catalogue processing"""
+"""module for catalogue processing."""
 
-from weakref import ref, finalize
+from weakref import finalize, ref
+
 import fitsio
 
 from .base import CatalogBase, CatalogPage
 
 
 def _is_table_hdu(hdu):
-    """return true if HDU is a table with data"""
+    """Return true if HDU is a table with data."""
     return isinstance(hdu, fitsio.hdu.TableHDU) and hdu.has_data()
 
 
 def rowfilter(array, expr):
-    """filter the rows of a structured array"""
+    """Filter the rows of a structured array."""
     return eval(expr, None, {name: array[name] for name in array.dtype.names})
 
 
 class FitsCatalog(CatalogBase):
-    """flexible reader for catalogues from FITS files"""
+    """flexible reader for catalogues from FITS files."""
 
-    def __init__(self, filename, *, columns=None, ext=None):
-        """create a new FITS catalogue reader
+    def __init__(self, filename, *, columns=None, ext=None) -> None:
+        """Create a new FITS catalogue reader.
 
         Neither opens the FITS file nor reads the catalogue immediately.
 
@@ -49,23 +50,22 @@ class FitsCatalog(CatalogBase):
         self._ext = ext
 
     def __copy__(self):
-        """return a copy of this catalog"""
+        """Return a copy of this catalog."""
         other = super().__copy__()
         other._filename = self._filename
         other._columns = self._columns
         other._ext = self._ext
         return other
 
-    def __repr__(self):
-        """string representation of FitsCatalog"""
+    def __repr__(self) -> str:
+        """String representation of FitsCatalog."""
         s = self._filename
         if self._ext is not None:
             s = f"{s}[{self._ext!r}]"
         return s
 
     def hdu(self):
-        """HDU for catalogue data"""
-
+        """HDU for catalogue data."""
         # see if there's a reference to hdu still around
         try:
             hdu = self._hdu()
@@ -86,7 +86,8 @@ class FitsCatalog(CatalogBase):
                         # find table data extension
                         hdu = next(filter(_is_table_hdu, fits))
                     except StopIteration:
-                        raise TypeError("no table data in FITS") from None
+                        msg = "no table data in FITS"
+                        raise TypeError(msg) from None
                 else:
                     hdu = fits[self._ext]
 
@@ -104,25 +105,24 @@ class FitsCatalog(CatalogBase):
         return hdu
 
     def _names(self):
-        """column names in FITS catalogue"""
+        """Column names in FITS catalogue."""
         # store column names on first access
         if self._columns is None:
             self._columns = self.hdu().get_colnames()
         return self._columns
 
     def _size(self, selection):
-        """size of FITS catalogue; selection is ignored"""
+        """Size of FITS catalogue; selection is ignored."""
         return self.hdu().get_nrows()
 
     def _join(self, *where):
-        """join rowfilter expressions"""
+        """Join rowfilter expressions."""
         return (
             "(" + ") & (".join(map(str, filter(None, where))) + ")" if where else None
         )
 
     def _pages(self, selection):
-        """iterate pages of rows in FITS file, optionally using the query"""
-
+        """Iterate pages of rows in FITS file, optionally using the query."""
         # keep an unchanging local copy of the page size
         page_size = self.page_size
 

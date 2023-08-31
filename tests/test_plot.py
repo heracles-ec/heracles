@@ -2,8 +2,8 @@ import itertools
 
 
 def test_postage_stamps():
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
 
     from heracles.plot import postage_stamps
 

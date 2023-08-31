@@ -16,14 +16,14 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for file reading and writing"""
+"""module for file reading and writing."""
 
-import os
 import logging
+import os
 
-import numpy as np
-import healpy as hp
 import fitsio
+import healpy as hp
+import numpy as np
 
 from .util import toc_match
 
@@ -45,20 +45,20 @@ _METADATA_COMMENTS = {
 
 
 def _write_metadata(hdu, metadata):
-    """write array metadata to FITS HDU"""
+    """Write array metadata to FITS HDU."""
     md = metadata or {}
     for key, value in md.items():
         hdu.write_key(f"META {key.upper()}", value, _METADATA_COMMENTS.get(key))
 
 
 def _read_metadata(hdu):
-    """read array metadata from FITS HDU"""
+    """Read array metadata from FITS HDU."""
     h = hdu.read_header()
     return {key[5:].lower(): h[key] for key in h if key.startswith("META ")}
 
 
 def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
-    """read visibility map from a HEALPix map file"""
+    """Read visibility map from a HEALPix map file."""
     mask = hp.read_map(mask_name, field=field)
 
     # set unseen pixels to zero
@@ -87,15 +87,20 @@ def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
 
 
 def write_maps(
-    filename, maps, *, clobber=False, workdir=".", include=None, exclude=None
+    filename,
+    maps,
+    *,
+    clobber=False,
+    workdir=".",
+    include=None,
+    exclude=None,
 ):
-    """write a set of maps to FITS file
+    """Write a set of maps to FITS file.
 
     If the output file exists, the new estimates will be appended, unless the
     ``clobber`` parameter is set to ``True``.
 
     """
-
     logger.info(f"writing {len(maps)} maps to {filename}")
 
     # full path to FITS file
@@ -154,16 +159,22 @@ def write_maps(
             nside = hp.npix2nside(npix)
             fits[ext].write_key("PIXTYPE", "HEALPIX", "HEALPIX pixelisation")
             fits[ext].write_key(
-                "ORDERING", "RING", "Pixel ordering scheme, either RING or NESTED"
+                "ORDERING",
+                "RING",
+                "Pixel ordering scheme, either RING or NESTED",
             )
             fits[ext].write_key("NSIDE", nside, "Resolution parameter of HEALPIX")
             fits[ext].write_key("FIRSTPIX", 0, "First pixel # (0 based)")
             fits[ext].write_key("LASTPIX", npix - 1, "Last pixel # (0 based)")
             fits[ext].write_key(
-                "INDXSCHM", "IMPLICIT", "Indexing: IMPLICIT or EXPLICIT"
+                "INDXSCHM",
+                "IMPLICIT",
+                "Indexing: IMPLICIT or EXPLICIT",
             )
             fits[ext].write_key(
-                "OBJECT", "FULLSKY", "Sky coverage, either FULLSKY or PARTIAL"
+                "OBJECT",
+                "FULLSKY",
+                "Sky coverage, either FULLSKY or PARTIAL",
             )
 
             # write the TOC entry
@@ -174,8 +185,7 @@ def write_maps(
 
 
 def read_maps(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of maps from a FITS file"""
-
+    """Read a set of maps from a FITS file."""
     logger.info(f"reading maps from {filename}")
 
     # full path to FITS file
@@ -220,15 +230,20 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
 
 
 def write_alms(
-    filename, alms, *, clobber=False, workdir=".", include=None, exclude=None
+    filename,
+    alms,
+    *,
+    clobber=False,
+    workdir=".",
+    include=None,
+    exclude=None,
 ):
-    """write a set of alms to FITS file
+    """Write a set of alms to FITS file.
 
     If the output file exists, the new estimates will be appended, unless the
     ``clobber`` parameter is set to ``True``.
 
     """
-
     logger.info(f"writing {len(alms)} alms to {filename}")
 
     # full path to FITS file
@@ -283,8 +298,7 @@ def write_alms(
 
 
 def read_alms(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of alms from a FITS file"""
-
+    """Read a set of alms from a FITS file."""
     logger.info(f"reading alms from {filename}")
 
     # full path to FITS file
@@ -328,13 +342,12 @@ def read_alms(filename, workdir=".", *, include=None, exclude=None):
 
 
 def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclude=None):
-    """write a set of cls to FITS file
+    """Write a set of cls to FITS file.
 
     If the output file exists, the new estimates will be appended, unless the
     ``clobber`` parameter is set to ``True``.
 
     """
-
     logger.info(f"writing {len(cls)} cls to {filename}")
 
     # full path to FITS file
@@ -409,8 +422,7 @@ def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclud
 
 
 def read_cls(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of cls from a FITS file"""
-
+    """Read a set of cls from a FITS file."""
     logger.info(f"reading cls from {filename}")
 
     # full path to FITS file
@@ -450,13 +462,12 @@ def read_cls(filename, workdir=".", *, include=None, exclude=None):
 
 
 def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclude=None):
-    """write a set of mixing matrices to FITS file
+    """Write a set of mixing matrices to FITS file.
 
     If the output file exists, the new mixing matrices will be appended, unless
     the ``clobber`` parameter is set to ``True``.
 
     """
-
     logger.info(f"writing {len(mms)} mm(s) to {filename}")
 
     # full path to FITS file
@@ -520,8 +531,7 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
 
 
 def read_mms(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of mixing matrices from a FITS file"""
-
+    """Read a set of mixing matrices from a FITS file."""
     logger.info(f"reading mixing matrices from {filename}")
 
     # full path to FITS file
@@ -561,13 +571,12 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
 
 
 def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=None):
-    """write a set of covariance matrices to FITS file
+    """Write a set of covariance matrices to FITS file.
 
     If the output file exists, the new estimates will be appended, unless the
     ``clobber`` parameter is set to ``True``.
 
     """
-
     logger.info(f"writing {len(cov)} covariances to {filename}")
 
     # full path to FITS file
@@ -641,8 +650,7 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
 
 
 def read_cov(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of covariances matrices from a FITS file"""
-
+    """Read a set of covariances matrices from a FITS file."""
     logger.info(f"reading covariance matrices from {filename}")
 
     # full path to FITS file

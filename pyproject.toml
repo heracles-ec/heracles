@@ -51,6 +51,36 @@ build.hooks.vcs.version.source = "vcs"
 [tool.ruff]
 fix = true
 force-exclude = true
+per-file-ignores = {"test_*" = [
+    "S101",
+]}
+select = [
+    "A",
+    "BLE",
+    "COM",
+    "DJ",
+    "DTZ",
+    "E",
+    "EM",
+    "ERA",
+    "EXE",
+    "F",
+    "I",
+    "ICN",
+    "INP",
+    "ISC",
+    "PD",
+    "PIE",
+    "PYI",
+    "Q",
+    "RET",
+    "RSE",
+    "TCH",
+    "TID",
+    "UP",
+    "W",
+    "YTT",
+]
 target-version = "py38"
 isort.known-first-party = [
     "heracles",
