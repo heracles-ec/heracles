@@ -1,15 +1,10 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+requires = ["hatch-vcs", "hatchling"]
 
 [project]
-name = "heracles"
-description = "Harmonic-space statistics on the sphere"
-readme = "README.md"
-requires-python = ">=3.8"
-license = "LGPL-3.0-or-later"
 authors = [
-  {name = "Nicolas Tessore", email = "n.tessore@ucl.ac.uk"}
+  {email = "n.tessore@ucl.ac.uk", name = "Nicolas Tessore"}
 ]
 classifiers = [
   "Intended Audience :: Science/Research",
@@ -19,29 +14,34 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
+  "convolvecl",
   "fitsio",
   "healpy",
   "numba",
-  "numpy",
-  "convolvecl"
+  "numpy"
 ]
+description = "Harmonic-space statistics on the sphere"
 dynamic = ["version"]
+license = "LGPL-3.0-or-later"
+name = "heracles"
+readme = "README.md"
+requires-python = ">=3.8"
 
 [project.optional-dependencies]
+docs = [
+  "furo",
+  "matplotlib",
+  "numpydoc",
+  "sphinx",
+  "sphinxcontrib-katex"
+]
 test = [
   "pytest"
 ]
-docs = [
-  "sphinx",
-  "furo",
-  "sphinxcontrib-katex",
-  "numpydoc",
-  "matplotlib"
-]
 
 [project.urls]
-Homepage = "https://github.com/heracles-ec/heracles"
 Documentation = "https://heracles.readthedocs.io/"
+Homepage = "https://github.com/heracles-ec/heracles"
 Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.hatch]
