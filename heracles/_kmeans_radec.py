@@ -331,8 +331,7 @@ def cdist_radec(a1, a2):
     costheta = x1*x2 + y1*y2 + z1*z2
 
     costheta = np.clip(costheta, -1.0, 1.0)
-    theta = arccos(costheta)
-    return theta
+    return arccos(costheta)
 
 
 def random_sample(x, n):

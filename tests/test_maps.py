@@ -53,10 +53,7 @@ def page(nside):
     cols = {'ra': ra, 'dec': dec, 'g1': g1, 'g2': g2, 'w': w}
 
     def get(*names):
-        if len(names) == 1:
-            return cols[names[0]]
-        else:
-            return [cols[name] for name in names]
+        return cols[names[0]] if len(names) == 1 else [cols[name] for name in names]
 
     page = Mock()
     page.size = size
@@ -327,7 +324,7 @@ class MockCatalog:
     page_size = 1
 
     def __iter__(self):
-        for i in range(0, self.size, self.page_size):
+        for _ in range(0, self.size, self.page_size):
             yield {}
 
 

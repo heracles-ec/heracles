@@ -57,11 +57,7 @@ def add_sample(cov, x, y=None):
     '''add a sample to a sample covariance matrix'''
 
     x = np.reshape(x, -1)
-    if y is None:
-        y = x
-    else:
-        y = np.reshape(y, -1)
-
+    y = x if y is None else np.reshape(y, -1)
     if x.size != cov.sample_row_mean.size or y.size != cov.sample_col_mean.size:
         raise ValueError('size mismatch between sample and covariance matrix')
 
@@ -134,9 +130,4 @@ def jackknife_regions_kmeans(fpmap, n, *, maxrepeat=5, maxiter=1000, tol=1e-5, r
 
     logger.info('partitioned map in %s', timedelta(seconds=(time.monotonic() - t)))
 
-    if return_centers:
-        result = jkmap, km.centers
-    else:
-        result = jkmap
-
-    return result
+    return (jkmap, km.centers) if return_centers else jkmap

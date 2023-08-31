@@ -90,10 +90,7 @@ def update_metadata(array, **metadata):
     md.update(metadata)
     # create the new dtype with only the new metadata
     dt = array.dtype
-    if dt.fields is not None:
-        dt = dt.fields
-    else:
-        dt = dt.str
+    dt = dt.fields if dt.fields is not None else dt.str
     dt = np.dtype(dt, metadata=md)
     # check that new dtype is compatible with old one
     if not np.can_cast(dt, array.dtype, casting='no'):
@@ -271,10 +268,7 @@ class PositionMap(HealpixMap, RandomizableMap):
 
         # randomise position map if asked to
         if self._randomize:
-            if vmap is None:
-                p = np.full(npix, 1/npix)
-            else:
-                p = vmap/np.sum(vmap)
+            p = np.full(npix, 1/npix) if vmap is None else vmap/np.sum(vmap)
             pos[:] = np.random.multinomial(ngal, p)
 
         # compute average number density
@@ -285,10 +279,7 @@ class PositionMap(HealpixMap, RandomizableMap):
         # compute overdensity if asked to
         if self._overdensity:
             pos /= nbar
-            if vmap is None:
-                pos -= 1
-            else:
-                pos -= vmap
+            pos -= 1 if vmap is None else vmap
             power = 0
         else:
             power = 1
@@ -332,11 +323,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
 
             lon, lat, v = page.get(*col)
 
-            if wcol is None:
-                w = np.ones(page.size)
-            else:
-                w = page.get(wcol)
-
+            w = np.ones(page.size) if wcol is None else page.get(wcol)
             ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_real(wht, val, ipix, w, v)
@@ -434,11 +421,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
             lon, lat, re, im = page.get(*col)
 
-            if wcol is None:
-                w = np.ones(page.size)
-            else:
-                w = page.get(wcol)
-
+            w = np.ones(page.size) if wcol is None else page.get(wcol)
             if conjugate:
                 im = -im
 
@@ -533,11 +516,7 @@ class WeightMap(HealpixMap, NormalizableMap):
         def mapper(page: 'CatalogPage') -> None:
             lon, lat = page.get(*col)
 
-            if wcol is None:
-                w = np.ones(page.size)
-            else:
-                w = page.get(wcol)
-
+            w = np.ones(page.size) if wcol is None else page.get(wcol)
             ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_weight(wht, ipix, w)
@@ -625,11 +604,10 @@ def map_catalogs(maps: t.Mapping[t.Any, Map],
             prog.stop()
 
         # collect map generators from results
-        gen = {ki: v for ki, v in results.items() if isinstance(v, Generator)}
-
         # if there are any generators, feed them the catalogue pages
-        if gen:
-
+        if gen := {
+            ki: v for ki, v in results.items() if isinstance(v, Generator)
+        }:
             # get an iterator over each catalogue
             # by construction, these have all the same length and page size
             its = {i: iter(catalog) for i, catalog in group.items()}

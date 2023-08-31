@@ -48,17 +48,13 @@ def _write_metadata(hdu, metadata):
     '''write array metadata to FITS HDU'''
     md = metadata or {}
     for key, value in md.items():
-        hdu.write_key('META ' + key.upper(), value, _METADATA_COMMENTS.get(key))
+        hdu.write_key(f'META {key.upper()}', value, _METADATA_COMMENTS.get(key))
 
 
 def _read_metadata(hdu):
     '''read array metadata from FITS HDU'''
     h = hdu.read_header()
-    md = {}
-    for key in h:
-        if key.startswith('META '):
-            md[key[5:].lower()] = h[key]
-    return md
+    return {key[5:].lower(): h[key] for key in h if key.startswith('META ')}
 
 
 def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):

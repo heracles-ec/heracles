@@ -60,7 +60,7 @@ class FitsCatalog(CatalogBase):
         '''string representation of FitsCatalog'''
         s = self._filename
         if self._ext is not None:
-            s = s + f'[{self._ext!r}]'
+            s = f'{s}[{self._ext!r}]'
         return s
 
     def hdu(self):
@@ -118,9 +118,11 @@ class FitsCatalog(CatalogBase):
 
     def _join(self, *where):
         '''join rowfilter expressions'''
-        if not where:
-            return None
-        return '(' + ') & ('.join(map(str, filter(None, where))) + ')'
+        return (
+            '(' + ') & ('.join(map(str, filter(None, where))) + ')'
+            if where
+            else None
+        )
 
     def _pages(self, selection):
         '''iterate pages of rows in FITS file, optionally using the query'''
@@ -143,10 +145,7 @@ class FitsCatalog(CatalogBase):
 
             # see if rows were cached
             try:
-                if self._rowinfo == (hduid, start, stop):
-                    rows = self._rows
-                else:
-                    rows = None
+                rows = self._rows if self._rowinfo == (hduid, start, stop) else None
             except AttributeError:
                 rows = None
 

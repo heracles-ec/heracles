@@ -39,10 +39,7 @@ class ArrayCatalog(CatalogBase):
         return self._arr.dtype.names
 
     def _size(self, selection):
-        if selection is None:
-            return len(self._arr)
-        else:
-            return len(self._arr[selection])
+        return len(self._arr) if selection is None else len(self._arr[selection])
 
     def _join(self, first, *other):
         '''join boolean masks'''
@@ -53,10 +50,7 @@ class ArrayCatalog(CatalogBase):
 
     def _pages(self, selection):
         '''iterate the rows of the array in pages'''
-        if selection is None:
-            arr = self._arr
-        else:
-            arr = self._arr[selection]
+        arr = self._arr if selection is None else self._arr[selection]
         nrows = len(arr)
         page_size = self.page_size
         names = arr.dtype.names

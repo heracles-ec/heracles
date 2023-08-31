@@ -10,8 +10,7 @@ def nside():
 
 @pytest.fixture
 def zbins():
-    zbins = {0: (0., 0.8), 1: (1.0, 1.2)}
-    return zbins
+    return {0: (0., 0.8), 1: (1.0, 1.2)}
 
 
 @pytest.fixture
@@ -174,11 +173,7 @@ def test_binned_cls(weights):
 
     bins = [2, 5, 10, 15, 20]
 
-    if weights == '<rand>':
-        weights_ = np.random.rand(40)
-    else:
-        weights_ = weights
-
+    weights_ = np.random.rand(40) if weights == '<rand>' else weights
     result = binned_cls(cls, bins, weights=weights_)
 
     for key, cl in cls.items():

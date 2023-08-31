@@ -6,8 +6,7 @@ NFIELDS_TEST = 4
 
 @pytest.fixture
 def zbins():
-    zbins = {0: (0., 0.8), 1: (1.0, 1.2)}
-    return zbins
+    return {0: (0., 0.8), 1: (1.0, 1.2)}
 
 
 @pytest.fixture
@@ -64,14 +63,12 @@ def mock_cls():
 
 @pytest.fixture(scope='session')
 def nside():
-    nside = 32
-    return nside
+    return 32
 
 
 @pytest.fixture(scope='session')
 def datadir(tmp_path_factory):
-    datadir = tmp_path_factory.mktemp('data')
-    return datadir
+    return tmp_path_factory.mktemp('data')
 
 
 @pytest.fixture(scope='session')
@@ -83,7 +80,7 @@ def mock_mask_fields(nside):
     maps = np.random.rand(npix*NFIELDS_TEST).reshape((npix, NFIELDS_TEST))
     pixels = np.unique(np.random.randint(0, npix, npix//3))
     maskpix = np.delete(np.arange(0, npix), pixels)
-    for i in range(0, NFIELDS_TEST):
+    for i in range(NFIELDS_TEST):
         maps[:, i][maskpix] = 0
     return [maps, pixels]
 

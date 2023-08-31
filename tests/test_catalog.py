@@ -70,7 +70,7 @@ def test_catalog_page():
         data['a'] = b
 
     # test iterator
-    assert [_ for _ in page] == ['a', 'b']
+    assert list(page) == ['a', 'b']
 
     # test copy method
     copy = page.copy()
@@ -183,7 +183,7 @@ def test_catalog_base_properties(catalog):
     catalog.add_filter(filt)
     assert catalog.filters == [filt]
     catalog.filters = []
-    assert catalog.filters == []
+    assert not catalog.filters
 
     v = object()
     assert catalog.visibility is None

@@ -82,9 +82,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
                     md[f'{key}_1'] = value
         if alm2.dtype.metadata:
             for key, value in alm2.dtype.metadata.items():
-                if key == 'noisbias':
-                    pass
-                else:
+                if key != 'noisbias':
                     md[f'{key}_2'] = value
         update_metadata(cl, **md)
 

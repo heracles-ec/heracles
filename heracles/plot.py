@@ -63,20 +63,14 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
     if isinstance(transpose, Mapping):
         transpose = [transpose]
 
-    if plot is not None:
-        keys = {k: None for x in plot for k in x}
-    else:
-        keys = {}
-    if transpose is not None:
-        trkeys = {k: None for x in transpose for k in x}
-    else:
-        trkeys = {}
+    keys = {k: None for x in plot for k in x} if plot is not None else {}
+    trkeys = {} if transpose is None else {k: None for x in transpose for k in x}
+    stamps = sorted(
+        ({key[-2:] for key in keys} | {key[-2:][::-1] for key in trkeys})
+    )
 
-    stamps = sorted(set(key[-2:] for key in keys)
-                    | set(key[-2:][::-1] for key in trkeys))
-
-    sx = list(set(i for i, _ in stamps))
-    sy = list(set(j for _, j in stamps))
+    sx = list({i for i, _ in stamps})
+    sy = list({j for _, j in stamps})
 
     nx = len(sx)
     ny = len(sy)
@@ -170,12 +164,19 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
 
         ax.axhline(0., c='k', lw=0.8, ls='--')
 
-        ax.tick_params(axis='both', which='both', direction='in',
-                       top=True, bottom=True, left=True, right=True,
-                       labeltop=(idx == (0, 0) or idx == (0, ny-1)),
-                       labelbottom=(idx == (nx-1, 0) or idx == (nx-1, ny-1)),
-                       labelleft=(idx == (0, 0) or idx == (nx-1, 0)),
-                       labelright=(idx == (0, ny-1) or idx == (nx-1, ny-1)))
+        ax.tick_params(
+            axis='both',
+            which='both',
+            direction='in',
+            top=True,
+            bottom=True,
+            left=True,
+            right=True,
+            labeltop=idx in [(0, 0), (0, ny - 1)],
+            labelbottom=idx in [(nx - 1, 0), (nx - 1, ny - 1)],
+            labelleft=idx in [(0, 0), (nx - 1, 0)],
+            labelright=idx in [(0, ny - 1), (nx - 1, ny - 1)],
+        )
         ax.set_axisbelow(False)
 
         leg = ax.legend(frameon=True, edgecolor='none', framealpha=0.8,
@@ -204,16 +205,11 @@ def postage_stamps(plot=None, transpose=None, *, scale=None,
             tick.draw = _dont_draw_zero_tick(tick)
 
     # fill empty axes
-    for i, ax in enumerate(axes.ravel()):
-
+    for ax in axes.ravel():
         if not ax.has_data():
             if hatch_empty:
 
-                if isinstance(hatch_empty, str):
-                    hatch = hatch_empty
-                else:
-                    hatch = '/////'
-
+                hatch = hatch_empty if isinstance(hatch_empty, str) else '/////'
                 ax.patch.set_facecolor('none')
                 ax.patch.set_edgecolor('k')
                 ax.patch.set_hatch(hatch)
