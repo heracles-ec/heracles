@@ -48,6 +48,15 @@ urls.Issues = "https://github.com/heracles-ec/heracles/issues"
 build.hooks.vcs.version-file = "heracles/_version.py"
 build.hooks.vcs.version.source = "vcs"
 
+[tool.ruff]
+fix = true
+force-exclude = true
+target-version = "py38"
+isort.known-first-party = [
+    "heracles",
+]
+mccabe.max-complexity = 18
+
 [tool.tomlsort]
 all = true
 spaces_indent_inline_array = 4
