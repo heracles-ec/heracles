@@ -29,31 +29,24 @@ dynamic = [
 ]
 license = "LGPL-3.0-or-later"
 name = "heracles"
-readme = "README.md"
-requires-python = ">=3.8"
-
-[project.optional-dependencies]
-docs = [
+optional-dependencies = {docs = [
     "furo",
     "matplotlib",
     "numpydoc",
     "sphinx",
     "sphinxcontrib-katex",
-]
-test = [
+], test = [
     "pytest",
-]
-
-[project.urls]
-Documentation = "https://heracles.readthedocs.io/"
-Homepage = "https://github.com/heracles-ec/heracles"
-Issues = "https://github.com/heracles-ec/heracles/issues"
+]}
+readme = "README.md"
+requires-python = ">=3.8"
+urls.Documentation = "https://heracles.readthedocs.io/"
+urls.Homepage = "https://github.com/heracles-ec/heracles"
+urls.Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.hatch]
-
-[tool.hatch.build.hooks.vcs]
-version-file = "heracles/_version.py"
-version.source = "vcs"
+build.hooks.vcs.version-file = "heracles/_version.py"
+build.hooks.vcs.version.source = "vcs"
 
 [tool.tomlsort]
 all = true
