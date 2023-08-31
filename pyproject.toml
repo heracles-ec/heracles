@@ -4,21 +4,21 @@ requires = ["hatch-vcs", "hatchling"]
 
 [project]
 authors = [
-  {email = "n.tessore@ucl.ac.uk", name = "Nicolas Tessore"}
+    {email = "n.tessore@ucl.ac.uk", name = "Nicolas Tessore"},
 ]
 classifiers = [
-  "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3",
-  "Topic :: Scientific/Engineering :: Astronomy"
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
-  "convolvecl",
-  "fitsio",
-  "healpy",
-  "numba",
-  "numpy"
+    "convolvecl",
+    "fitsio",
+    "healpy",
+    "numba",
+    "numpy",
 ]
 description = "Harmonic-space statistics on the sphere"
 dynamic = ["version"]
@@ -29,14 +29,14 @@ requires-python = ">=3.8"
 
 [project.optional-dependencies]
 docs = [
-  "furo",
-  "matplotlib",
-  "numpydoc",
-  "sphinx",
-  "sphinxcontrib-katex"
+    "furo",
+    "matplotlib",
+    "numpydoc",
+    "sphinx",
+    "sphinxcontrib-katex",
 ]
 test = [
-  "pytest"
+    "pytest",
 ]
 
 [project.urls]
@@ -49,3 +49,9 @@ Issues = "https://github.com/heracles-ec/heracles/issues"
 [tool.hatch.build.hooks.vcs]
 version-file = "heracles/_version.py"
 version.source = "vcs"
+
+[tool.tomlsort]
+all = true
+spaces_indent_inline_array = 4
+trailing_comma_inline_array = true
+overrides."project.classifiers".inline_arrays = false
