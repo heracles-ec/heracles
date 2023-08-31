@@ -15,5 +15,5 @@ def test_kmeans_sample():
     assert len(km.centers) == ncen
     assert len(km.labels) == npts
     assert len(km.distances) == npts
-    assert len(km.r50) == ncen*2
-    assert len(km.r90) == ncen*2
+    assert len(km.r50) == ncen * 2
+    assert len(km.r90) == ncen * 2

@@ -15,7 +15,7 @@ def map_catalog(m, catalog):
     except StopIteration as stop:
         return stop.value
     else:
-        raise RuntimeError('generator did not stop')
+        raise RuntimeError("generator did not stop")
 
 
 @pytest.fixture
@@ -30,27 +30,30 @@ def sigma_e():
 
 @pytest.fixture
 def vmap(nside):
-    return np.round(np.random.rand(12*nside**2))
+    return np.round(np.random.rand(12 * nside**2))
 
 
 @pytest.fixture
 def page(nside):
     from unittest.mock import Mock
 
-    ipix = np.ravel(4*hp.ring2nest(nside, np.arange(12*nside**2))[:, np.newaxis] + [0, 1, 2, 3])
+    ipix = np.ravel(
+        4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis]
+        + [0, 1, 2, 3]
+    )
 
-    ra, dec = hp.pix2ang(nside*2, ipix, nest=True, lonlat=True)
+    ra, dec = hp.pix2ang(nside * 2, ipix, nest=True, lonlat=True)
 
     size = ra.size
 
-    w = np.random.rand(size//4, 4)
-    g1 = np.random.randn(size//4, 4)
-    g2 = np.random.randn(size//4, 4)
-    g1 -= np.sum(w*g1, axis=-1, keepdims=True)/np.sum(w, axis=-1, keepdims=True)
-    g2 -= np.sum(w*g2, axis=-1, keepdims=True)/np.sum(w, axis=-1, keepdims=True)
+    w = np.random.rand(size // 4, 4)
+    g1 = np.random.randn(size // 4, 4)
+    g2 = np.random.randn(size // 4, 4)
+    g1 -= np.sum(w * g1, axis=-1, keepdims=True) / np.sum(w, axis=-1, keepdims=True)
+    g2 -= np.sum(w * g2, axis=-1, keepdims=True) / np.sum(w, axis=-1, keepdims=True)
     w, g1, g2 = w.reshape(-1), g1.reshape(-1), g2.reshape(-1)
 
-    cols = {'ra': ra, 'dec': dec, 'g1': g1, 'g2': g2, 'w': w}
+    cols = {"ra": ra, "dec": dec, "g1": g1, "g2": g2, "w": w}
 
     def get(*names):
         return cols[names[0]] if len(names) == 1 else [cols[name] for name in names]
@@ -65,7 +68,6 @@ def page(nside):
 
 @pytest.fixture
 def catalog(page):
-
     from unittest.mock import Mock
 
     catalog = Mock()
@@ -76,13 +78,12 @@ def catalog(page):
 
 
 def test_visibility_map(nside, vmap):
-
     from unittest.mock import Mock
     from heracles.maps import VisibilityMap
 
     fsky = vmap.mean()
 
-    for nside_out in [nside//2, nside, nside*2]:
+    for nside_out in [nside // 2, nside, nside * 2]:
         catalog = Mock()
         catalog.visibility = vmap
 
@@ -93,124 +94,168 @@ def test_visibility_map(nside, vmap):
 
         assert result is not vmap
 
-        assert result.shape == (12*nside_out**2,)
-        assert result.dtype.metadata == {'spin': 0, 'kernel': 'healpix', 'power': 0}
+        assert result.shape == (12 * nside_out**2,)
+        assert result.dtype.metadata == {"spin": 0, "kernel": "healpix", "power": 0}
         assert np.isclose(result.mean(), fsky)
 
     # test missing visibility map
     catalog = Mock()
     catalog.visibility = None
     mapper = VisibilityMap(nside)
-    with pytest.raises(ValueError, match='no visibility'):
+    with pytest.raises(ValueError, match="no visibility"):
         mapper(catalog)
 
 
 def test_position_map(nside, catalog, vmap):
-
     from heracles.maps import PositionMap
 
     # normal mode: compute overdensity maps with metadata
 
-    m = map_catalog(PositionMap(nside, 'ra', 'dec'), catalog)
+    m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'nbar': 4., 'kernel': 'healpix', 'power': 0}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {"spin": 0, "nbar": 4.0, "kernel": "healpix", "power": 0}
     np.testing.assert_array_equal(m, 0)
 
     # compute number count map
 
-    m = map_catalog(PositionMap(nside, 'ra', 'dec', overdensity=False), catalog)
+    m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'nbar': 4., 'kernel': 'healpix', 'power': 1}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {"spin": 0, "nbar": 4.0, "kernel": "healpix", "power": 1}
     np.testing.assert_array_equal(m, 4)
 
     # compute overdensity maps with visibility map
 
     catalog.visibility = vmap
 
-    m = map_catalog(PositionMap(nside, 'ra', 'dec'), catalog)
+    m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'nbar': 4./vmap.mean(), 'kernel': 'healpix', 'power': 0}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "nbar": 4.0 / vmap.mean(),
+        "kernel": "healpix",
+        "power": 0,
+    }
 
     # compute number count map with visibility map
 
-    m = map_catalog(PositionMap(nside, 'ra', 'dec', overdensity=False), catalog)
+    m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'nbar': 4./vmap.mean(), 'kernel': 'healpix', 'power': 1}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "nbar": 4.0 / vmap.mean(),
+        "kernel": "healpix",
+        "power": 1,
+    }
 
 
 def test_scalar_map(nside, catalog):
-
     from heracles.maps import ScalarMap
 
-    m = map_catalog(ScalarMap(nside, 'ra', 'dec', 'g1', 'w'), catalog)
+    m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w"), catalog)
 
-    w = next(iter(catalog))['w']
-    w = w.reshape(w.size//4, 4).sum(axis=-1)
+    w = next(iter(catalog))["w"]
+    w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 0,
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
-    m = map_catalog(ScalarMap(nside, 'ra', 'dec', 'g1', 'w', normalize=False), catalog)
+    m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 1,
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
 
 def test_complex_map(nside, catalog):
-
     from heracles.maps import ComplexMap
 
-    m = map_catalog(ComplexMap(nside, 'ra', 'dec', 'g1', 'g2', 'w', spin=2), catalog)
+    m = map_catalog(ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2), catalog)
 
-    w = next(iter(catalog))['w']
-    w = w.reshape(w.size//4, 4).sum(axis=-1)
+    w = next(iter(catalog))["w"]
+    w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
 
-    assert m.shape == (2, 12*nside**2,)
-    assert m.dtype.metadata == {'spin': 2, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
+    assert m.shape == (
+        2,
+        12 * nside**2,
+    )
+    assert m.dtype.metadata == {
+        "spin": 2,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 0,
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
-    m = map_catalog(ComplexMap(nside, 'ra', 'dec', 'g1', 'g2', 'w', spin=1, normalize=False), catalog)
+    m = map_catalog(
+        ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False),
+        catalog,
+    )
 
-    assert m.shape == (2, 12*nside**2,)
-    assert m.dtype.metadata == {'spin': 1, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
+    assert m.shape == (
+        2,
+        12 * nside**2,
+    )
+    assert m.dtype.metadata == {
+        "spin": 1,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 1,
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
 
 def test_weight_map(nside, catalog):
-
     from heracles.maps import WeightMap
 
-    m = map_catalog(WeightMap(nside, 'ra', 'dec', 'w'), catalog)
+    m = map_catalog(WeightMap(nside, "ra", "dec", "w"), catalog)
 
-    w = next(iter(catalog))['w']
-    w = w.reshape(w.size//4, 4).sum(axis=-1)
+    w = next(iter(catalog))["w"]
+    w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 0}
-    np.testing.assert_array_almost_equal(m, w/wbar)
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 0,
+    }
+    np.testing.assert_array_almost_equal(m, w / wbar)
 
-    m = map_catalog(WeightMap(nside, 'ra', 'dec', 'w', normalize=False), catalog)
+    m = map_catalog(WeightMap(nside, "ra", "dec", "w", normalize=False), catalog)
 
-    assert m.shape == (12*nside**2,)
-    assert m.dtype.metadata == {'spin': 0, 'wbar': wbar, 'kernel': 'healpix', 'power': 1}
+    assert m.shape == (12 * nside**2,)
+    assert m.dtype.metadata == {
+        "spin": 0,
+        "wbar": wbar,
+        "kernel": "healpix",
+        "power": 1,
+    }
     np.testing.assert_array_almost_equal(m, w)
 
 
 def test_transform_maps():
-
     from heracles.maps import transform_maps, update_metadata
 
     nside = 32
-    npix = 12*nside**2
+    npix = 12 * nside**2
 
     t = np.random.randn(npix)
     update_metadata(t, spin=0, a=1)
@@ -218,43 +263,43 @@ def test_transform_maps():
     update_metadata(p, spin=2, b=2)
 
     # single scalar map
-    maps = {('T', 0): t}
+    maps = {("T", 0): t}
     alms = transform_maps(maps)
 
     assert len(alms) == 1
     assert alms.keys() == maps.keys()
-    assert alms['T', 0].dtype.metadata['spin'] == 0
-    assert alms['T', 0].dtype.metadata['a'] == 1
-    assert alms['T', 0].dtype.metadata['nside'] == nside
+    assert alms["T", 0].dtype.metadata["spin"] == 0
+    assert alms["T", 0].dtype.metadata["a"] == 1
+    assert alms["T", 0].dtype.metadata["nside"] == nside
 
     # polarisation map
-    maps = {('P', 0): p}
+    maps = {("P", 0): p}
     alms = transform_maps(maps)
 
     assert len(alms) == 2
-    assert alms.keys() == {('P_E', 0), ('P_B', 0)}
-    assert alms['P_E', 0].dtype.metadata['spin'] == 2
-    assert alms['P_B', 0].dtype.metadata['spin'] == 2
-    assert alms['P_E', 0].dtype.metadata['b'] == 2
-    assert alms['P_B', 0].dtype.metadata['b'] == 2
-    assert alms['P_E', 0].dtype.metadata['nside'] == nside
-    assert alms['P_B', 0].dtype.metadata['nside'] == nside
+    assert alms.keys() == {("P_E", 0), ("P_B", 0)}
+    assert alms["P_E", 0].dtype.metadata["spin"] == 2
+    assert alms["P_B", 0].dtype.metadata["spin"] == 2
+    assert alms["P_E", 0].dtype.metadata["b"] == 2
+    assert alms["P_B", 0].dtype.metadata["b"] == 2
+    assert alms["P_E", 0].dtype.metadata["nside"] == nside
+    assert alms["P_B", 0].dtype.metadata["nside"] == nside
 
     # mixed
-    maps = {('T', 0): t, ('P', 1): p}
+    maps = {("T", 0): t, ("P", 1): p}
     alms = transform_maps(maps)
 
     assert len(alms) == 3
-    assert alms.keys() == {('T', 0), ('P_E', 1), ('P_B', 1)}
-    assert alms['T', 0].dtype.metadata['spin'] == 0
-    assert alms['P_E', 1].dtype.metadata['spin'] == 2
-    assert alms['P_B', 1].dtype.metadata['spin'] == 2
-    assert alms['T', 0].dtype.metadata['a'] == 1
-    assert alms['P_E', 1].dtype.metadata['b'] == 2
-    assert alms['P_B', 1].dtype.metadata['b'] == 2
-    assert alms['T', 0].dtype.metadata['nside'] == nside
-    assert alms['P_E', 1].dtype.metadata['nside'] == nside
-    assert alms['P_B', 1].dtype.metadata['nside'] == nside
+    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
+    assert alms["T", 0].dtype.metadata["spin"] == 0
+    assert alms["P_E", 1].dtype.metadata["spin"] == 2
+    assert alms["P_B", 1].dtype.metadata["spin"] == 2
+    assert alms["T", 0].dtype.metadata["a"] == 1
+    assert alms["P_E", 1].dtype.metadata["b"] == 2
+    assert alms["P_B", 1].dtype.metadata["b"] == 2
+    assert alms["T", 0].dtype.metadata["nside"] == nside
+    assert alms["P_E", 1].dtype.metadata["nside"] == nside
+    assert alms["P_B", 1].dtype.metadata["nside"] == nside
 
 
 def test_update_metadata():
@@ -266,35 +311,37 @@ def test_update_metadata():
 
     update_metadata(a, x=1)
 
-    assert a.dtype.metadata == {'x': 1}
+    assert a.dtype.metadata == {"x": 1}
 
     update_metadata(a, y=2)
 
-    assert a.dtype.metadata == {'x': 1, 'y': 2}
+    assert a.dtype.metadata == {"x": 1, "y": 2}
 
     update_metadata(a, x=3)
 
-    assert a.dtype.metadata == {'x': 3, 'y': 2}
+    assert a.dtype.metadata == {"x": 3, "y": 2}
 
     # check dtype fields are preserved
 
-    a = np.array([('Alice', 37, 56.0), ('Bob', 25, 73.0)], dtype=[('f0', 'U10'), ('f1', 'i4'), ('f2', 'f4')])
+    a = np.array(
+        [("Alice", 37, 56.0), ("Bob", 25, 73.0)],
+        dtype=[("f0", "U10"), ("f1", "i4"), ("f2", "f4")],
+    )
 
     a_fields_original = np.copy(a.dtype.fields)
 
     update_metadata(a, x=1)
 
     assert a.dtype.fields == a_fields_original
-    assert a.dtype.metadata == {'x': 1}
+    assert a.dtype.metadata == {"x": 1}
 
     update_metadata(a, y=2)
 
     assert a.dtype.fields == a_fields_original
-    assert a.dtype.metadata == {'x': 1, 'y': 2}
+    assert a.dtype.metadata == {"x": 1, "y": 2}
 
 
 class MockMap:
-
     def __init__(self):
         self.args = []
         self.return_value = object()
@@ -311,10 +358,10 @@ class MockMap:
 
 
 class MockMapGen(MockMap):
-
     def __call__(self, catalog):
         def f(page):
             pass
+
         yield f
         return super().__call__(catalog)
 
@@ -328,14 +375,13 @@ class MockCatalog:
             yield {}
 
 
-@pytest.mark.parametrize('Map', [MockMap, MockMapGen])
-@pytest.mark.parametrize('parallel', [False, True])
+@pytest.mark.parametrize("Map", [MockMap, MockMapGen])
+@pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(Map, parallel):
-
     from heracles.maps import map_catalogs
 
-    maps = {'a': Map(), 'b': Map(), 'z': Map()}
-    catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
+    maps = {"a": Map(), "b": Map(), "z": Map()}
+    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
     data = map_catalogs(maps, catalogs, parallel=parallel)
 
@@ -345,18 +391,17 @@ def test_map_catalogs(Map, parallel):
             assert data[k, i] is maps[k].return_value
 
 
-@pytest.mark.parametrize('Map', [MockMap, MockMapGen])
+@pytest.mark.parametrize("Map", [MockMap, MockMapGen])
 def test_map_catalogs_match(Map):
-
     from heracles.maps import map_catalogs
 
-    maps = {'a': Map(), 'b': Map(), 'c': Map()}
-    catalogs = {'x': MockCatalog(), 'y': MockCatalog()}
+    maps = {"a": Map(), "b": Map(), "c": Map()}
+    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    data = map_catalogs(maps, catalogs, include=[(..., 'y')])
+    data = map_catalogs(maps, catalogs, include=[(..., "y")])
 
-    assert set(data.keys()) == {('a', 'y'), ('b', 'y'), ('c', 'y')}
+    assert set(data.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
 
-    data = map_catalogs(maps, catalogs, exclude=[('a', ...)])
+    data = map_catalogs(maps, catalogs, exclude=[("a", ...)])
 
-    assert set(data.keys()) == {('b', 'x'), ('b', 'y'), ('c', 'x'), ('c', 'y')}
+    assert set(data.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}

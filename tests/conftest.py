@@ -10,7 +10,7 @@ config.DISABLE_JIT = True
 def warns(*types):
     if types == (None,):
         with warnings.catch_warnings():
-            warnings.simplefilter('error')
+            warnings.simplefilter("error")
             try:
                 yield
             finally:
