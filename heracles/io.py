@@ -96,7 +96,7 @@ def write_maps(
 
     """
 
-    logger.info("writing %d maps to %s", len(maps), filename)
+    logger.info(f"writing {len(maps)} maps to {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -130,7 +130,7 @@ def write_maps(
             if not toc_match((n, i), include=include, exclude=exclude):
                 continue
 
-            logger.info("writing %s map for bin %s", n, i)
+            logger.info(f"writing {n} map for bin {i}")
 
             # the cl extension name
             ext = f"MAP{mapn}"
@@ -170,13 +170,13 @@ def write_maps(
             tocentry[0] = (ext, n, i)
             fits["MAPTOC"].append(tocentry)
 
-    logger.info("done with %d maps", len(maps))
+    logger.info(f"done with {len(maps)} maps")
 
 
 def read_maps(filename, workdir=".", *, include=None, exclude=None):
     """read a set of maps from a FITS file"""
 
-    logger.info("reading maps from %s", filename)
+    logger.info(f"reading maps from {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -197,7 +197,7 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
             if not toc_match((n, i), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading %s map for bin %s", n, i)
+            logger.info(f"reading {n} map for bin {i}")
 
             # read the map from the extension
             m = fits[ext].read()
@@ -213,7 +213,7 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
             # store in set of maps
             maps[n, i] = m
 
-    logger.info("done with %d maps", len(maps))
+    logger.info(f"done with {len(maps)} maps")
 
     # return the dictionary of maps
     return maps
@@ -229,7 +229,7 @@ def write_alms(
 
     """
 
-    logger.info("writing %d alms to %s", len(alms), filename)
+    logger.info(f"writing {len(alms)} alms to {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -263,7 +263,7 @@ def write_alms(
             if not toc_match((n, i), include=include, exclude=exclude):
                 continue
 
-            logger.info("writing %s alm for bin %s", n, i)
+            logger.info(f"writing {n} alm for bin {i}")
 
             # the cl extension name
             ext = f"ALM{almn}"
@@ -279,13 +279,13 @@ def write_alms(
             tocentry[0] = (ext, n, i)
             fits["ALMTOC"].append(tocentry)
 
-    logger.info("done with %d alms", len(alms))
+    logger.info(f"done with {len(alms)} alms")
 
 
 def read_alms(filename, workdir=".", *, include=None, exclude=None):
     """read a set of alms from a FITS file"""
 
-    logger.info("reading alms from %s", filename)
+    logger.info(f"reading alms from {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -306,7 +306,7 @@ def read_alms(filename, workdir=".", *, include=None, exclude=None):
             if not toc_match((n, i), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading %s alm for bin %s", n, i)
+            logger.info(f"reading {n} alm for bin {i}")
 
             # read the alm from the extension
             raw = fits[ext].read()
@@ -321,7 +321,7 @@ def read_alms(filename, workdir=".", *, include=None, exclude=None):
             # store in set of alms
             alms[n, i] = alm
 
-    logger.info("done with %d alms", len(alms))
+    logger.info(f"done with {len(alms)} alms")
 
     # return the dictionary of alms
     return alms
@@ -335,7 +335,7 @@ def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclud
 
     """
 
-    logger.info("writing %d cls to %s", len(cls), filename)
+    logger.info(f"writing {len(cls)} cls to {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -369,7 +369,7 @@ def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclud
             if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("writing %s x %s cl for bins %s, %s", k1, k2, i1, i2)
+            logger.info(f"writing {k1} x {k2} cl for bins {i1}, {i2}")
 
             # the cl extension name
             ext = f"CL{cln}"
@@ -405,13 +405,13 @@ def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclud
             tocentry[0] = (ext, k1, k2, i1, i2)
             fits["CLTOC"].append(tocentry)
 
-    logger.info("done with %d cls", len(cls))
+    logger.info(f"done with {len(cls)} cls")
 
 
 def read_cls(filename, workdir=".", *, include=None, exclude=None):
     """read a set of cls from a FITS file"""
 
-    logger.info("reading cls from %s", filename)
+    logger.info(f"reading cls from {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -432,7 +432,7 @@ def read_cls(filename, workdir=".", *, include=None, exclude=None):
             if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading %s x %s cl for bins %s, %s", k1, k2, i1, i2)
+            logger.info(f"reading {k1} x {k2} cl for bins {i1}, {i2}")
 
             # read the cl from the extension
             cl = fits[ext].read()
@@ -443,7 +443,7 @@ def read_cls(filename, workdir=".", *, include=None, exclude=None):
             # store in set of cls
             cls[k1, k2, i1, i2] = cl
 
-    logger.info("done with %d cls", len(cls))
+    logger.info(f"done with {len(cls)} cls")
 
     # return the dictionary of cls
     return cls
@@ -457,7 +457,7 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
 
     """
 
-    logger.info("writing %d mm(s) to %s", len(mms), filename)
+    logger.info(f"writing {len(mms)} mm(s) to {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -491,7 +491,7 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
             if not toc_match((n, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("writing mixing matrix %s for bins %s, %s", n, i1, i2)
+            logger.info(f"writing mixing matrix {n} for bins {i1}, {i2}")
 
             # the mm extension name
             ext = f"MM{mmn}"
@@ -516,13 +516,13 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
             tocentry[0] = (ext, n, i1, i2)
             fits["MMTOC"].append(tocentry)
 
-    logger.info("done with %d mm(s)", len(mms))
+    logger.info(f"done with {len(mms)} mm(s)")
 
 
 def read_mms(filename, workdir=".", *, include=None, exclude=None):
     """read a set of mixing matrices from a FITS file"""
 
-    logger.info("reading mixing matrices from %s", filename)
+    logger.info(f"reading mixing matrices from {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -543,7 +543,7 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
             if not toc_match((n, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading mixing matrix %s for bins %s, %s", n, i1, i2)
+            logger.info(f"reading mixing matrix {n} for bins {i1}, {i2}")
 
             # read the mixing matrix from the extension
             mm = fits[ext].read()
@@ -554,7 +554,7 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
             # store in set of mms
             mms[n, i1, i2] = mm
 
-    logger.info("done with %d mm(s)", len(mms))
+    logger.info(f"done with {len(mms)} mm(s)")
 
     # return the dictionary of mms
     return mms
@@ -568,7 +568,7 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
 
     """
 
-    logger.info("writing %d covariances to %s", len(cov), filename)
+    logger.info(f"writing {len(cov)} covariances to {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -616,7 +616,7 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
             ext = f"COV{extn}"
             extn += 1
 
-            logger.info("writing %s x %s covariance matrix", k1, k2)
+            logger.info(f"writing {k1} x {k2} covariance matrix")
 
             # write the covariance matrix as an image
             fits.write_image(mat, extname=ext)
@@ -637,13 +637,13 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
             tocentry[0] = (ext, *k1, *k2)
             fits["COVTOC"].append(tocentry)
 
-    logger.info("done with %d covariance(s)", len(cov))
+    logger.info(f"done with {len(cov)} covariance(s)")
 
 
 def read_cov(filename, workdir=".", *, include=None, exclude=None):
     """read a set of covariances matrices from a FITS file"""
 
-    logger.info("reading covariance matrices from %s", filename)
+    logger.info(f"reading covariance matrices from {filename}")
 
     # full path to FITS file
     path = os.path.join(workdir, filename)
@@ -666,7 +666,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
             if not toc_match((k1, k2), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading %s x %s covariance matrix", k1, k2)
+            logger.info(f"reading {k1} x {k2} covariance matrix")
 
             # read the covariance matrix from the extension
             mat = fits[ext].read()
@@ -677,7 +677,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
             # store in set
             cov[k1, k2] = mat
 
-    logger.info("done with %d covariance(s)", len(cov))
+    logger.info(f"done with {len(cov)} covariance(s)")
 
     # return the toc dict of covariances
     return cov

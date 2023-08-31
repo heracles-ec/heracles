@@ -719,7 +719,7 @@ def transform_maps(
         md = m.dtype.metadata or {}
         spin = md.get("spin", 0)
 
-        logger.info("transforming %s map (spin %s) for bin %s", k, spin, i)
+        logger.info(f"transforming {k} map (spin {spin}) for bin {i}")
 
         if spin == 0:
             pol = False

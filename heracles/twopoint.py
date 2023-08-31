@@ -41,13 +41,12 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
     """compute angular power spectra from a set of alms"""
 
     logger.info(
-        "computing cls for %d%s alm(s)",
-        len(alms),
-        f"x{len(alms2)}" if alms2 is not None else "",
+        f"computing cls for {len(alms)}"
+        f"{f'x{len(alms2)}' if alms2 is not None else ''} alm(s)",
     )
     t = time.monotonic()
 
-    logger.info("using LMAX = %s for cls", lmax)
+    logger.info(f"using LMAX = {lmax} for cls")
 
     # collect all alm combinations for computing cls
     if alms2 is None:
@@ -75,7 +74,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         if not toc_match((k1, k2, i1, i2), include, exclude):
             continue
 
-        logger.info("computing %s x %s cl for bins %s, %s", k1, k2, i1, i2)
+        logger.info(f"computing {k1} x {k2} cl for bins {i1}, {i2}")
 
         # compute the raw cl from the alms
         cl = hp.alm2cl(alm1, alm2, lmax_out=lmax)
@@ -101,7 +100,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         twopoint_names.add((k1, k2))
 
     logger.info(
-        "computed %d cl(s) in %s", len(cls), timedelta(seconds=(time.monotonic() - t))
+        f"computed {len(cls)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}"
     )
 
     # return the toc dict of cls
@@ -111,7 +110,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 def debias_cls(cls, noisebias=None, *, inplace=False):
     """remove noise bias from cls"""
 
-    logger.info("debiasing %d cl(s)%s", len(cls), " in place" if inplace else "")
+    logger.info(f"debiasing {len(cls)} cl(s){' in place' if inplace else ''}")
     t = time.monotonic()
 
     # toc dict for noise biases
@@ -122,7 +121,7 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
 
     # subtract noise bias of each cl in turn
     for key in cls:
-        logger.info("debiasing %s cl for bins %s, %s", *key)
+        logger.info(f"debiasing {key[0]} cl for bins {key[1]}, {key[2]}")
 
         cl = cls[key]
         md = cl.dtype.metadata or {}
@@ -147,7 +146,7 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
         out[key] = cl
 
     logger.info(
-        "debiased %d cl(s) in %s", len(out), timedelta(seconds=(time.monotonic() - t))
+        f"debiased {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}"
     )
 
     # return the toc dict of debiased cls
@@ -157,7 +156,7 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
 def depixelate_cls(cls, *, inplace=False):
     """remove discretisation kernel from cls"""
 
-    logger.info("depixelate %d cl(s)%s", len(cls), " in place" if inplace else "")
+    logger.info(f"depixelate {len(cls)} cl(s){' in place' if inplace else ''}")
     t = time.monotonic()
 
     # keep a cache of convolution kernels (i.e. pixel window functions)
@@ -170,7 +169,7 @@ def depixelate_cls(cls, *, inplace=False):
 
     # remove effect of convolution for each cl in turn
     for key in cls:
-        logger.info("depixelate %s cl for bins %s, %s", *key)
+        logger.info(f"depixelate {key[0]} cl for bins {key[1]}, {key[2]}")
 
         cl = cls[key]
         md = cl.dtype.metadata or {}
@@ -191,7 +190,7 @@ def depixelate_cls(cls, *, inplace=False):
 
         # deconvolve the kernels of the first and second map
         for i, spin, kernel in zip([1, 2], spins, kernels):
-            logger.info("- spin-%s %s kernel", spin, kernel)
+            logger.info(f"- spin-{spin} {kernel} kernel")
             if kernel is None:
                 fl = None
                 a = None
@@ -204,10 +203,8 @@ def depixelate_cls(cls, *, inplace=False):
                 fl = fls[kernel].get((nside, lmax, spin))
                 if fl is None:
                     logger.warning(
-                        "no HEALPix kernel for NSIDE = %s, LMAX = %s, SPIN = %s",
-                        nside,
-                        lmax,
-                        spin,
+                        f"no HEALPix kernel for NSIDE = {nside}, "
+                        f"LMAX = {lmax}, SPIN = {spin}"
                     )
                 a = hp.nside2pixarea(nside)
             else:
@@ -225,9 +222,7 @@ def depixelate_cls(cls, *, inplace=False):
         out[key] = cl
 
     logger.info(
-        "depixelated %d cl(s) in %s",
-        len(out),
-        timedelta(seconds=(time.monotonic() - t)),
+        f"depixelated {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of depixelated cls
@@ -237,10 +232,10 @@ def depixelate_cls(cls, *, inplace=False):
 def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
     """compute mixing matrices from a set of cls"""
 
-    logger.info("computing two-point mixing matrices for %d cl(s)", len(cls))
+    logger.info(f"computing two-point mixing matrices for {len(cls)} cl(s)")
     t = time.monotonic()
 
-    logger.info("using L1MAX = %s, L2MAX = %s, L3MAX = %s", l1max, l2max, l3max)
+    logger.info(f"using L1MAX = {l1max}, L2MAX = {l2max}, L3MAX = {l3max}")
 
     # set of computed mixing matrices
     mms = {}
@@ -249,19 +244,19 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
     # which mixing matrix is computed depends on the combination of V/W maps
     for (k1, k2, i1, i2), cl in cls.items():
         if k1 == "V" and k2 == "V":
-            logger.info("computing 00 mixing matrix for bins %s, %s", i1, i2)
+            logger.info(f"computing 00 mixing matrix for bins {i1}, {i2}")
             w00 = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
             mms["00", i1, i2] = w00
         elif k1 == "V" and k2 == "W":
-            logger.info("computing 0+ mixing matrix for bins %s, %s", i1, i2)
+            logger.info(f"computing 0+ mixing matrix for bins {i1}, {i2}")
             w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(0, 2))
             mms["0+", i1, i2] = w0p
         elif k1 == "W" and k2 == "V":
-            logger.info("computing 0+ mixing matrix for bins %s, %s", i2, i1)
+            logger.info(f"computing 0+ mixing matrix for bins {i2}, {i1}")
             w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 0))
             mms["0+", i2, i1] = w0p
         elif k1 == "W" and k2 == "W":
-            logger.info("computing ++, --, +- mixing matrices for bins %s, %s", i1, i2)
+            logger.info(f"computing ++, --, +- mixing matrices for bins {i1}, {i2}")
             wpp, wmm, wpm = mixmat_eb(
                 cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 2)
             )
@@ -270,17 +265,13 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
             mms["+-", i1, i2] = wpm
         else:
             logger.warning(
-                "computing unknown %s x %s mixing matrix for bins %s, %s",
-                k1,
-                k2,
-                i1,
-                i2,
+                f"computing unknown {k1} x {k2} mixing matrix for bins {i1}, {i2}",
             )
             w = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
             mms[f"{k1}{k2}", i1, i2] = w
 
     logger.info(
-        "computed %d mm(s) in %s", len(mms), timedelta(seconds=(time.monotonic() - t))
+        f"computed {len(mms)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}"
     )
 
     # return the toc dict of mixing matrices
@@ -290,8 +281,8 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
 def pixelate_mms_healpix(mms, nside, *, inplace=False):
     """apply HEALPix pixel window function to mms"""
 
-    logger.info("pixelate %d mm(s)%s", len(mms), " in place" if inplace else "")
-    logger.info("kernel: HEALPix, NSIDE=%d", nside)
+    logger.info(f"pixelate {len(mms)} mm(s){' in place' if inplace else ''}")
+    logger.info(f"kernel: HEALPix, NSIDE={nside}")
     t = time.monotonic()
 
     # pixel window functions
@@ -307,7 +298,7 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
 
     # apply discretisation kernel from cl to each mm in turn
     for key in mms:
-        logger.info("pixelate %s mm for bins %s, %s", *key)
+        logger.info(f"pixelate {key[0]} mm for bins {key[1]}, {key[2]}")
 
         mm = mms[key]
         if not inplace:
@@ -316,9 +307,7 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
         n = np.shape(mm)[-2]
         if n >= lmax:
             logger.error(
-                "no HEALPix pixel window function for NSIDE=%d and LMAX=%d",
-                nside,
-                n - 1,
+                f"no HEALPix pixel window function for NSIDE={nside} and LMAX={n - 1}",
             )
 
         name = key[0]
@@ -336,7 +325,7 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
         out[key] = mm
 
     logger.info(
-        "pixelated %d mm(s) in %s", len(out), timedelta(seconds=(time.monotonic() - t))
+        f"pixelated {len(out)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}"
     )
 
     # return the toc dict of modified cls
@@ -423,8 +412,8 @@ def random_noisebias(
 
     """
 
-    logger.info("estimating two-point noise bias for %d catalog(s)", len(catalogs))
-    logger.info("randomising %s maps", ", ".join(map(str, maps)))
+    logger.info(f"estimating two-point noise bias for {len(catalogs)} catalog(s)")
+    logger.info(f"randomising {', '.join(map(str, maps))} maps")
     t = time.monotonic()
 
     # grab lmax parameter if given
@@ -446,8 +435,8 @@ def random_noisebias(
 
         for n in range(repeat):
             logger.info(
-                "estimating noise bias from randomised maps%s",
-                "" if n == 0 else f" (repeat {n+1})",
+                "estimating noise bias from randomised maps"
+                f"{'' if n == 0 else f' (repeat {n+1})'}",
             )
 
             data = _map_catalogs(
@@ -475,9 +464,8 @@ def random_noisebias(
             m.randomize = randomize[k]
 
     logger.info(
-        "estimated %d two-point noise biases in %s",
-        len(nbs),
-        timedelta(seconds=(time.monotonic() - t)),
+        f"estimated {len(nbs)} two-point noise biases in "
+        f"{timedelta(seconds=(time.monotonic() - t))}"
     )
 
     return nbs
