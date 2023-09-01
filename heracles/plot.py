@@ -124,7 +124,7 @@ def postage_stamps(
         # label for first plot only, set to None after
         label = f"${ki}^{{{i}}} \\times {kj}^{{{j}}}$"
 
-        for _m, cl, iprop in zip(count(), cls, cycle(cycler)):
+        for _, cl, iprop in zip(count(), cls, cycle(cycler)):
             if cl is None:
                 continue
 

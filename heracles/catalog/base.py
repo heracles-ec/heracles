@@ -37,7 +37,7 @@ class CatalogPage:
         """Update internal data after dictionary changes."""
         # get and check size of rows
         size: int = -1
-        for _col, rows in self._data.items():
+        for _, rows in self._data.items():
             if size == -1:
                 size = len(rows)
             elif size != len(rows):
