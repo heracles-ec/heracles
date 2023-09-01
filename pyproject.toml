@@ -1,48 +1,48 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+requires = [
+    "hatch-vcs",
+    "hatchling",
+]
 
 [project]
-name = "heracles"
-description = "Harmonic-space statistics on the sphere"
-readme = "README.md"
-requires-python = ">=3.8"
-license = "LGPL-3.0-or-later"
 authors = [
-  {name = "Nicolas Tessore", email = "n.tessore@ucl.ac.uk"}
+    {email = "n.tessore@ucl.ac.uk", name = "Nicolas Tessore"},
 ]
 classifiers = [
-  "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3",
-  "Topic :: Scientific/Engineering :: Astronomy"
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
-  "fitsio",
-  "healpy",
-  "numba",
-  "numpy",
-  "convolvecl"
+    "convolvecl",
+    "fitsio",
+    "healpy",
+    "numba",
+    "numpy",
 ]
-dynamic = ["version"]
-
-[project.optional-dependencies]
-test = [
-  "pytest"
+description = "Harmonic-space statistics on the sphere"
+dynamic = [
+    "version",
 ]
-docs = [
-  "sphinx",
-  "furo",
-  "sphinxcontrib-katex",
-  "numpydoc",
-  "matplotlib"
-]
-
-[project.urls]
-Homepage = "https://github.com/heracles-ec/heracles"
-Documentation = "https://heracles.readthedocs.io/"
-Issues = "https://github.com/heracles-ec/heracles/issues"
+license = "LGPL-3.0-or-later"
+name = "heracles"
+optional-dependencies = {docs = [
+    "furo",
+    "matplotlib",
+    "numpydoc",
+    "sphinx",
+    "sphinxcontrib-katex",
+], test = [
+    "pytest",
+]}
+readme = "README.md"
+requires-python = ">=3.8"
+urls.Documentation = "https://heracles.readthedocs.io/"
+urls.Homepage = "https://github.com/heracles-ec/heracles"
+urls.Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.black]
 force-exclude = """
@@ -54,3 +54,9 @@ force-exclude = """
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
+
+[tool.tomlsort]
+all = true
+spaces_indent_inline_array = 4
+trailing_comma_inline_array = true
+overrides."project.classifiers".inline_arrays = false
