@@ -108,7 +108,7 @@ MapData = np.ndarray
 MapFunction = typing.Callable[["CatalogPage"], None]
 
 # type hint for map generators
-MapGenerator = typing.collections.abc.Generator[MapFunction, None, MapData]
+MapGenerator = typing.Generator[MapFunction, None, MapData]
 
 
 class Map(metaclass=abc.ABCMeta):
