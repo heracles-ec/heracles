@@ -18,14 +18,14 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for angular power spectrum estimation."""
 
+import datetime
+import itertools
 import logging
 import time
-from datetime import timedelta
-from itertools import combinations_with_replacement, product
 
+import convolvecl
 import healpy as hp
 import numpy as np
-from convolvecl import mixmat, mixmat_eb
 
 from .maps import (
     map_catalogs as _map_catalogs,
@@ -53,9 +53,9 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 
     # collect all alm combinations for computing cls
     if alms2 is None:
-        alm_pairs = combinations_with_replacement(alms.items(), 2)
+        alm_pairs = itertools.combinations_with_replacement(alms.items(), 2)
     else:
-        alm_pairs = product(alms.items(), alms2.items())
+        alm_pairs = itertools.product(alms.items(), alms2.items())
 
     # keep track of the twopoint combinations we have seen here
     twopoint_names = set()
@@ -103,7 +103,8 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         twopoint_names.add((k1, k2))
 
     logger.info(
-        f"computed {len(cls)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"computed {len(cls)} cl(s) in "
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of cls
@@ -148,7 +149,8 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
         out[key] = cl
 
     logger.info(
-        f"debiased {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"debiased {len(out)} cl(s) in "
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of debiased cls
@@ -224,7 +226,8 @@ def depixelate_cls(cls, *, inplace=False):
         out[key] = cl
 
     logger.info(
-        f"depixelated {len(out)} cl(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"depixelated {len(out)} cl(s) in "
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of depixelated cls
@@ -246,19 +249,31 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
     for (k1, k2, i1, i2), cl in cls.items():
         if k1 == "V" and k2 == "V":
             logger.info(f"computing 00 mixing matrix for bins {i1}, {i2}")
-            w00 = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
+            w00 = convolvecl.mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
             mms["00", i1, i2] = w00
         elif k1 == "V" and k2 == "W":
             logger.info(f"computing 0+ mixing matrix for bins {i1}, {i2}")
-            w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(0, 2))
+            w0p = convolvecl.mixmat(
+                cl,
+                l1max=l1max,
+                l2max=l2max,
+                l3max=l3max,
+                spin=(0, 2),
+            )
             mms["0+", i1, i2] = w0p
         elif k1 == "W" and k2 == "V":
             logger.info(f"computing 0+ mixing matrix for bins {i2}, {i1}")
-            w0p = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max, spin=(2, 0))
+            w0p = convolvecl.mixmat(
+                cl,
+                l1max=l1max,
+                l2max=l2max,
+                l3max=l3max,
+                spin=(2, 0),
+            )
             mms["0+", i2, i1] = w0p
         elif k1 == "W" and k2 == "W":
             logger.info(f"computing ++, --, +- mixing matrices for bins {i1}, {i2}")
-            wpp, wmm, wpm = mixmat_eb(
+            wpp, wmm, wpm = convolvecl.mixmat_eb(
                 cl,
                 l1max=l1max,
                 l2max=l2max,
@@ -272,11 +287,12 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
             logger.warning(
                 f"computing unknown {k1} x {k2} mixing matrix for bins {i1}, {i2}",
             )
-            w = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
+            w = convolvecl.mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
             mms[f"{k1}{k2}", i1, i2] = w
 
     logger.info(
-        f"computed {len(mms)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"computed {len(mms)} mm(s) in "
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of mixing matrices
@@ -329,7 +345,8 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
         out[key] = mm
 
     logger.info(
-        f"pixelated {len(out)} mm(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"pixelated {len(out)} mm(s) in "
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     # return the toc dict of modified cls
@@ -469,7 +486,7 @@ def random_noisebias(
 
     logger.info(
         f"estimated {len(nbs)} two-point noise biases in "
-        f"{timedelta(seconds=(time.monotonic() - t))}",
+        f"{datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
     return nbs

@@ -18,20 +18,20 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for map-making."""
 
+import abc
+import collections
+import functools
 import logging
-import typing as t
+import typing
 import warnings
-from abc import ABCMeta, abstractmethod
-from collections.abc import Generator
-from functools import partial, wraps
 
 import healpy as hp
+import numba
 import numpy as np
-from numba import njit
 
 from .util import Progress, toc_match
 
-if t.TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 def _nativebyteorder(fn):
     """Utility decorator to convert inputs to native byteorder."""
 
-    @wraps(fn)
+    @functools.wraps(fn)
     def wrapper(*inputs):
         native = []
         for a in inputs:
@@ -53,14 +53,14 @@ def _nativebyteorder(fn):
 
 
 @_nativebyteorder
-@njit(nogil=True, fastmath=True)
+@numba.njit(nogil=True, fastmath=True)
 def _map_pos(pos, ipix):
     for i in ipix:
         pos[i] += 1
 
 
 @_nativebyteorder
-@njit(nogil=True, fastmath=True)
+@numba.njit(nogil=True, fastmath=True)
 def _map_real(wht, val, ipix, w, v):
     for i, w_i, v_i in zip(ipix, w, v):
         wht[i] += w_i
@@ -68,7 +68,7 @@ def _map_real(wht, val, ipix, w, v):
 
 
 @_nativebyteorder
-@njit(nogil=True, fastmath=True)
+@numba.njit(nogil=True, fastmath=True)
 def _map_complex(wht, val, ipix, w, re, im):
     for i, w_i, re_i, im_i in zip(ipix, w, re, im):
         wht[i] += w_i
@@ -77,7 +77,7 @@ def _map_complex(wht, val, ipix, w, re, im):
 
 
 @_nativebyteorder
-@njit(nogil=True, fastmath=True)
+@numba.njit(nogil=True, fastmath=True)
 def _map_weight(wht, ipix, w):
     for i, w_i in zip(ipix, w):
         wht[i] += w_i
@@ -105,13 +105,13 @@ def update_metadata(array, **metadata):
 MapData = np.ndarray
 
 # type hint for functions returned by map generators
-MapFunction = t.Callable[["CatalogPage"], None]
+MapFunction = typing.Callable[["CatalogPage"], None]
 
 # type hint for map generators
-MapGenerator = t.Generator[MapFunction, None, MapData]
+MapGenerator = typing.collections.abc.Generator[MapFunction, None, MapData]
 
 
-class Map(metaclass=ABCMeta):
+class Map(metaclass=abc.ABCMeta):
     """Abstract base class for map making from catalogues.
 
     Concrete classes must implement the `__call__()` method which takes a
@@ -119,18 +119,18 @@ class Map(metaclass=ABCMeta):
 
     """
 
-    def __init__(self, columns: t.Tuple[t.Optional[str]]) -> None:
+    def __init__(self, columns: typing.Tuple[typing.Optional[str]]) -> None:
         """Initialise the map."""
         self._columns = columns
         super().__init__()
 
     @property
-    def columns(self) -> t.Tuple[t.Optional[str]]:
+    def columns(self) -> typing.Tuple[typing.Optional[str]]:
         """Return the catalogue columns used by this map."""
         return self._columns
 
-    @abstractmethod
-    def __call__(self, catalog: "Catalog") -> t.Union[MapData, MapGenerator]:
+    @abc.abstractmethod
+    def __call__(self, catalog: "Catalog") -> typing.Union[MapData, MapGenerator]:
         """Implementation for mapping a catalogue."""
         ...
 
@@ -307,7 +307,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         lon: str,
         lat: str,
         value: str,
-        weight: t.Optional[str] = None,
+        weight: typing.Optional[str] = None,
         *,
         normalize: bool = True,
     ) -> None:
@@ -385,7 +385,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         lat: str,
         real: str,
         imag: str,
-        weight: t.Optional[str] = None,
+        weight: typing.Optional[str] = None,
         *,
         spin: int = 0,
         conjugate: bool = False,
@@ -573,7 +573,7 @@ class WeightMap(HealpixMap, NormalizableMap):
         return wht
 
 
-Spin2Map = partial(ComplexMap, spin=2)
+Spin2Map = functools.partial(ComplexMap, spin=2)
 ShearMap = Spin2Map
 EllipticityMap = Spin2Map
 
@@ -589,15 +589,19 @@ def _close_and_return(generator):
 
 
 def map_catalogs(
-    maps: t.Mapping[t.Any, Map],
-    catalogs: t.Mapping[t.Any, "Catalog"],
+    maps: typing.Mapping[typing.Any, Map],
+    catalogs: typing.Mapping[typing.Any, "Catalog"],
     *,
     parallel: bool = False,
-    out: t.Optional[t.MutableMapping[t.Any, t.Any]] = None,
-    include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
-    exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
+    out: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
+    include: typing.Optional[
+        typing.Sequence[typing.Tuple[typing.Any, typing.Any]]
+    ] = None,
+    exclude: typing.Optional[
+        typing.Sequence[typing.Tuple[typing.Any, typing.Any]]
+    ] = None,
     progress: bool = False,
-) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
+) -> typing.Dict[typing.Tuple[typing.Any, typing.Any], MapData]:
     """Make maps for a set of catalogues."""
     # the toc dict of maps
     if out is None:
@@ -637,7 +641,11 @@ def map_catalogs(
 
         # collect map generators from results
         # if there are any generators, feed them the catalogue pages
-        if gen := {ki: v for ki, v in results.items() if isinstance(v, Generator)}:
+        if gen := {
+            ki: v
+            for ki, v in results.items()
+            if isinstance(v, collections.abc.Generator)
+        }:
             # get an iterator over each catalogue
             # by construction, these have all the same length and page size
             its = {i: iter(catalog) for i, catalog in group.items()}
@@ -701,12 +709,12 @@ def map_catalogs(
 
 
 def transform_maps(
-    maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
+    maps: typing.Mapping[typing.Tuple[typing.Any, typing.Any], MapData],
     *,
-    out: t.Optional[t.MutableMapping[t.Any, t.Any]] = None,
+    out: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
     progress: bool = False,
     **kwargs,
-) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
+) -> typing.Dict[typing.Tuple[typing.Any, typing.Any], np.ndarray]:
     """Transform a set of maps to alms."""
     # the output toc dict
     if out is None:

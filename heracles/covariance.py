@@ -18,10 +18,10 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for covariance matrix computation."""
 
+import datetime
+import itertools
 import logging
 import time
-from datetime import timedelta
-from itertools import combinations_with_replacement
 
 import healpy as hp
 import numpy as np
@@ -75,7 +75,10 @@ def update_covariance(cov, sample):
     logger.info(f"updating covariances for {len(sample)} item(s)")
     t = time.monotonic()
 
-    for (k1, v1), (k2, v2) in combinations_with_replacement(sample.items(), 2):
+    for (k1, v1), (k2, v2) in itertools.combinations_with_replacement(
+        sample.items(),
+        2,
+    ):
         if (k1, k2) not in cov:
             nrows, ncols = np.size(v1), np.size(v2)
             logger.info(f"creating {nrows} x {ncols} covariance matrix for {k1}, {k2}")
@@ -85,7 +88,7 @@ def update_covariance(cov, sample):
 
     logger.info(
         f"updated {len(sample) * (len(sample) + 1) // 2} "
-        f"covariance(s) in {timedelta(seconds=(time.monotonic() - t))}",
+        f"covariance(s) in {datetime.timedelta(seconds=(time.monotonic() - t))}",
     )
 
 
@@ -145,6 +148,8 @@ def jackknife_regions_kmeans(
     jkmap = np.zeros(npix, dtype=int)
     jkmap[ipix] = km.labels + 1
 
-    logger.info(f"partitioned map in {timedelta(seconds=(time.monotonic() - t))}")
+    logger.info(
+        f"partitioned map in {datetime.timedelta(seconds=(time.monotonic() - t))}",
+    )
 
     return (jkmap, km.centers) if return_centers else jkmap

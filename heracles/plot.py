@@ -18,15 +18,14 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """utility functions for plotting."""
 
-from collections import defaultdict
-from collections.abc import Mapping
-from itertools import chain, count, cycle
+import collections
+import itertools
 
+import cycler
 import matplotlib.pyplot as plt
 import numpy as np
-from cycler import cycler
 
-DEFAULT_CYCLER = cycler(linestyle=["-", "--", ":", "-."])
+DEFAULT_CYCLER = cycler.cycler(linestyle=["-", "--", ":", "-."])
 
 
 def _dont_draw_zero_tick(tick):
@@ -66,9 +65,9 @@ def postage_stamps(
         msg = "missing plot data"
         raise ValueError(msg)
 
-    if isinstance(plot, Mapping):
+    if isinstance(plot, collections.abc.Mapping):
         plot = [plot]
-    if isinstance(transpose, Mapping):
+    if isinstance(transpose, collections.abc.Mapping):
         transpose = [transpose]
 
     keys = {k: None for x in plot for k in x} if plot is not None else {}
@@ -94,7 +93,7 @@ def postage_stamps(
     )
 
     prop_cycle = plt.rcParams["axes.prop_cycle"]
-    prop = defaultdict(lambda: cycle(prop_cycle))
+    prop = collections.defaultdict(lambda: itertools.cycle(prop_cycle))
 
     xmin, xmax = np.inf, -np.inf
     ymin, ymax = 0, 0
@@ -103,7 +102,7 @@ def postage_stamps(
     axidx = set()
     traxidx = set()
 
-    for n, key in enumerate(chain(keys, trkeys)):
+    for n, key in enumerate(itertools.chain(keys, trkeys)):
         ki, kj, i, j = key
 
         if n < len(keys):
@@ -118,13 +117,13 @@ def postage_stamps(
         # axis for plotting this key
         ax = axes[idx]
 
-        # outer property cycle for this axis
+        # outer property itertools.cycle for this axis
         oprop = next(prop[idx])
 
         # label for first plot only, set to None after
         label = f"${ki}^{{{i}}} \\times {kj}^{{{j}}}$"
 
-        for _, cl, iprop in zip(count(), cls, cycle(cycler)):
+        for _, cl, iprop in zip(itertools.count(), cls, itertools.cycle(cycler)):
             if cl is None:
                 continue
 
@@ -164,7 +163,7 @@ def postage_stamps(
         trylin = 10 ** np.ceil(np.log10(max(abs(trymin), abs(trymax)) * linscale))
 
     # scale the axes and transpose axes
-    for n, idx in enumerate(chain(axidx, traxidx)):
+    for n, idx in enumerate(itertools.chain(axidx, traxidx)):
         if n < len(axidx):
             ymin_, ymax_, ylin_ = ymin, ymax, ylin
         else:

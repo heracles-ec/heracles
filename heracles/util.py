@@ -18,11 +18,11 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for utilities."""
 
+import collections
+import datetime
 import os
 import sys
 import time
-from collections.abc import Mapping, Sequence
-from datetime import timedelta
 
 
 def toc_match(key, include=None, exclude=None):
@@ -42,9 +42,9 @@ def toc_match(key, include=None, exclude=None):
 
 def toc_filter(obj, include=None, exclude=None):
     """Return a filtered toc dict ``d``."""
-    if isinstance(obj, Sequence):
+    if isinstance(obj, collections.abc.Sequence):
         return [toc_filter(item, include, exclude) for item in obj]
-    if isinstance(obj, Mapping):
+    if isinstance(obj, collections.abc.Mapping):
         return {k: v for k, v in obj.items() if toc_match(k, include, exclude)}
     msg = "invalid input type"
     raise TypeError(msg)
@@ -76,7 +76,7 @@ class Progress:
         p = self.progress / self.total
         b = "#" * int(20 * p)
         f = f"{self.progress:_}/{self.total:_}"
-        t = timedelta(seconds=(time.monotonic() - self.time))
+        t = datetime.timedelta(seconds=(time.monotonic() - self.time))
         s = f"\r{m}{100*p:3.0f}% |{b:20s}| {f} | {t}"
         try:
             w, _ = os.get_terminal_size(self.out.fileno())

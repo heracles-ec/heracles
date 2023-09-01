@@ -17,8 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for catalogue processing."""
-
-from weakref import finalize, ref
+import weakref
 
 import fitsio
 
@@ -97,10 +96,10 @@ class FitsCatalog(CatalogBase):
                     fits.close()
 
             # make sure that internal _FITS is closed when hdu dies
-            finalize(hdu, hdu._FITS.close)
+            weakref.finalize(hdu, hdu._FITS.close)
 
             # cache hdu as a weak reference
-            self._hdu = ref(hdu)
+            self._hdu = weakref.ref(hdu)
 
         return hdu
 

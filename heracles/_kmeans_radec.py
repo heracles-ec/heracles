@@ -29,7 +29,6 @@ http://stackoverflow.com/questions/5529625/is-it-possible-to-specify-your-own-di
 import random
 
 import numpy as np
-from numpy import arccos, arctan2, cos, deg2rad, newaxis, pi, rad2deg, sin, sqrt
 
 _TOL_DEF = 1e-5
 _MAXITER_DEF = 100
@@ -72,12 +71,11 @@ class KMeans:
     example
     -------
     import kmeans_radec
-    from kmeans_radec import KMeans
 
     cen_guess = numpy.zeros( (ncen, 2) )
     cen_guess[:,0] = ra_guesses
     cen_guess[:,1] = dec_guesses
-    km = KMeans(cen_guess)
+    km = kmeans_radec.KMeans(cen_guess)
     km.run(X, maxiter = 100)
 
     # did it converge?
@@ -102,7 +100,7 @@ class KMeans:
 
     # you can save the centers and load them into a KMeans
     # object at a later time
-    km = KMeans(centers)
+    km = kmeans_radec.KMeans(centers)
     labels = km.find_nearest(X)
     """
 
@@ -220,7 +218,7 @@ class KMeans:
         self.r90 = r90.copy()
         print(f"kmeans: cluster 50 {r50.astype(int)} radius")
         print(f"kmeans: cluster 90 {r90.astype(int)} radius")
-        # scale L1 / dim, L2 / sqrt(dim) ?
+        # scale L1 / dim, L2 / np.sqrt(dim) ?
 
 
 def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
@@ -239,7 +237,7 @@ def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
         Number of centers
     nsample: int, optional
         Number of samples to use on first pass, default
-        max( 2*sqrt(N), 10*ncen )
+        max( 2*np.sqrt(N), 10*ncen )
     tol: float, optional
         The relative change in the average distance to
         centers, signifies convergence
@@ -295,28 +293,28 @@ def cdist_radec(a1, a2):
     ra2 = a2[:, 0]
     dec2 = a2[:, 1]
 
-    ra1 = ra1[:, newaxis]
-    dec1 = dec1[:, newaxis]
+    ra1 = ra1[:, np.newaxis]
+    dec1 = dec1[:, np.newaxis]
 
-    phi1 = deg2rad(ra1)
-    theta1 = _PIOVER2 - deg2rad(dec1)
-    phi2 = deg2rad(ra2)
-    theta2 = _PIOVER2 - deg2rad(dec2)
+    phi1 = np.deg2rad(ra1)
+    theta1 = _PIOVER2 - np.deg2rad(dec1)
+    phi2 = np.deg2rad(ra2)
+    theta2 = _PIOVER2 - np.deg2rad(dec2)
 
-    sintheta = sin(theta1)
-    x1 = sintheta * cos(phi1)
-    y1 = sintheta * sin(phi1)
-    z1 = cos(theta1)
+    sintheta = np.sin(theta1)
+    x1 = sintheta * np.cos(phi1)
+    y1 = sintheta * np.sin(phi1)
+    z1 = np.cos(theta1)
 
-    sintheta = sin(theta2)
-    x2 = sintheta * cos(phi2)
-    y2 = sintheta * sin(phi2)
-    z2 = cos(theta2)
+    sintheta = np.sin(theta2)
+    x2 = sintheta * np.cos(phi2)
+    y2 = sintheta * np.sin(phi2)
+    z2 = np.cos(theta2)
 
     costheta = x1 * x2 + y1 * y2 + z1 * z2
 
     costheta = np.clip(costheta, -1.0, 1.0)
-    return arccos(costheta)
+    return np.arccos(costheta)
 
 
 def random_sample(x, n):
@@ -374,13 +372,13 @@ def get_mean_center(x, y, z):
     ymean = y.mean()
     zmean = z.mean()
 
-    rmean = sqrt(xmean**2 + ymean**2 + zmean**2)
+    rmean = np.sqrt(xmean**2 + ymean**2 + zmean**2)
 
-    thetamean = arccos(zmean / rmean)
-    phimean = arctan2(ymean, xmean)
+    thetamean = np.arccos(zmean / rmean)
+    phimean = np.arctan2(ymean, xmean)
 
-    ramean = rad2deg(phimean)
-    decmean = rad2deg(pi / 2.0 - thetamean)
+    ramean = np.rad2deg(phimean)
+    decmean = np.rad2deg(np.pi / 2.0 - thetamean)
 
     ramean = atbound1(ramean, 0.0, 360.0)
 
@@ -388,13 +386,13 @@ def get_mean_center(x, y, z):
 
 
 def radec2xyz(ra, dec):
-    phi = deg2rad(ra)
-    theta = _PIOVER2 - deg2rad(dec)
+    phi = np.deg2rad(ra)
+    theta = _PIOVER2 - np.deg2rad(dec)
 
-    sintheta = sin(theta)
-    x = sintheta * cos(phi)
-    y = sintheta * sin(phi)
-    z = cos(theta)
+    sintheta = np.sin(theta)
+    x = sintheta * np.cos(phi)
+    y = sintheta * np.sin(phi)
+    z = np.cos(theta)
 
     return x, y, z
 

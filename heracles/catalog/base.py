@@ -18,10 +18,10 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """base definition for catalogue interface."""
 
-from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
-from types import MappingProxyType
-from typing import Protocol, runtime_checkable
+import abc
+import collections
+import types
+import typing
 
 import numpy as np
 
@@ -45,7 +45,7 @@ class CatalogPage:
                 raise ValueError(msg)
         self._size = size
 
-    def __init__(self, data: Mapping) -> None:
+    def __init__(self, data: collections.abc.Mapping) -> None:
         """Create a new catalogue page from given data."""
         self._data = {k: np.asanyarray(v) for k, v in data.items()}
         for v in self._data.values():
@@ -83,7 +83,7 @@ class CatalogPage:
     @property
     def data(self):
         """Return an immutable view on the data of this page."""
-        return MappingProxyType(self._data)
+        return types.MappingProxyType(self._data)
 
     def get(self, *col):
         """Return one or more columns with checking."""
@@ -109,8 +109,8 @@ class CatalogPage:
         self._update()
 
 
-@runtime_checkable
-class Catalog(Protocol):
+@typing.runtime_checkable
+class Catalog(typing.Protocol):
     """protocol for catalogues."""
 
     def __getitem__(self, where):
@@ -240,7 +240,7 @@ class CatalogView:
         yield from self._catalog.select(joined)
 
 
-class CatalogBase(metaclass=ABCMeta):
+class CatalogBase(metaclass=abc.ABCMeta):
     """abstract base class for base catalogues (not views)."""
 
     default_page_size: int = 100_000
@@ -260,22 +260,22 @@ class CatalogBase(metaclass=ABCMeta):
         other._visibility = self._visibility
         return other
 
-    @abstractmethod
+    @abc.abstractmethod
     def _names(self):
         """Abstract method to return the columns in the catalogue."""
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _size(self, selection):
         """Abstract method to return the size of the catalogue or selection."""
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _join(self, *where):
         """Abstract method to join selections."""
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _pages(self, selection):
         """Abstract method to iterate selected pages from the catalogue."""
         ...
