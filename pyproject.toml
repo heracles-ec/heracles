@@ -9,35 +9,34 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = "LGPL-3.0-or-later"
 authors = [
-    {name = "Nicolas Tessore", email = "n.tessore@ucl.ac.uk"},
+  {name = "Nicolas Tessore", email = "n.tessore@ucl.ac.uk"}
 ]
 classifiers = [
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Astronomy",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
   "fitsio",
   "healpy",
   "numba",
   "numpy",
-  "convolvecl",
-
+  "convolvecl"
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
-    "pytest",
+  "pytest"
 ]
 docs = [
-    "sphinx",
-    "furo",
-    "sphinxcontrib-katex",
-    "numpydoc",
-    "matplotlib",
+  "sphinx",
+  "furo",
+  "sphinxcontrib-katex",
+  "numpydoc",
+  "matplotlib"
 ]
 
 [project.urls]
@@ -45,8 +44,13 @@ Homepage = "https://github.com/heracles-ec/heracles"
 Documentation = "https://heracles.readthedocs.io/"
 Issues = "https://github.com/heracles-ec/heracles/issues"
 
-[tool.hatch]
-version.source = "vcs"
+[tool.black]
+force-exclude = """
+(
+  _kmeans_radec.py
+)
+"""
 
-[tool.hatch.build.hooks.vcs]
-version-file = "heracles/_version.py"
+[tool.hatch]
+build.hooks.vcs.version-file = "heracles/_version.py"
+version.source = "vcs"

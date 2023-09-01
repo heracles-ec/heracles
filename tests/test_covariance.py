@@ -25,7 +25,7 @@ def test_sample_covariance():
 
     x = np.reshape(samples, (n, size, 1))
     y = np.reshape(samples, (n, 1, size))
-    cxy = n/(n-1)*((x - x.mean(axis=0))*(y - y.mean(axis=0))).mean(axis=0)
+    cxy = n / (n - 1) * ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
 
     assert np.allclose(cov, cxy)
 
@@ -45,7 +45,7 @@ def test_sample_covariance():
 
     x = np.reshape(samples, (n, size, 1))
     y = np.reshape(samples2, (n, 1, size2))
-    cxy = n/(n-1)*((x - x.mean(axis=0))*(y - y.mean(axis=0))).mean(axis=0)
+    cxy = n / (n - 1) * ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
 
     assert np.allclose(cov, cxy)
 
@@ -61,19 +61,19 @@ def test_update_covariance():
 
     cov = {}
 
-    sample = {i: np.random.randn(i+1) for i in range(n)}
+    sample = {i: np.random.randn(i + 1) for i in range(n)}
     update_covariance(cov, sample)
 
-    assert len(cov) == n*(n+1)//2
+    assert len(cov) == n * (n + 1) // 2
     for k1, k2 in combinations_with_replacement(sample, 2):
         assert (k1, k2) in cov
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
         assert np.all(cov[k1, k2] == 0)
 
-    sample2 = {i: np.random.randn(i+1) for i in range(n)}
+    sample2 = {i: np.random.randn(i + 1) for i in range(n)}
     update_covariance(cov, sample2)
 
-    assert len(cov) == n*(n+1)//2
+    assert len(cov) == n * (n + 1) // 2
     for k1, k2 in combinations_with_replacement(sample, 2):
         assert (k1, k2) in cov
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
@@ -81,20 +81,19 @@ def test_update_covariance():
 
 
 def test_jackknife_regions_kmeans():
-
     from heracles.covariance import jackknife_regions_kmeans
 
     nside = 64
 
-    fpmap = np.zeros(12*nside**2)
-    fpmap[:fpmap.size//2] = 1.
+    fpmap = np.zeros(12 * nside**2)
+    fpmap[: fpmap.size // 2] = 1.0
 
     n = 12
 
     jkmap, jkcen = jackknife_regions_kmeans(fpmap, n, return_centers=True)
 
     assert jkmap.size == fpmap.size
-    assert np.all(jkmap[jkmap.size//2:] == 0)
-    assert np.all(jkmap[:jkmap.size//2] > 0)
-    assert list(np.unique(jkmap)) == list(range(n+1))
+    assert np.all(jkmap[jkmap.size // 2 :] == 0)
+    assert np.all(jkmap[: jkmap.size // 2] > 0)
+    assert list(np.unique(jkmap)) == list(range(n + 1))
     assert len(jkcen) == n

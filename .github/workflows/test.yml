@@ -3,7 +3,7 @@ name: Test
 on:
   push:
     branches:
-    - main
+      - main
   pull_request:
 
 jobs:
@@ -11,27 +11,46 @@ jobs:
     name: Style
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - run: pipx run flake8 heracles tests
+      - uses: actions/checkout@v3
+      - name: Cache pre-commit
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install dependencies
+        run: |-
+          python -m pip install pre-commit
+          pre-commit install
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --color always
   tests:
     name: Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - run: pip install -c .github/test-constraints.txt '.[test]'
-    - run: pytest tests
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -c .github/test-constraints.txt '.[test]'
+      - run: pytest tests
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - run: pipx run build
+      - uses: actions/checkout@v3
+      - run: pipx run build
   # docs:
   #   name: Docs
   #   runs-on: ubuntu-latest
