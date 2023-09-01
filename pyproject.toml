@@ -45,7 +45,5 @@ Documentation = "https://heracles.readthedocs.io/"
 Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.hatch]
-
-[tool.hatch.build.hooks.vcs]
-version-file = "heracles/_version.py"
+build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
