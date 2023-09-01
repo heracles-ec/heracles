@@ -82,9 +82,6 @@ You can use any of the other common git trailers.  In particular, you can use
 Versioning
 ----------
 
-The target is to have a new *Heracles* release at the beginning of each month,
-as long as there have been changes.
-
 The current version number is automatically inferred from the last release
 (i.e. git tag), subsequent unreleased commits, and local changes, if any.
 
