@@ -6,7 +6,8 @@ NFIELDS_TEST = 4
 
 @pytest.fixture
 def zbins():
-    return {0: (0.0, 0.8), 1: (1.0, 1.2)}
+    zbins = {0: (0.0, 0.8), 1: (1.0, 1.2)}
+    return zbins
 
 
 @pytest.fixture
@@ -68,7 +69,8 @@ def nside():
 
 @pytest.fixture(scope="session")
 def datadir(tmp_path_factory):
-    return tmp_path_factory.mktemp("data")
+    datadir = tmp_path_factory.mktemp("data")
+    return datadir
 
 
 @pytest.fixture(scope="session")

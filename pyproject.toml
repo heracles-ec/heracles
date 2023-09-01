@@ -10,11 +10,11 @@ authors = [
     {email = "n.tessore@ucl.ac.uk", name = "Nicolas Tessore"},
 ]
 classifiers = [
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Astronomy",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
     "convolvecl",
@@ -43,6 +43,13 @@ requires-python = ">=3.8"
 urls.Documentation = "https://heracles.readthedocs.io/"
 urls.Homepage = "https://github.com/heracles-ec/heracles"
 urls.Issues = "https://github.com/heracles-ec/heracles/issues"
+
+[tool.black]
+force-exclude = """
+(
+  _kmeans_radec.py
+)
+"""
 
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"

@@ -69,7 +69,7 @@ def test_catalog_page():
         data["a"] = b
 
     # test iterator
-    assert list(page) == ["a", "b"]
+    assert [_ for _ in page] == ["a", "b"]
 
     # test copy method
     copy = page.copy()

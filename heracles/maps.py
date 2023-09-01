@@ -275,7 +275,10 @@ class PositionMap(HealpixMap, RandomizableMap):
 
         # randomise position map if asked to
         if self._randomize:
-            p = np.full(npix, 1 / npix) if vmap is None else vmap / np.sum(vmap)
+            if vmap is None:
+                p = np.full(npix, 1 / npix)
+            else:
+                p = vmap / np.sum(vmap)
             pos[:] = np.random.multinomial(ngal, p)
 
         # compute average number density
@@ -634,7 +637,7 @@ def map_catalogs(
 
         # collect map generators from results
         # if there are any generators, feed them the catalogue pages
-        if gen := {ki: v for ki, v in results.items() if isinstance(v, Generator)}:
+        if gen:
             # get an iterator over each catalogue
             # by construction, these have all the same length and page size
             its = {i: iter(catalog) for i, catalog in group.items()}

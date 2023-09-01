@@ -50,7 +50,10 @@ class ArrayCatalog(CatalogBase):
 
     def _pages(self, selection):
         """iterate the rows of the array in pages"""
-        arr = self._arr if selection is None else self._arr[selection]
+        if selection is None:
+            arr = self._arr
+        else:
+            arr = self._arr[selection]
         nrows = len(arr)
         page_size = self.page_size
         names = arr.dtype.names

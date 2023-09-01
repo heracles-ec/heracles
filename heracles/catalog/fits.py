@@ -60,7 +60,7 @@ class FitsCatalog(CatalogBase):
         """string representation of FitsCatalog"""
         s = self._filename
         if self._ext is not None:
-            s = f"{s}[{self._ext!r}]"
+            s = s + f"[{self._ext!r}]"
         return s
 
     def hdu(self):
@@ -116,9 +116,9 @@ class FitsCatalog(CatalogBase):
 
     def _join(self, *where):
         """join rowfilter expressions"""
-        return (
-            "(" + ") & (".join(map(str, filter(None, where))) + ")" if where else None
-        )
+        if not where:
+            return None
+        return "(" + ") & (".join(map(str, filter(None, where))) + ")"
 
     def _pages(self, selection):
         """iterate pages of rows in FITS file, optionally using the query"""
