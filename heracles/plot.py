@@ -117,7 +117,7 @@ def postage_stamps(
         # axis for plotting this key
         ax = axes[idx]
 
-        # outer property itertools.cycle for this axis
+        # outer property cycle for this axis
         oprop = next(prop[idx])
 
         # label for first plot only, set to None after
