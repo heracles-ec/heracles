@@ -18,7 +18,8 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for catalogue processing"""
 
-from weakref import ref, finalize
+from weakref import finalize, ref
+
 import fitsio
 
 from .base import CatalogBase, CatalogPage
@@ -86,7 +87,8 @@ class FitsCatalog(CatalogBase):
                         # find table data extension
                         hdu = next(filter(_is_table_hdu, fits))
                     except StopIteration:
-                        raise TypeError("no table data in FITS") from None
+                        msg = "no table data in FITS"
+                        raise TypeError(msg) from None
                 else:
                     hdu = fits[self._ext]
 

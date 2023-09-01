@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for catalogue processing"""
 
-from .base import Catalog, CatalogBase, CatalogView, CatalogPage  # noqa: F401
-from .filters import InvalidValueFilter, FootprintFilter  # noqa: F401
 from .array import ArrayCatalog  # noqa: F401
+from .base import Catalog, CatalogBase, CatalogPage, CatalogView  # noqa: F401
+from .filters import FootprintFilter, InvalidValueFilter  # noqa: F401
 from .fits import FitsCatalog  # noqa: F401

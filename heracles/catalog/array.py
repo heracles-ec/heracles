@@ -41,8 +41,7 @@ class ArrayCatalog(CatalogBase):
     def _size(self, selection):
         if selection is None:
             return len(self._arr)
-        else:
-            return len(self._arr[selection])
+        return len(self._arr[selection])
 
     def _join(self, first, *other):
         """join boolean masks"""

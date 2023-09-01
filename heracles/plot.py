@@ -21,10 +21,10 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from itertools import chain, count, cycle
-import numpy as np
-import matplotlib.pyplot as plt
-from cycler import cycler
 
+import matplotlib.pyplot as plt
+import numpy as np
+from cycler import cycler
 
 DEFAULT_CYCLER = cycler(linestyle=["-", "--", ":", "-."])
 
@@ -64,7 +64,8 @@ def postage_stamps(
         cycler = DEFAULT_CYCLER
 
     if plot is None and transpose is None:
-        raise ValueError("missing plot data")
+        msg = "missing plot data"
+        raise ValueError(msg)
 
     if isinstance(plot, Mapping):
         plot = [plot]
@@ -81,7 +82,7 @@ def postage_stamps(
         trkeys = {}
 
     stamps = sorted(
-        set(key[-2:] for key in keys) | set(key[-2:][::-1] for key in trkeys)
+        set(key[-2:] for key in keys) | set(key[-2:][::-1] for key in trkeys),
     )
 
     sx = list(set(i for i, _ in stamps))
@@ -220,12 +221,18 @@ def postage_stamps(
 
         ax.set_xlim(xmin, xmax)
         ax.set_xscale(
-            "symlog", linthresh=10, linscale=0.45, subs=[2, 3, 4, 5, 6, 7, 8, 9]
+            "symlog",
+            linthresh=10,
+            linscale=0.45,
+            subs=[2, 3, 4, 5, 6, 7, 8, 9],
         )
 
         ax.set_ylim(ymin_, ymax_)
         ax.set_yscale(
-            "symlog", linthresh=ylin_, linscale=0.45, subs=[2, 3, 4, 5, 6, 7, 8, 9]
+            "symlog",
+            linthresh=ylin_,
+            linscale=0.45,
+            subs=[2, 3, 4, 5, 6, 7, 8, 9],
         )
 
         for tick in ax.xaxis.get_major_ticks():

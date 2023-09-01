@@ -22,6 +22,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Protocol, runtime_checkable
+
 import numpy as np
 
 
@@ -40,7 +41,8 @@ class CatalogPage:
             if size == -1:
                 size = len(rows)
             elif size != len(rows):
-                raise ValueError("inconsistent row length")
+                msg = "inconsistent row length"
+                raise ValueError(msg)
         self._size = size
 
     def __init__(self, data: Mapping) -> None:
@@ -54,8 +56,7 @@ class CatalogPage:
         """Return one or more columns without checking."""
         if isinstance(col, (list, tuple)):
             return tuple(self._data[c] for c in col)
-        else:
-            return self._data[col]
+        return self._data[col]
 
     def __len__(self):
         """Number of columns in the page."""
@@ -90,7 +91,8 @@ class CatalogPage:
         for c in col:
             v = self._data[c]
             if np.any(np.isnan(v)):
-                raise ValueError(f'invalid values in column "{c}"')
+                msg = f'invalid values in column "{c}"'
+                raise ValueError(msg)
             val.append(v)
         if len(val) == 1:
             val = val[0]
@@ -300,12 +302,12 @@ class CatalogBase(metaclass=ABCMeta):
     @property
     def base(self):
         """returns ``None`` since this is not a view of another catalogue"""
-        return None
+        return
 
     @property
     def selection(self):
         """returns ``None`` since this is not a view of another catalogue"""
-        return None
+        return
 
     @property
     def names(self):

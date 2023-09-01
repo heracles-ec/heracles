@@ -19,8 +19,9 @@
 """module for catalogue filters"""
 
 import warnings
-import numpy as np
+
 import healpy as hp
+import numpy as np
 
 
 class InvalidValueFilter:

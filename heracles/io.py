@@ -18,12 +18,12 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for file reading and writing"""
 
-import os
 import logging
+import os
 
-import numpy as np
-import healpy as hp
 import fitsio
+import healpy as hp
+import numpy as np
 
 from .util import toc_match
 
@@ -91,7 +91,13 @@ def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
 
 
 def write_maps(
-    filename, maps, *, clobber=False, workdir=".", include=None, exclude=None
+    filename,
+    maps,
+    *,
+    clobber=False,
+    workdir=".",
+    include=None,
+    exclude=None,
 ):
     """write a set of maps to FITS file
 
@@ -158,16 +164,22 @@ def write_maps(
             nside = hp.npix2nside(npix)
             fits[ext].write_key("PIXTYPE", "HEALPIX", "HEALPIX pixelisation")
             fits[ext].write_key(
-                "ORDERING", "RING", "Pixel ordering scheme, either RING or NESTED"
+                "ORDERING",
+                "RING",
+                "Pixel ordering scheme, either RING or NESTED",
             )
             fits[ext].write_key("NSIDE", nside, "Resolution parameter of HEALPIX")
             fits[ext].write_key("FIRSTPIX", 0, "First pixel # (0 based)")
             fits[ext].write_key("LASTPIX", npix - 1, "Last pixel # (0 based)")
             fits[ext].write_key(
-                "INDXSCHM", "IMPLICIT", "Indexing: IMPLICIT or EXPLICIT"
+                "INDXSCHM",
+                "IMPLICIT",
+                "Indexing: IMPLICIT or EXPLICIT",
             )
             fits[ext].write_key(
-                "OBJECT", "FULLSKY", "Sky coverage, either FULLSKY or PARTIAL"
+                "OBJECT",
+                "FULLSKY",
+                "Sky coverage, either FULLSKY or PARTIAL",
             )
 
             # write the TOC entry
@@ -224,7 +236,13 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
 
 
 def write_alms(
-    filename, alms, *, clobber=False, workdir=".", include=None, exclude=None
+    filename,
+    alms,
+    *,
+    clobber=False,
+    workdir=".",
+    include=None,
+    exclude=None,
 ):
     """write a set of alms to FITS file
 

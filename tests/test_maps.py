@@ -1,5 +1,5 @@
-import numpy as np
 import healpy as hp
+import numpy as np
 import pytest
 
 from .conftest import warns
@@ -15,7 +15,8 @@ def map_catalog(m, catalog):
     except StopIteration as stop:
         return stop.value
     else:
-        raise RuntimeError("generator did not stop")
+        msg = "generator did not stop"
+        raise RuntimeError(msg)
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def page(nside):
 
     ipix = np.ravel(
         4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis]
-        + [0, 1, 2, 3]
+        + [0, 1, 2, 3],
     )
 
     ra, dec = hp.pix2ang(nside * 2, ipix, nest=True, lonlat=True)
@@ -58,8 +59,7 @@ def page(nside):
     def get(*names):
         if len(names) == 1:
             return cols[names[0]]
-        else:
-            return [cols[name] for name in names]
+        return [cols[name] for name in names]
 
     page = Mock()
     page.size = size
@@ -82,6 +82,7 @@ def catalog(page):
 
 def test_visibility_map(nside, vmap):
     from unittest.mock import Mock
+
     from heracles.maps import VisibilityMap
 
     fsky = vmap.mean()
