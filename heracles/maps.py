@@ -18,18 +18,18 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for map-making"""
 
+import logging
+import typing as t
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Generator
-from functools import wraps, partial
-import logging
-import numpy as np
+from functools import partial, wraps
+
 import healpy as hp
+import numpy as np
 from numba import njit
 
-from .util import toc_match, Progress
-
-import typing as t
+from .util import Progress, toc_match
 
 if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
@@ -98,7 +98,8 @@ def update_metadata(array, **metadata):
     dt = np.dtype(dt, metadata=md)
     # check that new dtype is compatible with old one
     if not np.can_cast(dt, array.dtype, casting="no"):
-        raise ValueError("array with unsupported dtype")
+        msg = "array with unsupported dtype"
+        raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
 
@@ -323,7 +324,9 @@ class ScalarMap(HealpixMap, NormalizableMap):
         """Create a new real map."""
 
         super().__init__(
-            columns=(lon, lat, value, weight), nside=nside, normalize=normalize
+            columns=(lon, lat, value, weight),
+            nside=nside,
+            normalize=normalize,
         )
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
@@ -517,14 +520,15 @@ class VisibilityMap(HealpixMap):
         # make sure that catalogue has a visibility map
         vmap = catalog.visibility
         if vmap is None:
-            raise ValueError("no visibility map in catalog")
+            msg = "no visibility map in catalog"
+            raise ValueError(msg)
 
         # warn if visibility is changing resolution
         vmap_nside = hp.get_nside(vmap)
         if vmap_nside != self.nside:
             warnings.warn(
                 f"changing NSIDE of visibility map "
-                f"from {vmap_nside} to {self.nside}"
+                f"from {vmap_nside} to {self.nside}",
             )
             vmap = hp.ud_grade(vmap, self.nside)
         else:
@@ -540,7 +544,13 @@ class WeightMap(HealpixMap, NormalizableMap):
     """Create a HEALPix weight map from a catalogue."""
 
     def __init__(
-        self, nside: int, lon: str, lat: str, weight: str, *, normalize=True
+        self,
+        nside: int,
+        lon: str,
+        lat: str,
+        weight: str,
+        *,
+        normalize=True,
     ) -> None:
         """Create a new weight map."""
         super().__init__(columns=(lon, lat, weight), nside=nside, normalize=normalize)
@@ -602,7 +612,8 @@ def _close_and_return(generator):
     except StopIteration as end:
         return end.value
     else:
-        raise RuntimeError("generator did not stop")
+        msg = "generator did not stop"
+        raise RuntimeError(msg)
 
 
 def map_catalogs(
@@ -678,9 +689,9 @@ def map_catalogs(
                     try:
                         page = next(it)
                     except StopIteration:
+                        msg = f"catalog {i} finished prematurely in page started at row {rownum}"
                         raise RuntimeError(
-                            f"catalog {i} finished prematurely"
-                            f" in page started at row {rownum}"
+                            msg,
                         )
                     for k in maps:
                         if (fn := fns.get((k, i))) is not None:
@@ -750,7 +761,8 @@ def transform_maps(
             pol = True
             m = [np.zeros(np.shape(m)[-1]), m[0], m[1]]
         else:
-            raise NotImplementedError(f"spin-{spin} maps not yet supported")
+            msg = f"spin-{spin} maps not yet supported"
+            raise NotImplementedError(msg)
 
         alms = hp.map2alm(m, pol=pol, **kwargs)
 

@@ -1,6 +1,7 @@
 import unittest.mock
-import pytest
+
 import numpy as np
+import pytest
 
 
 @pytest.fixture
@@ -10,8 +11,7 @@ def nside():
 
 @pytest.fixture
 def zbins():
-    zbins = {0: (0.0, 0.8), 1: (1.0, 1.2)}
-    return zbins
+    return {0: (0.0, 0.8), 1: (1.0, 1.2)}
 
 
 @pytest.fixture
@@ -36,6 +36,7 @@ def mock_alms(zbins):
 
 def test_angular_power_spectra(mock_alms):
     from itertools import combinations_with_replacement
+
     from heracles.twopoint import angular_power_spectra
 
     # alms cross themselves
@@ -58,7 +59,8 @@ def test_angular_power_spectra(mock_alms):
     # explicit include
 
     cls = angular_power_spectra(
-        mock_alms, include=[("P", "P", ..., ...), ("P", "G_E", ..., ...)]
+        mock_alms,
+        include=[("P", "P", ..., ...), ("P", "G_E", ..., ...)],
     )
 
     assert cls.keys() == {
@@ -78,7 +80,8 @@ def test_angular_power_spectra(mock_alms):
     # explicit exclude
 
     cls = angular_power_spectra(
-        mock_alms, exclude=[("P", "P"), ("P", "G_E"), ("P", "G_B")]
+        mock_alms,
+        exclude=[("P", "P"), ("P", "G_E"), ("P", "G_B")],
     )
 
     assert cls.keys() == {
@@ -148,6 +151,7 @@ def test_mixing_matrices():
 
 def test_pixelate_mms_healpix():
     import healpy as hp
+
     from heracles.twopoint import pixelate_mms_healpix
 
     nside = 512

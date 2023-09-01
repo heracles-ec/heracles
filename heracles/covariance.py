@@ -22,8 +22,9 @@ import logging
 import time
 from datetime import timedelta
 from itertools import combinations_with_replacement
-import numpy as np
+
 import healpy as hp
+import numpy as np
 
 from ._kmeans_radec import kmeans_sample
 
@@ -63,7 +64,8 @@ def add_sample(cov, x, y=None):
         y = np.reshape(y, -1)
 
     if x.size != cov.sample_row_mean.size or y.size != cov.sample_col_mean.size:
-        raise ValueError("size mismatch between sample and covariance matrix")
+        msg = "size mismatch between sample and covariance matrix"
+        raise ValueError(msg)
 
     delta = x - cov.sample_row_mean
     cov.sample_count += 1
@@ -83,7 +85,11 @@ def update_covariance(cov, sample):
         if (k1, k2) not in cov:
             nrows, ncols = np.size(v1), np.size(v2)
             logger.info(
-                "creating %d x %d covariance matrix for %s, %s", nrows, ncols, k1, k2
+                "creating %d x %d covariance matrix for %s, %s",
+                nrows,
+                ncols,
+                k1,
+                k2,
             )
             cov[k1, k2] = SampleCovariance(nrows, ncols)
         logger.info("updating covariance for %s, %s", k1, k2)
@@ -97,7 +103,13 @@ def update_covariance(cov, sample):
 
 
 def jackknife_regions_kmeans(
-    fpmap, n, *, maxrepeat=5, maxiter=1000, tol=1e-5, return_centers=False
+    fpmap,
+    n,
+    *,
+    maxrepeat=5,
+    maxiter=1000,
+    tol=1e-5,
+    return_centers=False,
 ):
     """partition a footprint map into n regions using k-means"""
 
@@ -128,11 +140,13 @@ def jackknife_regions_kmeans(
         if km.converged:
             logger.info("k-means converged")
             break
-        else:
-            logger.info("k-means not converged; repeat")
+        logger.info("k-means not converged; repeat")
     else:
-        raise RuntimeError(
+        msg = (
             f"k-means failed to partition map into {n} regions after repeat {maxrepeat}"
+        )
+        raise RuntimeError(
+            msg,
         )
 
     areas = 60**4 // 100 / np.pi / npix * np.bincount(km.labels)

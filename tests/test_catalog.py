@@ -1,6 +1,6 @@
-import pytest
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 
 @pytest.fixture
@@ -300,8 +300,9 @@ def test_invalid_value_filter(catalog):
 
 
 def test_footprint_filter(catalog):
-    from heracles.catalog import FootprintFilter
     from healpy import ang2pix
+
+    from heracles.catalog import FootprintFilter
 
     # footprint for northern hemisphere
     nside = 8
@@ -310,7 +311,7 @@ def test_footprint_filter(catalog):
     # replace x and y in catalog with lon and lat
     catalog.DATA["x"] = lon = np.random.uniform(-180, 180, size=catalog.SIZE)
     catalog.DATA["y"] = lat = np.degrees(
-        np.arcsin(np.random.uniform(-1, 1, size=catalog.SIZE))
+        np.arcsin(np.random.uniform(-1, 1, size=catalog.SIZE)),
     )
 
     filt = FootprintFilter(m, "x", "y")
@@ -373,6 +374,7 @@ def test_array_catalog():
 
 def test_fits_catalog(tmp_path):
     import fitsio
+
     from heracles.catalog import Catalog
     from heracles.catalog.fits import FitsCatalog
 
@@ -436,7 +438,9 @@ def test_fits_catalog(tmp_path):
 
 def test_fits_catalog_caching(tmp_path):
     import gc
+
     import fitsio
+
     from heracles.catalog.fits import FitsCatalog
 
     size = 100

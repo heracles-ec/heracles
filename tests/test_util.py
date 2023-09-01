@@ -39,6 +39,7 @@ def test_toc_filter():
 
 def test_progress():
     from io import StringIO
+
     from heracles.util import Progress
 
     f = StringIO()

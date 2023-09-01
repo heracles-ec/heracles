@@ -55,6 +55,47 @@ force-exclude = """
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
 
+[tool.ruff]
+extend-exclude = ["heracles/_kmeans_radec.py"]
+fix = true
+force-exclude = true
+line-length = 100
+per-file-ignores = {"test_*" = [
+    "S101",
+]}
+select = [
+    "A",
+    "BLE",
+    "COM",
+    "DJ",
+    "DTZ",
+    "E",
+    "EM",
+    "ERA",
+    "EXE",
+    "F",
+    "I",
+    "ICN",
+    "INP",
+    "ISC",
+    "PD",
+    "PIE",
+    "PYI",
+    "Q",
+    "RET",
+    "RSE",
+    "TCH",
+    "TID",
+    "UP",
+    "W",
+    "YTT",
+]
+target-version = "py38"
+isort.known-first-party = [
+    "heracles",
+]
+mccabe.max-complexity = 18
+
 [tool.tomlsort]
 all = true
 spaces_indent_inline_array = 4
