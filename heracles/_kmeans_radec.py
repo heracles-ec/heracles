@@ -135,10 +135,8 @@ class KMeans:
         ncen, _ = centers.shape
 
         if self.verbose:
-            print(
-                f"X {x.shape} centers {centers.shape} "
-                f"tol = {self.tol:.2g}  maxiter = {maxiter}"
-            )
+            tup = (x.shape, centers.shape, self.tol, maxiter)
+            print("X %s  centers %s  tol = %.2g  maxiter = %d" % tup)
 
         xx, xy, xz = radec2xyz(x[:, 0], x[:, 1])
 
@@ -156,7 +154,7 @@ class KMeans:
             # median ?
             avdist = distances.mean()
             if self.verbose >= 2:
-                print(f"    av |X - nearest centre| = {avdist:.4g}")
+                print("    av |X - nearest centre| = %.4g" % avdist)
 
             self.converged = (1 - self.tol) * prevdist <= avdist <= prevdist
             if self.converged:
@@ -227,8 +225,8 @@ class KMeans:
                 r50[j], r90[j] = np.percentile(dist, (50, 90))
         self.r50 = r50.copy()
         self.r90 = r90.copy()
-        print(f"kmeans: cluster 50 {r50.astype(int)} radius")
-        print(f"kmeans: cluster 90 {r90.astype(int)} radius")
+        print("kmeans: cluster 50 % radius", r50.astype(int))
+        print("kmeans: cluster 90 % radius", r90.astype(int))
         # scale L1 / dim, L2 / sqrt(dim) ?
 
 
@@ -368,9 +366,9 @@ def _check_dims(x, centers):
     _, dim = x.shape
     ncen, cdim = centers.shape
     if dim != cdim:
+        tup = (x.shape, centers.shape)
         raise ValueError(
-            f"X {x.shape} and centers {centers.shape} "
-            "must have the same number of columns"
+            "X %s and centers %s must have the same number of columns" % tup
         )
 
 
