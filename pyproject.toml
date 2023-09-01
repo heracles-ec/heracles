@@ -46,7 +46,7 @@ urls.Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
-build.hooks.vcs.version.source = "vcs"
+version.source = "vcs"
 
 [tool.tomlsort]
 all = true

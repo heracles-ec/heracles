@@ -72,23 +72,20 @@ def add_sample(cov, x, y=None):
 def update_covariance(cov, sample):
     """update a set of sample covariances given a sample"""
 
-    logger.info("updating covariances for %d item(s)", len(sample))
+    logger.info(f"updating covariances for {len(sample)} item(s)")
     t = time.monotonic()
 
     for (k1, v1), (k2, v2) in combinations_with_replacement(sample.items(), 2):
         if (k1, k2) not in cov:
             nrows, ncols = np.size(v1), np.size(v2)
-            logger.info(
-                "creating %d x %d covariance matrix for %s, %s", nrows, ncols, k1, k2
-            )
+            logger.info(f"creating {nrows} x {ncols} covariance matrix for {k1}, {k2}")
             cov[k1, k2] = SampleCovariance(nrows, ncols)
-        logger.info("updating covariance for %s, %s", k1, k2)
+        logger.info(f"updating covariance for {k1}, {k2}")
         add_sample(cov[k1, k2], v1, v2)
 
     logger.info(
-        "updated %d covariance(s) in %s",
-        len(sample) * (len(sample) + 1) // 2,
-        timedelta(seconds=(time.monotonic() - t)),
+        f"updated {len(sample) * (len(sample) + 1) // 2} "
+        f"covariance(s) in {timedelta(seconds=(time.monotonic() - t))}",
     )
 
 
@@ -100,23 +97,22 @@ def jackknife_regions_kmeans(
     nside = hp.get_nside(fpmap)
     npix = hp.nside2npix(nside)
 
-    logger.info("partitioning map with NSIDE=%s into %s regions", nside, n)
+    logger.info(f"partitioning map with NSIDE={nside} into {n} regions")
     t = time.monotonic()
 
     logger.info("finding all nonzero pixels in map")
 
     ipix = np.nonzero(fpmap)[0]
 
-    logger.info("found %d nonzero pixels in map", len(ipix))
+    logger.info(f"found {len(ipix)} nonzero pixels in map")
     logger.info("getting angles of all nonzero pixels in map")
 
     radec = np.transpose(hp.pix2ang(nside, ipix, lonlat=True))
 
     for r in range(maxrepeat + 1):
         logger.info(
-            "constructing %s regions using k-means%s",
-            n,
-            "" if r == 0 else f" (repeat {r})",
+            f"constructing {n} regions using k-means"
+            f"{'' if r == 0 else f' (repeat {r})'}"
         )
 
         km = kmeans_sample(radec, n, verbose=0)
@@ -137,11 +133,11 @@ def jackknife_regions_kmeans(
         area_mean, area_std, area_unit = area_mean / 3600, area_std / 3600, "arcmin2"
     if area_mean < 1.0:
         area_mean, area_std, area_unit = area_mean / 3600, area_std / 3600, "arcsec2"
-    logger.info("region area is %.3f ± %.3f %s", area_mean, area_std, area_unit)
+    logger.info(f"region area is {area_mean:.3f} ± {area_std:.3f} {area_unit}")
 
     jkmap = np.zeros(npix, dtype=int)
     jkmap[ipix] = km.labels + 1
 
-    logger.info("partitioned map in %s", timedelta(seconds=(time.monotonic() - t)))
+    logger.info(f"partitioned map in {timedelta(seconds=(time.monotonic() - t))}")
 
     return (jkmap, km.centers) if return_centers else jkmap
