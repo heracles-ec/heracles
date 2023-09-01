@@ -1,12 +1,12 @@
 import itertools
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+from heracles.plot import postage_stamps
+
 
 def test_postage_stamps():
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    from heracles.plot import postage_stamps
-
     cl = [1, 2, 3, 4]
 
     plot = {

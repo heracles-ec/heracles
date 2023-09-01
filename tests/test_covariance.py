@@ -1,10 +1,17 @@
+import itertools
+
 import numpy as np
 import pytest
 
+from heracles.covariance import (
+    SampleCovariance,
+    add_sample,
+    jackknife_regions_kmeans,
+    update_covariance,
+)
+
 
 def test_sample_covariance():
-    from heracles.covariance import SampleCovariance, add_sample
-
     n = 10
     size = 3
     size2 = 5
@@ -54,10 +61,6 @@ def test_sample_covariance():
 
 
 def test_update_covariance():
-    from itertools import combinations_with_replacement
-
-    from heracles.covariance import update_covariance
-
     n = 4
 
     cov = {}
@@ -66,7 +69,7 @@ def test_update_covariance():
     update_covariance(cov, sample)
 
     assert len(cov) == n * (n + 1) // 2
-    for k1, k2 in combinations_with_replacement(sample, 2):
+    for k1, k2 in itertools.combinations_with_replacement(sample, 2):
         assert (k1, k2) in cov
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
         assert np.all(cov[k1, k2] == 0)
@@ -75,15 +78,13 @@ def test_update_covariance():
     update_covariance(cov, sample2)
 
     assert len(cov) == n * (n + 1) // 2
-    for k1, k2 in combinations_with_replacement(sample, 2):
+    for k1, k2 in itertools.combinations_with_replacement(sample, 2):
         assert (k1, k2) in cov
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
         assert np.all(cov[k1, k2] != 0)
 
 
 def test_jackknife_regions_kmeans():
-    from heracles.covariance import jackknife_regions_kmeans
-
     nside = 64
 
     fpmap = np.zeros(12 * nside**2)

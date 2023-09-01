@@ -1,9 +1,11 @@
+import io
+
 import pytest
+
+from heracles.util import Progress, toc_filter, toc_match
 
 
 def test_toc_match():
-    from heracles.util import toc_match
-
     assert toc_match(("a",))
     assert toc_match(("a",), None, [])
     assert not toc_match(("a",), [], None)
@@ -24,8 +26,6 @@ def test_toc_match():
 
 
 def test_toc_filter():
-    from heracles.util import toc_filter
-
     full = {("a", "b"): 1, ("c", "d"): 2}
 
     assert toc_filter(full, [("a",)]) == {("a", "b"): 1}
@@ -38,11 +38,7 @@ def test_toc_filter():
 
 
 def test_progress():
-    from io import StringIO
-
-    from heracles.util import Progress
-
-    f = StringIO()
+    f = io.StringIO()
     prog = Progress(f)
     prog.start(10, "my title")
     s = f.getvalue()

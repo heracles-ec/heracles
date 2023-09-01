@@ -1,6 +1,19 @@
+import unittest.mock
+
 import healpy as hp
 import numpy as np
 import pytest
+
+from heracles.maps import (
+    ComplexMap,
+    PositionMap,
+    ScalarMap,
+    VisibilityMap,
+    WeightMap,
+    map_catalogs,
+    transform_maps,
+    update_metadata,
+)
 
 from .conftest import warns
 
@@ -36,8 +49,6 @@ def vmap(nside):
 
 @pytest.fixture()
 def page(nside):
-    from unittest.mock import Mock
-
     ipix = np.ravel(
         4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis]
         + [0, 1, 2, 3],
@@ -59,7 +70,7 @@ def page(nside):
     def get(*names):
         return cols[names[0]] if len(names) == 1 else [cols[name] for name in names]
 
-    page = Mock()
+    page = unittest.mock.Mock()
     page.size = size
     page.get = get
     page.__getitem__ = lambda self, *names: get(*names)
@@ -69,9 +80,7 @@ def page(nside):
 
 @pytest.fixture()
 def catalog(page):
-    from unittest.mock import Mock
-
-    catalog = Mock()
+    catalog = unittest.mock.Mock()
     catalog.visibility = None
     catalog.__iter__ = lambda self: iter([page])
 
@@ -79,14 +88,10 @@ def catalog(page):
 
 
 def test_visibility_map(nside, vmap):
-    from unittest.mock import Mock
-
-    from heracles.maps import VisibilityMap
-
     fsky = vmap.mean()
 
     for nside_out in [nside // 2, nside, nside * 2]:
-        catalog = Mock()
+        catalog = unittest.mock.Mock()
         catalog.visibility = vmap
 
         mapper = VisibilityMap(nside_out)
@@ -101,7 +106,7 @@ def test_visibility_map(nside, vmap):
         assert np.isclose(result.mean(), fsky)
 
     # test missing visibility map
-    catalog = Mock()
+    catalog = unittest.mock.Mock()
     catalog.visibility = None
     mapper = VisibilityMap(nside)
     with pytest.raises(ValueError, match="no visibility"):
@@ -109,8 +114,6 @@ def test_visibility_map(nside, vmap):
 
 
 def test_position_map(nside, catalog, vmap):
-    from heracles.maps import PositionMap
-
     # normal mode: compute overdensity maps with metadata
 
     m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
@@ -155,8 +158,6 @@ def test_position_map(nside, catalog, vmap):
 
 
 def test_scalar_map(nside, catalog):
-    from heracles.maps import ScalarMap
-
     m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w"), catalog)
 
     w = next(iter(catalog))["w"]
@@ -185,8 +186,6 @@ def test_scalar_map(nside, catalog):
 
 
 def test_complex_map(nside, catalog):
-    from heracles.maps import ComplexMap
-
     m = map_catalog(ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2), catalog)
 
     w = next(iter(catalog))["w"]
@@ -224,8 +223,6 @@ def test_complex_map(nside, catalog):
 
 
 def test_weight_map(nside, catalog):
-    from heracles.maps import WeightMap
-
     m = map_catalog(WeightMap(nside, "ra", "dec", "w"), catalog)
 
     w = next(iter(catalog))["w"]
@@ -254,8 +251,6 @@ def test_weight_map(nside, catalog):
 
 
 def test_transform_maps():
-    from heracles.maps import transform_maps, update_metadata
-
     nside = 32
     npix = 12 * nside**2
 
@@ -305,8 +300,6 @@ def test_transform_maps():
 
 
 def test_update_metadata():
-    from heracles.maps import update_metadata
-
     a = np.empty(0)
 
     assert a.dtype.metadata is None
@@ -380,8 +373,6 @@ class MockCatalog:
 @pytest.mark.parametrize("Map", [MockMap, MockMapGen])
 @pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(Map, parallel):
-    from heracles.maps import map_catalogs
-
     maps = {"a": Map(), "b": Map(), "z": Map()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
@@ -395,8 +386,6 @@ def test_map_catalogs(Map, parallel):
 
 @pytest.mark.parametrize("Map", [MockMap, MockMapGen])
 def test_map_catalogs_match(Map):
-    from heracles.maps import map_catalogs
-
     maps = {"a": Map(), "b": Map(), "c": Map()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 

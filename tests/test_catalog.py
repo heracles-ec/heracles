@@ -1,12 +1,23 @@
+import gc
+
+import fitsio
+import healpy as hp
 import numpy as np
-import numpy.testing as npt
 import pytest
+
+from heracles.catalog import (
+    ArrayCatalog,
+    Catalog,
+    CatalogBase,
+    CatalogPage,
+    FootprintFilter,
+    InvalidValueFilter,
+)
+from heracles.catalog.fits import FitsCatalog
 
 
 @pytest.fixture()
 def catalog():
-    from heracles.catalog import CatalogBase, CatalogPage
-
     # fix a set of rows to be returned for testing
     size = 100
     x = np.random.rand(size)
@@ -41,8 +52,6 @@ def catalog():
 
 
 def test_catalog_page():
-    from heracles.catalog import CatalogPage
-
     a = [1.0, 2.0, 3.0, 4.0]
     b = [5.0, 6.0, 7.0, 8.0]
 
@@ -50,10 +59,10 @@ def test_catalog_page():
 
     # test basic behaviour
     assert len(page) == 2
-    npt.assert_array_equal(page["a"], a)
-    npt.assert_array_equal(page["b"], b)
-    npt.assert_array_equal(page["a", "b"], [a, b])
-    npt.assert_array_equal(page[["a", "b"]], [a, b])
+    np.testing.assert_array_equal(page["a"], a)
+    np.testing.assert_array_equal(page["b"], b)
+    np.testing.assert_array_equal(page["a", "b"], [a, b])
+    np.testing.assert_array_equal(page[["a", "b"]], [a, b])
 
     # test names attribute
     assert page.names == ["a", "b"]
@@ -64,7 +73,7 @@ def test_catalog_page():
     # test data attribute, which is a readonly view
     data = page.data
     assert list(data.keys()) == ["a", "b"]
-    npt.assert_array_equal(list(data.values()), [a, b])
+    np.testing.assert_array_equal(list(data.values()), [a, b])
     with pytest.raises(TypeError):
         data["a"] = b
 
@@ -102,15 +111,13 @@ def test_catalog_page():
 
 
 def test_catalog_page_get():
-    from heracles.catalog import CatalogPage
-
     a = [np.nan, 2.0, 3.0, 4.0]
     b = [5.0, 6.0, 7.0, 8.0]
 
     page = CatalogPage({"a": a, "b": b})
     with pytest.raises(ValueError, match='column "a"'):
         page.get("a")
-    npt.assert_array_equal(page.get("b"), b)
+    np.testing.assert_array_equal(page.get("b"), b)
     with pytest.raises(ValueError, match='column "a"'):
         page.get("a", "b")
 
@@ -118,7 +125,7 @@ def test_catalog_page_get():
     b[1] = np.nan
 
     page = CatalogPage({"a": a, "b": b})
-    npt.assert_array_equal(page.get("a"), a)
+    np.testing.assert_array_equal(page.get("a"), a)
     with pytest.raises(ValueError, match='column "b"'):
         page.get("b")
     with pytest.raises(ValueError, match='column "b"'):
@@ -127,14 +134,12 @@ def test_catalog_page_get():
     b[1] = 6.0
 
     page = CatalogPage({"a": a, "b": b})
-    npt.assert_array_equal(page.get("a"), a)
-    npt.assert_array_equal(page.get("b"), b)
-    npt.assert_array_equal(page.get("a", "b"), [a, b])
+    np.testing.assert_array_equal(page.get("a"), a)
+    np.testing.assert_array_equal(page.get("b"), b)
+    np.testing.assert_array_equal(page.get("a", "b"), [a, b])
 
 
 def test_catalog_page_immutable():
-    from heracles.catalog import CatalogPage
-
     a = [1.0, 2.0, 3.0, 4.0]
     b = [5.0, 6.0, 7.0, 8.0]
 
@@ -145,8 +150,6 @@ def test_catalog_page_immutable():
 
 
 def test_catalog_base(catalog):
-    from heracles.catalog import Catalog, CatalogBase
-
     # ABC cannot be instantiated directly
     with pytest.raises(TypeError):
         CatalogBase()
@@ -159,8 +162,6 @@ def test_catalog_base(catalog):
 
 
 def test_catalog_base_properties(catalog):
-    from heracles.catalog import CatalogBase
-
     assert catalog.size == catalog.SIZE
     assert catalog.names == list(catalog.DATA.keys())
 
@@ -197,13 +198,11 @@ def test_catalog_base_pagination(catalog):
             assert page.size == page_size
             for k, v in catalog.DATA.items():
                 vp = v[i * page_size : (i + 1) * page_size]
-                npt.assert_array_equal(page[k], vp)
+                np.testing.assert_array_equal(page[k], vp)
         assert i * page_size + page.size == size
 
 
 def test_catalog_base_copy():
-    from heracles.catalog import CatalogBase
-
     class TestCatalog(CatalogBase):
         def __init__(self) -> None:
             super().__init__()
@@ -233,8 +232,6 @@ def test_catalog_base_copy():
 
 
 def test_catalog_view(catalog):
-    from heracles.catalog import Catalog
-
     catalog.visibility = cvis = object()
 
     where = object()
@@ -275,8 +272,6 @@ def test_catalog_view(catalog):
 
 
 def test_invalid_value_filter(catalog):
-    from heracles.catalog import InvalidValueFilter
-
     catalog.DATA["x"][0] = np.nan
     catalog.DATA["y"][1] = np.nan
 
@@ -296,14 +291,10 @@ def test_invalid_value_filter(catalog):
         page = next(iter(catalog))
     assert page.size == catalog.SIZE - 2
     for k, v in catalog.DATA.items():
-        npt.assert_array_equal(page.get(k), v[2:])
+        np.testing.assert_array_equal(page.get(k), v[2:])
 
 
 def test_footprint_filter(catalog):
-    from healpy import ang2pix
-
-    from heracles.catalog import FootprintFilter
-
     # footprint for northern hemisphere
     nside = 8
     m = np.round(np.random.rand(12 * nside**2))
@@ -320,7 +311,7 @@ def test_footprint_filter(catalog):
 
     catalog.add_filter(filt)
 
-    good = m[ang2pix(nside, lon, lat, lonlat=True)] != 0
+    good = m[hp.ang2pix(nside, lon, lat, lonlat=True)] != 0
     assert good.sum() != good.size
 
     page = next(iter(catalog))
@@ -330,8 +321,6 @@ def test_footprint_filter(catalog):
 
 
 def test_array_catalog():
-    from heracles.catalog import ArrayCatalog, Catalog
-
     arr = np.empty(100, [("lon", float), ("lat", float), ("x", float), ("y", float)])
     for name in arr.dtype.names:
         arr[name] = np.random.rand(len(arr))
@@ -350,7 +339,7 @@ def test_array_catalog():
         assert len(page) == 4
         assert page.names == list(arr.dtype.names)
         for k in arr.dtype.names:
-            npt.assert_array_equal(page[k], arr[k])
+            np.testing.assert_array_equal(page[k], arr[k])
     assert i == 0
 
     sel1 = arr["x"] > 0.5
@@ -362,7 +351,7 @@ def test_array_catalog():
         assert len(page) == 4
         assert page.names == list(arr.dtype.names)
         for k in arr.dtype.names:
-            npt.assert_array_equal(page[k], arr[sel1 & sel2][k])
+            np.testing.assert_array_equal(page[k], arr[sel1 & sel2][k])
     assert i == 0
 
     copied = catalog.__copy__()
@@ -373,11 +362,6 @@ def test_array_catalog():
 
 
 def test_fits_catalog(tmp_path):
-    import fitsio
-
-    from heracles.catalog import Catalog
-    from heracles.catalog.fits import FitsCatalog
-
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
     dec = np.random.uniform(-90, 90, size=size)
@@ -437,12 +421,6 @@ def test_fits_catalog(tmp_path):
 
 
 def test_fits_catalog_caching(tmp_path):
-    import gc
-
-    import fitsio
-
-    from heracles.catalog.fits import FitsCatalog
-
     size = 100
     ra = np.random.uniform(-180, 180, size=size)
     dec = np.random.uniform(-90, 90, size=size)

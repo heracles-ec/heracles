@@ -1,7 +1,18 @@
+import itertools
 import unittest.mock
 
+import healpy as hp
 import numpy as np
 import pytest
+
+from heracles.twopoint import (
+    angular_power_spectra,
+    binned_cls,
+    debias_cls,
+    mixing_matrices,
+    pixelate_mms_healpix,
+    random_noisebias,
+)
 
 
 @pytest.fixture()
@@ -16,8 +27,6 @@ def zbins():
 
 @pytest.fixture()
 def mock_alms(zbins):
-    import numpy as np
-
     lmax = 32
 
     Nlm = (lmax + 1) * (lmax + 2) // 2
@@ -35,15 +44,11 @@ def mock_alms(zbins):
 
 
 def test_angular_power_spectra(mock_alms):
-    from itertools import combinations_with_replacement
-
-    from heracles.twopoint import angular_power_spectra
-
     # alms cross themselves
 
     comb = {
         (k1, k2, i1, i2)
-        for (k1, i1), (k2, i2) in combinations_with_replacement(mock_alms, 2)
+        for (k1, i1), (k2, i2) in itertools.combinations_with_replacement(mock_alms, 2)
     }
 
     cls = angular_power_spectra(mock_alms)
@@ -96,8 +101,6 @@ def test_angular_power_spectra(mock_alms):
 
 
 def test_debias_cls():
-    from heracles.twopoint import debias_cls
-
     cls = {
         ("PP", 0, 0): np.zeros(100),
     }
@@ -112,8 +115,6 @@ def test_debias_cls():
 
 
 def test_mixing_matrices():
-    from heracles.twopoint import mixing_matrices
-
     # this only tests the function logic
     # the mixing matrix computation itself is tested elsewhere
 
@@ -150,10 +151,6 @@ def test_mixing_matrices():
 
 
 def test_pixelate_mms_healpix():
-    import healpy as hp
-
-    from heracles.twopoint import pixelate_mms_healpix
-
     nside = 512
     lmax = 1000
 
@@ -180,8 +177,6 @@ def test_pixelate_mms_healpix():
 
 @pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
 def test_binned_cls(weights):
-    from heracles.twopoint import binned_cls
-
     cls = {"key": np.random.randn(21)}
 
     bins = [2, 5, 10, 15, 20]
@@ -219,8 +214,6 @@ def test_binned_cls(weights):
 
 @pytest.mark.parametrize("full", [False, True])
 def test_random_noisebias(full):
-    from heracles.twopoint import random_noisebias
-
     nside = 64
     npix = 12 * nside**2
 

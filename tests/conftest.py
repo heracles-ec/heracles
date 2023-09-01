@@ -1,13 +1,13 @@
+import contextlib
 import warnings
-from contextlib import contextmanager
 
+import numba
 import pytest
-from numba import config
 
-config.DISABLE_JIT = True
+numba.config.DISABLE_JIT = True
 
 
-@contextmanager
+@contextlib.contextmanager
 def warns(*types):
     if types == (None,):
         with warnings.catch_warnings():

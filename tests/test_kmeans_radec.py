@@ -1,8 +1,9 @@
+import numpy as np
+
+from heracles._kmeans_radec import kmeans_sample
+
+
 def test_kmeans_sample():
-    import numpy as np
-
-    from heracles._kmeans_radec import kmeans_sample
-
     npts = 10000
     ncen = 20
 

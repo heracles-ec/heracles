@@ -1,4 +1,23 @@
+import itertools
+
+import fitsio
+import healpy as hp
+import numpy as np
 import pytest
+
+from heracles.io import (
+    read_alms,
+    read_cls,
+    read_cov,
+    read_maps,
+    read_mask,
+    read_mms,
+    write_alms,
+    write_cls,
+    write_cov,
+    write_maps,
+    write_mms,
+)
 
 NFIELDS_TEST = 4
 
@@ -10,8 +29,6 @@ def zbins():
 
 @pytest.fixture()
 def mock_alms(zbins):
-    import numpy as np
-
     lmax = 32
 
     Nlm = (lmax + 1) * (lmax + 2) // 2
@@ -30,8 +47,6 @@ def mock_alms(zbins):
 
 @pytest.fixture()
 def mock_cls():
-    import numpy as np
-
     cl = np.random.rand(101)
     cl.dtype = np.dtype(cl.dtype, metadata={"nside_1": 32, "nside_2": 64})
 
@@ -72,9 +87,6 @@ def datadir(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def mock_mask_fields(nside):
-    import healpy as hp
-    import numpy as np
-
     npix = hp.nside2npix(nside)
     maps = np.random.rand(npix * NFIELDS_TEST).reshape((npix, NFIELDS_TEST))
     pixels = np.unique(np.random.randint(0, npix, npix // 3))
@@ -86,8 +98,6 @@ def mock_mask_fields(nside):
 
 @pytest.fixture(scope="session")
 def mock_writemask_partial(mock_mask_fields, nside, datadir):
-    import fitsio
-
     filename = str(datadir / "mask_partial.fits")
 
     maps, pixels = mock_mask_fields
@@ -117,8 +127,6 @@ def mock_writemask_partial(mock_mask_fields, nside, datadir):
 
 @pytest.fixture(scope="session")
 def mock_writemask_full(mock_mask_fields, nside, datadir):
-    import fitsio
-
     filename = str(datadir / "mask_full.fits")
 
     maps, _ = mock_mask_fields
@@ -142,9 +150,6 @@ def mock_writemask_full(mock_mask_fields, nside, datadir):
 
 @pytest.fixture(scope="session")
 def mock_mask_extra(nside):
-    import healpy as hp
-    import numpy as np
-
     npix = hp.nside2npix(nside)
     maps = np.random.rand(npix)
     pixels = np.unique(np.random.randint(0, npix, npix // 3))
@@ -155,8 +160,6 @@ def mock_mask_extra(nside):
 
 @pytest.fixture(scope="session")
 def mock_writemask_extra(mock_mask_extra, nside, datadir):
-    import fitsio
-
     filename = str(datadir / "mask_extra.fits")
 
     maps, _ = mock_mask_extra
@@ -179,11 +182,6 @@ def mock_writemask_extra(mock_mask_extra, nside, datadir):
 
 
 def test_write_read_maps(tmp_path):
-    import healpy as hp
-    import numpy as np
-
-    from heracles.io import read_maps, write_maps
-
     nside = 4
     npix = 12 * nside**2
 
@@ -216,10 +214,6 @@ def test_write_read_maps(tmp_path):
 
 
 def test_write_read_alms(mock_alms, tmp_path):
-    import numpy as np
-
-    from heracles.io import read_alms, write_alms
-
     write_alms("alms.fits", mock_alms, workdir=str(tmp_path))
     assert (tmp_path / "alms.fits").exists()
     alms = read_alms("alms.fits", workdir=str(tmp_path))
@@ -231,10 +225,6 @@ def test_write_read_alms(mock_alms, tmp_path):
 
 
 def test_write_read_cls(mock_cls, tmp_path):
-    import numpy as np
-
-    from heracles.io import read_cls, write_cls
-
     filename = "test.fits"
     workdir = str(tmp_path)
 
@@ -255,10 +245,6 @@ def test_write_read_cls(mock_cls, tmp_path):
 
 
 def test_write_read_mms(tmp_path):
-    import numpy as np
-
-    from heracles.io import read_mms, write_mms
-
     filename = "test.fits"
     workdir = str(tmp_path)
 
@@ -280,16 +266,10 @@ def test_write_read_mms(tmp_path):
 
 
 def test_write_read_cov(mock_cls, tmp_path):
-    from itertools import combinations_with_replacement
-
-    import numpy as np
-
-    from heracles.io import read_cov, write_cov
-
     workdir = str(tmp_path)
 
     cov = {}
-    for k1, k2 in combinations_with_replacement(mock_cls, 2):
+    for k1, k2 in itertools.combinations_with_replacement(mock_cls, 2):
         cl1, cl2 = mock_cls[k1], mock_cls[k2]
         cov[k1, k2] = np.outer(cl1, cl2)
 
@@ -307,10 +287,6 @@ def test_write_read_cov(mock_cls, tmp_path):
 
 
 def test_read_mask_partial(mock_mask_fields, mock_writemask_partial, nside):
-    import healpy as hp
-
-    from heracles.io import read_mask
-
     maps = mock_mask_fields[0]
 
     mask = read_mask(mock_writemask_partial, nside=nside)
@@ -327,10 +303,6 @@ def test_read_mask_partial(mock_mask_fields, mock_writemask_partial, nside):
 
 
 def test_read_mask_full(mock_mask_fields, mock_writemask_full, nside):
-    import healpy as hp
-
-    from heracles.io import read_mask
-
     maps = mock_mask_fields[0]
 
     mask = read_mask(mock_writemask_full, nside=nside)
@@ -358,8 +330,6 @@ def test_read_mask_extra(
     nside,
     mock_writemask_extra,
 ):
-    from heracles.io import read_mask
-
     maps = mock_mask_fields[0]
     maps_extra = mock_mask_extra[0]
 
