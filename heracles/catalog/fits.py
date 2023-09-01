@@ -141,7 +141,10 @@ class FitsCatalog(CatalogBase):
 
             # see if rows were cached
             try:
-                rows = self._rows if self._rowinfo == (hduid, start, stop) else None
+                if self._rowinfo == (hduid, start, stop):
+                    rows = self._rows
+                else:
+                    rows = None
             except AttributeError:
                 rows = None
 

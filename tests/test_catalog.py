@@ -178,7 +178,7 @@ def test_catalog_base_properties(catalog):
     catalog.add_filter(filt)
     assert catalog.filters == [filt]
     catalog.filters = []
-    assert not catalog.filters
+    assert catalog.filters == []
 
     v = object()
     assert catalog.visibility is None

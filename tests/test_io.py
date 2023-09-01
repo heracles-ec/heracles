@@ -64,7 +64,8 @@ def mock_cls():
 
 @pytest.fixture(scope="session")
 def nside():
-    return 32
+    nside = 32
+    return nside
 
 
 @pytest.fixture(scope="session")
@@ -82,7 +83,7 @@ def mock_mask_fields(nside):
     maps = np.random.rand(npix * NFIELDS_TEST).reshape((npix, NFIELDS_TEST))
     pixels = np.unique(np.random.randint(0, npix, npix // 3))
     maskpix = np.delete(np.arange(0, npix), pixels)
-    for i in range(NFIELDS_TEST):
+    for i in range(0, NFIELDS_TEST):
         maps[:, i][maskpix] = 0
     return [maps, pixels]
 

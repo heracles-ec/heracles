@@ -84,8 +84,8 @@ def postage_stamps(
         set(key[-2:] for key in keys) | set(key[-2:][::-1] for key in trkeys)
     )
 
-    sx = list({i for i, _ in stamps})
-    sy = list({j for _, j in stamps})
+    sx = list(set(i for i, _ in stamps))
+    sy = list(set(j for _, j in stamps))
 
     nx = len(sx)
     ny = len(sy)

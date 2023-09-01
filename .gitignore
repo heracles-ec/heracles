@@ -1,5 +1,4 @@
+heracles/_version.py
+
 __pycache__
-_version.py
 .*.swp
-.envrc
-.ipynb_checkpoints

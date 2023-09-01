@@ -91,7 +91,10 @@ def update_metadata(array, **metadata):
     md.update(metadata)
     # create the new dtype with only the new metadata
     dt = array.dtype
-    dt = dt.fields if dt.fields is not None else dt.str
+    if dt.fields is not None:
+        dt = dt.fields
+    else:
+        dt = dt.str
     dt = np.dtype(dt, metadata=md)
     # check that new dtype is compatible with old one
     if not np.can_cast(dt, array.dtype, casting="no"):
@@ -289,7 +292,10 @@ class PositionMap(HealpixMap, RandomizableMap):
         # compute overdensity if asked to
         if self._overdensity:
             pos /= nbar
-            pos -= 1 if vmap is None else vmap
+            if vmap is None:
+                pos -= 1
+            else:
+                pos -= vmap
             power = 0
         else:
             power = 1
@@ -341,7 +347,11 @@ class ScalarMap(HealpixMap, NormalizableMap):
 
             lon, lat, v = page.get(*col)
 
-            w = np.ones(page.size) if wcol is None else page.get(wcol)
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
             ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_real(wht, val, ipix, w, v)
@@ -452,7 +462,11 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
             lon, lat, re, im = page.get(*col)
 
-            w = np.ones(page.size) if wcol is None else page.get(wcol)
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
             if conjugate:
                 im = -im
 
@@ -548,7 +562,11 @@ class WeightMap(HealpixMap, NormalizableMap):
         def mapper(page: "CatalogPage") -> None:
             lon, lat = page.get(*col)
 
-            w = np.ones(page.size) if wcol is None else page.get(wcol)
+            if wcol is None:
+                w = np.ones(page.size)
+            else:
+                w = page.get(wcol)
+
             ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
             _map_weight(wht, ipix, w)
@@ -636,6 +654,8 @@ def map_catalogs(
             prog.stop()
 
         # collect map generators from results
+        gen = {ki: v for ki, v in results.items() if isinstance(v, Generator)}
+
         # if there are any generators, feed them the catalogue pages
         if gen:
             # get an iterator over each catalogue
@@ -722,7 +742,7 @@ def transform_maps(
         md = m.dtype.metadata or {}
         spin = md.get("spin", 0)
 
-        logger.info(f"transforming {k} map (spin {spin}) for bin {i}")
+        logger.info("transforming %s map (spin %s) for bin %s", k, spin, i)
 
         if spin == 0:
             pol = False

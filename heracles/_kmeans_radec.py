@@ -32,7 +32,7 @@ import numpy as np
 from numpy import deg2rad, rad2deg, pi, sin, cos, arccos, arctan2, newaxis, sqrt
 
 
-_TOL_DEF = 1e-5
+_TOL_DEF = 1.0e-5
 _MAXITER_DEF = 100
 _VERBOSE_DEF = 1
 
@@ -107,8 +107,10 @@ class KMeans:
     km = KMeans(centers)
     labels = km.find_nearest(X)
     """
+    def __init__(self, centers,
+                 tol=_TOL_DEF,
+                 verbose=_VERBOSE_DEF):
 
-    def __init__(self, centers, tol=_TOL_DEF, verbose=_VERBOSE_DEF):
         self.set_centers(centers)
 
         self.tol = float(tol)
@@ -135,17 +137,16 @@ class KMeans:
         ncen, _ = centers.shape
 
         if self.verbose:
-            print(
-                f"X {x.shape} centers {centers.shape} "
-                f"tol = {self.tol:.2g}  maxiter = {maxiter}"
-            )
+            tup = (x.shape, centers.shape, self.tol, maxiter)
+            print("X %s  centers %s  tol = %.2g  maxiter = %d" % tup)
 
         xx, xy, xz = radec2xyz(x[:, 0], x[:, 1])
 
         self.converged = False
         allx = np.arange(n)
         prevdist = 0
-        for jiter in range(1, maxiter + 1):
+        for jiter in range(1, maxiter+1):
+
             # npoints x ncenters
             d = cdist_radec(x, centers)
 
@@ -156,7 +157,7 @@ class KMeans:
             # median ?
             avdist = distances.mean()
             if self.verbose >= 2:
-                print(f"    av |X - nearest centre| = {avdist:.4g}")
+                print("    av |X - nearest centre| = %.4g" % avdist)
 
             self.converged = (1 - self.tol) * prevdist <= avdist <= prevdist
             if self.converged:
@@ -168,12 +169,13 @@ class KMeans:
             prevdist = avdist
             # (1 pass in C)
             for jc in range(ncen):
-                (c,) = np.where(labels == jc)
+                c, = np.where(labels == jc)
                 if len(c) > 0:
                     centers[jc] = get_mean_center(xx[c], xy[c], xz[c])
 
         if self.verbose:
-            print(jiter, "iterations  cluster sizes:", np.bincount(labels))
+            print(jiter, "iterations  cluster "
+                  "sizes:", np.bincount(labels))
 
         self.centers = centers
         self.labels = labels
@@ -227,8 +229,8 @@ class KMeans:
                 r50[j], r90[j] = np.percentile(dist, (50, 90))
         self.r50 = r50.copy()
         self.r90 = r90.copy()
-        print(f"kmeans: cluster 50 {r50.astype(int)} radius")
-        print(f"kmeans: cluster 90 {r90.astype(int)} radius")
+        print("kmeans: cluster 50 % radius", r50.astype(int))
+        print("kmeans: cluster 90 % radius", r90.astype(int))
         # scale L1 / dim, L2 / sqrt(dim) ?
 
 
@@ -273,7 +275,7 @@ def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
 
     n, _ = x.shape
     if nsample is None:
-        nsample = max(2 * np.sqrt(n), 10 * ncen)
+        nsample = max(2*np.sqrt(n), 10*ncen)
 
     # smaller random sample to start with
     xsample = random_sample(x, int(nsample))
@@ -293,7 +295,7 @@ def kmeans_sample(x, ncen, nsample=None, maxiter=_MAXITER_DEF, **kw):
     return km
 
 
-_PIOVER2 = np.pi * 0.5
+_PIOVER2 = np.pi*0.5
 
 
 def cdist_radec(a1, a2):
@@ -326,10 +328,11 @@ def cdist_radec(a1, a2):
     y2 = sintheta * sin(phi2)
     z2 = cos(theta2)
 
-    costheta = x1 * x2 + y1 * y2 + z1 * z2
+    costheta = x1*x2 + y1*y2 + z1*z2
 
     costheta = np.clip(costheta, -1.0, 1.0)
-    return arccos(costheta)
+    theta = arccos(costheta)
+    return theta
 
 
 def random_sample(x, n):
@@ -368,10 +371,9 @@ def _check_dims(x, centers):
     _, dim = x.shape
     ncen, cdim = centers.shape
     if dim != cdim:
-        raise ValueError(
-            f"X {x.shape} and centers {centers.shape} "
-            "must have the same number of columns"
-        )
+        tup = (x.shape, centers.shape)
+        raise ValueError("X %s and centers %s must have the same "
+                         "number of columns" % tup)
 
 
 def get_mean_center(x, y, z):
@@ -391,13 +393,13 @@ def get_mean_center(x, y, z):
     ymean = y.mean()
     zmean = z.mean()
 
-    rmean = sqrt(xmean**2 + ymean**2 + zmean**2)
+    rmean = sqrt(xmean ** 2 + ymean ** 2 + zmean ** 2)
 
     thetamean = arccos(zmean / rmean)
     phimean = arctan2(ymean, xmean)
 
     ramean = rad2deg(phimean)
-    decmean = rad2deg(pi / 2.0 - thetamean)
+    decmean = rad2deg(pi/2.0 - thetamean)
 
     ramean = atbound1(ramean, 0.0, 360.0)
 
@@ -417,6 +419,7 @@ def radec2xyz(ra, dec):
 
 
 def atbound1(longitude_in, minval, maxval):
+
     longitude = longitude_in
     while longitude < minval:
         longitude += 360.0

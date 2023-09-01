@@ -57,7 +57,11 @@ def add_sample(cov, x, y=None):
     """add a sample to a sample covariance matrix"""
 
     x = np.reshape(x, -1)
-    y = x if y is None else np.reshape(y, -1)
+    if y is None:
+        y = x
+    else:
+        y = np.reshape(y, -1)
+
     if x.size != cov.sample_row_mean.size or y.size != cov.sample_col_mean.size:
         raise ValueError("size mismatch between sample and covariance matrix")
 
