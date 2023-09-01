@@ -44,6 +44,13 @@ Homepage = "https://github.com/heracles-ec/heracles"
 Documentation = "https://heracles.readthedocs.io/"
 Issues = "https://github.com/heracles-ec/heracles/issues"
 
+[tool.black]
+force-exclude = """
+(
+  _kmeans_radec.py
+)
+"""
+
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
