@@ -119,13 +119,13 @@ class Map(metaclass=abc.ABCMeta):
 
     """
 
-    def __init__(self, columns: typing.Tuple[typing.Optional[str]]) -> None:
+    def __init__(self, columns: tuple[typing.Optional[str]]) -> None:
         """Initialise the map."""
         self._columns = columns
         super().__init__()
 
     @property
-    def columns(self) -> typing.Tuple[typing.Optional[str]]:
+    def columns(self) -> tuple[typing.Optional[str]]:
         """Return the catalogue columns used by this map."""
         return self._columns
 
@@ -594,14 +594,10 @@ def map_catalogs(
     *,
     parallel: bool = False,
     out: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
-    include: typing.Optional[
-        typing.Sequence[typing.Tuple[typing.Any, typing.Any]]
-    ] = None,
-    exclude: typing.Optional[
-        typing.Sequence[typing.Tuple[typing.Any, typing.Any]]
-    ] = None,
+    include: typing.Optional[typing.Sequence[tuple[typing.Any, typing.Any]]] = None,
+    exclude: typing.Optional[typing.Sequence[tuple[typing.Any, typing.Any]]] = None,
     progress: bool = False,
-) -> typing.Dict[typing.Tuple[typing.Any, typing.Any], MapData]:
+) -> dict[tuple[typing.Any, typing.Any], MapData]:
     """Make maps for a set of catalogues."""
     # the toc dict of maps
     if out is None:
@@ -709,12 +705,12 @@ def map_catalogs(
 
 
 def transform_maps(
-    maps: typing.Mapping[typing.Tuple[typing.Any, typing.Any], MapData],
+    maps: typing.Mapping[tuple[typing.Any, typing.Any], MapData],
     *,
     out: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
     progress: bool = False,
     **kwargs,
-) -> typing.Dict[typing.Tuple[typing.Any, typing.Any], np.ndarray]:
+) -> dict[tuple[typing.Any, typing.Any], np.ndarray]:
     """Transform a set of maps to alms."""
     # the output toc dict
     if out is None:
