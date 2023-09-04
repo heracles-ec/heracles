@@ -47,8 +47,6 @@ jobs:
       - run: pip install -c .github/test-constraints.txt '.[test]'
       - name: Test with tox
         run: tox run
-        env:
-          OS: ${{ matrix.os }}
   build:
     name: Build
     runs-on: ubuntu-latest

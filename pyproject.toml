@@ -113,10 +113,6 @@ legacy_tox_ini = """
         3.10: py310
         3.11: py311
 
-    [gh-actions:env]
-    OS =
-        ubuntu-latest: linux
-
     [testenv]
     commands =
         pytest
@@ -124,5 +120,5 @@ legacy_tox_ini = """
         pytest-rerunfailures
 
     [tox]
-    env_list = py{39,310,311}-{linux}
+    env_list = py{39,310,311}
 """
