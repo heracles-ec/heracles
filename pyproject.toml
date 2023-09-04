@@ -56,6 +56,12 @@ force-exclude = """
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
 
+[tool.pytest.ini_options]
+addopts = "--color=yes -v"
+testpaths = [
+    "tests",
+]
+
 [tool.ruff]
 extend-exclude = [
     "_kmeans_radec.py",
