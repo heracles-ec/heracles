@@ -39,7 +39,7 @@ optional-dependencies = {docs = [
     "pytest",
 ]}
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 urls.Documentation = "https://heracles.readthedocs.io/"
 urls.Homepage = "https://github.com/heracles-ec/heracles"
 urls.Issues = "https://github.com/heracles-ec/heracles/issues"
@@ -92,7 +92,7 @@ select = [
     "W",
     "YTT",
 ]
-target-version = "py38"
+target-version = "py39"
 isort.known-first-party = [
     "heracles",
 ]

@@ -122,13 +122,13 @@ class Map(metaclass=ABCMeta):
 
     """
 
-    def __init__(self, columns: t.Tuple[t.Optional[str]]) -> None:
+    def __init__(self, columns: tuple[t.Optional[str]]) -> None:
         """Initialise the map."""
         self._columns = columns
         super().__init__()
 
     @property
-    def columns(self) -> t.Tuple[t.Optional[str]]:
+    def columns(self) -> tuple[t.Optional[str]]:
         """Return the catalogue columns used by this map."""
         return self._columns
 
@@ -622,10 +622,10 @@ def map_catalogs(
     *,
     parallel: bool = False,
     out: t.MutableMapping[t.Any, t.Any] = None,
-    include: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
-    exclude: t.Optional[t.Sequence[t.Tuple[t.Any, t.Any]]] = None,
+    include: t.Optional[t.Sequence[tuple[t.Any, t.Any]]] = None,
+    exclude: t.Optional[t.Sequence[tuple[t.Any, t.Any]]] = None,
     progress: bool = False,
-) -> t.Dict[t.Tuple[t.Any, t.Any], MapData]:
+) -> dict[tuple[t.Any, t.Any], MapData]:
     """Make maps for a set of catalogues."""
 
     # the toc dict of maps
@@ -729,12 +729,12 @@ def map_catalogs(
 
 
 def transform_maps(
-    maps: t.Mapping[t.Tuple[t.Any, t.Any], MapData],
+    maps: t.Mapping[tuple[t.Any, t.Any], MapData],
     *,
     out: t.MutableMapping[t.Any, t.Any] = None,
     progress: bool = False,
     **kwargs,
-) -> t.Dict[t.Tuple[t.Any, t.Any], np.ndarray]:
+) -> dict[tuple[t.Any, t.Any], np.ndarray]:
     """transform a set of maps to alms"""
 
     # the output toc dict
