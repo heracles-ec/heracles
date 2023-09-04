@@ -36,7 +36,8 @@ optional-dependencies = {docs = [
     "sphinx",
     "sphinxcontrib-katex",
 ], test = [
-    "pytest",
+    "tox",
+    "tox-gh-actions",
 ]}
 readme = "README.md"
 requires-python = ">=3.9"
@@ -103,3 +104,25 @@ all = true
 spaces_indent_inline_array = 4
 trailing_comma_inline_array = true
 overrides."project.classifiers".inline_arrays = false
+
+[tool.tox]
+legacy_tox_ini = """
+    [gh-actions]
+    python =
+        3.9: py39
+        3.10: py310
+        3.11: py311
+
+    [gh-actions:env]
+    OS =
+        ubuntu-latest: linux
+
+    [testenv]
+    commands =
+        pytest
+    deps =
+        pytest-rerunfailures
+
+    [tox]
+    env_list = py{39,310,311}-{linux}
+"""

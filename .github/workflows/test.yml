@@ -45,7 +45,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -c .github/test-constraints.txt '.[test]'
-      - run: pytest tests
+      - name: Test with tox
+        run: tox run
+        env:
+          OS: ${{ matrix.os }}
   build:
     name: Build
     runs-on: ubuntu-latest
