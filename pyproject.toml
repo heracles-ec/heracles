@@ -56,7 +56,9 @@ build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
 
 [tool.ruff]
-extend-exclude = ["heracles/_kmeans_radec.py"]
+extend-exclude = [
+    "_kmeans_radec.py",
+]
 fix = true
 force-exclude = true
 line-length = 100
