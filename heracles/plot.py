@@ -52,7 +52,8 @@ def postage_stamps(
     transpose=None,
     *,
     scale=None,
-    shift_transpose=0,
+    trxshift=0,
+    tryshift=0,
     stampsize=1.0,
     hatch_empty=False,
     linscale=0.01,
@@ -92,7 +93,8 @@ def postage_stamps(
     ny = len(sy)
 
     if trkeys:
-        ny += shift_transpose
+        nx += trxshift
+        ny += tryshift
 
     fig, axes = plt.subplots(
         nx,
@@ -117,11 +119,11 @@ def postage_stamps(
         ki, kj, i, j = key
 
         if n < len(keys):
-            idx = (sx.index(j), sy.index(i))
+            idx = (sx.index(j) + trxshift, sy.index(i))
             cls = (x.get(key) for x in plot)
             axidx.add(idx)
         else:
-            idx = (sx.index(i), sy.index(j) + shift_transpose)
+            idx = (sx.index(i), sy.index(j) + tryshift)
             cls = (x.get(key) for x in transpose)
             traxidx.add(idx)
 
