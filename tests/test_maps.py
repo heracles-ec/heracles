@@ -74,6 +74,7 @@ def catalog(page):
     from unittest.mock import Mock
 
     catalog = Mock()
+    catalog.size = page.size
     catalog.visibility = None
     catalog.__iter__ = lambda self: iter([page])
 
@@ -113,98 +114,143 @@ def test_visibility_map(nside, vmap):
 def test_position_map(nside, catalog, vmap):
     from heracles.maps import PositionMap
 
+    # bias
+    npix = 12 * nside**2
+    bias = (4 * np.pi / npix) * (catalog.size / npix)
+
     # normal mode: compute overdensity maps with metadata
 
     m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
 
-    assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {"spin": 0, "nbar": 4.0, "kernel": "healpix", "power": 0}
+    nbar = 4.0
+    assert m.shape == (npix,)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "nbar": nbar,
+            "kernel": "healpix",
+            "power": 0,
+            "bias": bias / nbar**2,
+        },
+    )
     np.testing.assert_array_equal(m, 0)
 
     # compute number count map
 
     m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
-    assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {"spin": 0, "nbar": 4.0, "kernel": "healpix", "power": 1}
+    assert m.shape == (npix,)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "nbar": 4.0,
+            "kernel": "healpix",
+            "power": 1,
+            "bias": bias,
+        },
+    )
     np.testing.assert_array_equal(m, 4)
 
     # compute overdensity maps with visibility map
 
     catalog.visibility = vmap
+    nbar /= vmap.mean()
 
     m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
 
     assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {
-        "spin": 0,
-        "nbar": 4.0 / vmap.mean(),
-        "kernel": "healpix",
-        "power": 0,
-    }
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "nbar": nbar,
+            "kernel": "healpix",
+            "power": 0,
+            "bias": bias / nbar**2,
+        },
+    )
 
     # compute number count map with visibility map
 
     m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
     assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {
-        "spin": 0,
-        "nbar": 4.0 / vmap.mean(),
-        "kernel": "healpix",
-        "power": 1,
-    }
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "nbar": nbar,
+            "kernel": "healpix",
+            "power": 1,
+            "bias": bias,
+        },
+    )
 
 
 def test_scalar_map(nside, catalog):
     from heracles.maps import ScalarMap
 
+    npix = 12 * nside**2
+
     m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w"), catalog)
 
     w = next(iter(catalog))["w"]
+    v = next(iter(catalog))["g1"]
+    v2 = ((w * v) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    bias = (4 * np.pi / npix / npix) * v2
 
-    assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {
-        "spin": 0,
-        "wbar": wbar,
-        "kernel": "healpix",
-        "power": 0,
-    }
+    assert m.shape == (npix,)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "wbar": wbar,
+            "kernel": "healpix",
+            "power": 0,
+            "bias": bias / wbar**2,
+        },
+    )
     np.testing.assert_array_almost_equal(m, 0)
 
     m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False), catalog)
 
-    assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {
-        "spin": 0,
-        "wbar": wbar,
-        "kernel": "healpix",
-        "power": 1,
-    }
+    assert m.shape == (npix,)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 0,
+            "wbar": wbar,
+            "kernel": "healpix",
+            "power": 1,
+            "bias": bias,
+        },
+    )
     np.testing.assert_array_almost_equal(m, 0)
 
 
 def test_complex_map(nside, catalog):
     from heracles.maps import ComplexMap
 
+    npix = 12 * nside**2
+
     m = map_catalog(ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2), catalog)
 
     w = next(iter(catalog))["w"]
+    re = next(iter(catalog))["g1"]
+    im = next(iter(catalog))["g2"]
+    v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    bias = (4 * np.pi / npix / npix) * v2 / 2
 
-    assert m.shape == (
-        2,
-        12 * nside**2,
+    assert m.shape == (2, npix)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 2,
+            "wbar": wbar,
+            "kernel": "healpix",
+            "power": 0,
+            "bias": bias / wbar**2,
+        },
     )
-    assert m.dtype.metadata == {
-        "spin": 2,
-        "wbar": wbar,
-        "kernel": "healpix",
-        "power": 0,
-    }
     np.testing.assert_array_almost_equal(m, 0)
 
     m = map_catalog(
@@ -212,16 +258,16 @@ def test_complex_map(nside, catalog):
         catalog,
     )
 
-    assert m.shape == (
-        2,
-        12 * nside**2,
+    assert m.shape == (2, npix)
+    assert m.dtype.metadata == pytest.approx(
+        {
+            "spin": 1,
+            "wbar": wbar,
+            "kernel": "healpix",
+            "power": 1,
+            "bias": bias,
+        },
     )
-    assert m.dtype.metadata == {
-        "spin": 1,
-        "wbar": wbar,
-        "kernel": "healpix",
-        "power": 1,
-    }
     np.testing.assert_array_almost_equal(m, 0)
 
 
