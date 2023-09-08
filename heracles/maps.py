@@ -368,6 +368,9 @@ class ScalarMap(HealpixMap, NormalizableMap):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
+            if not page.size:
+                return
+
             lon, lat, v = page.get(*col)
 
             if wcol is None:
@@ -509,6 +512,9 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
             if wcol is not None:
                 page.delete(page[wcol] == 0)
+
+            if not page.size:
+                return
 
             lon, lat, re, im = page.get(*col)
 
