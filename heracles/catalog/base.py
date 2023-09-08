@@ -358,5 +358,5 @@ class CatalogBase(metaclass=ABCMeta):
             for filt in self._filters:
                 filt(page)
 
-            # yield the filtered page, unless empty
+            # yield the filtered page
             yield page
