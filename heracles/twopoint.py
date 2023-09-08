@@ -127,7 +127,7 @@ def debias_cls(cls, bias=None, *, inplace=False):
 
     # subtract bias of each cl in turn
     for key in cls:
-        logger.info("debiasing %s cl for bins %s, %s", *key)
+        logger.info("debiasing %s x %s cl for bins %s, %s", *key)
 
         cl = cls[key]
         md = cl.dtype.metadata or {}
@@ -146,7 +146,10 @@ def debias_cls(cls, bias=None, *, inplace=False):
             b = bias.get(key, 0.0)
 
         # remove bias
-        cl[lmin:] -= b
+        if cl.dtype.names is not None:
+            cl["CL"][lmin:] -= b
+        else:
+            cl[lmin:] -= b
 
         # write noise bias to corrected cl
         update_metadata(cl, bias=b)
@@ -180,7 +183,7 @@ def depixelate_cls(cls, *, inplace=False):
 
     # remove effect of convolution for each cl in turn
     for key in cls:
-        logger.info("depixelate %s cl for bins %s, %s", *key)
+        logger.info("depixelate %s x %s cl for bins %s, %s", *key)
 
         cl = cls[key]
         md = cl.dtype.metadata or {}
@@ -224,13 +227,19 @@ def depixelate_cls(cls, *, inplace=False):
                 msg = f"unknown kernel: {kernel}"
                 raise ValueError(msg)
             if fl is not None:
-                cl[lmin:] /= fl[lmin:]
+                if cl.dtype.names is not None:
+                    cl["CL"][lmin:] /= fl[lmin:]
+                else:
+                    cl[lmin:] /= fl[lmin:]
             areas.append(a)
 
         # scale by area**power
         for a, p in zip(areas, powers):
             if a is not None and p != 0:
-                cl[lmin:] /= a**p
+                if cl.dtype.names is not None:
+                    cl["CL"][lmin:] /= a**p
+                else:
+                    cl[lmin:] /= a**p
 
         # store depixelated cl in output set
         out[key] = cl
@@ -259,6 +268,8 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
     # go through the toc dict of cls and compute mixing matrices
     # which mixing matrix is computed depends on the combination of V/W maps
     for (k1, k2, i1, i2), cl in cls.items():
+        if cl.dtype.names is not None:
+            cl = cl["CL"]
         if k1 == "V" and k2 == "V":
             logger.info("computing 00 mixing matrix for bins %s, %s", i1, i2)
             w00 = mixmat(cl, l1max=l1max, l2max=l2max, l3max=l3max)
