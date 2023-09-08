@@ -46,9 +46,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
           cache-dependency-path: "pyproject.toml"
-      - run: pip install tox tox-gh-actions
-      - name: Test with tox
-        run: tox run
+      - run: pip install -c .github/test-constraints.txt '.[test]'
+      - run: pytest
   build:
     name: Build
     runs-on: ubuntu-latest
