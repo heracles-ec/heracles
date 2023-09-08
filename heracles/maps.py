@@ -266,8 +266,10 @@ class PositionMap(HealpixMap, RandomizableMap):
 
             ngal += page.size
 
-        # call yields here to apply mapper over entire catalogue
+        # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
+
+        # when function resumes, mapping has finished
 
         # get visibility map if present in catalogue
         vmap = catalog.visibility
@@ -287,8 +289,11 @@ class PositionMap(HealpixMap, RandomizableMap):
 
         # compute average number density
         nbar = ngal / npix
-        if vmap is not None:
-            nbar /= np.mean(vmap)
+        if vmap is None:
+            vbar = 1
+        else:
+            vbar = np.mean(vmap)
+            nbar /= vbar
 
         # compute overdensity if asked to
         if self._overdensity:
@@ -298,11 +303,20 @@ class PositionMap(HealpixMap, RandomizableMap):
             else:
                 pos -= vmap
             power = 0
+            bias = 4 * np.pi * vbar**2 / ngal
         else:
             power = 1
+            bias = (4 * np.pi / npix) * (ngal / npix)
 
         # set metadata of array
-        update_metadata(pos, spin=0, nbar=nbar, kernel="healpix", power=power)
+        update_metadata(
+            pos,
+            spin=0,
+            nbar=nbar,
+            kernel="healpix",
+            power=power,
+            bias=bias,
+        )
 
         # return the position map
         return pos
@@ -343,8 +357,14 @@ class ScalarMap(HealpixMap, NormalizableMap):
         wht = np.zeros(npix)
         val = np.zeros(npix)
 
+        # total weighted variance from online algorithm
+        ngal = 0
+        wmean, var = 0.0, 0.0
+
         # go through pages in catalogue and map values
         def mapper(page: "CatalogPage") -> None:
+            nonlocal ngal, wmean, var
+
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -359,25 +379,46 @@ class ScalarMap(HealpixMap, NormalizableMap):
 
             _map_real(wht, val, ipix, w, v)
 
-        # call yields here to apply mapper over entire catalogue
+            ngal += page.size
+            wmean += (w - wmean).sum() / ngal
+            var += ((w * v) ** 2 - var).sum() / ngal
+
+        # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
 
-        # compute average weight in nonzero pixels
-        wbar = wht.mean()
+        # when function resumes, mapping has finished
+
+        # compute mean visibility
+        if catalog.visibility is None:
+            vbar = 1
+        else:
+            vbar = np.mean(catalog.visibility)
+
+        # compute mean weight per visible pixel
+        wbar = ngal / npix / vbar * wmean
 
         # normalise the weight in each pixel if asked to
         if self.normalize:
             wht /= wbar
             power = 0
+            bias = 4 * np.pi * vbar**2 / ngal * (var / wmean**2)
         else:
             power = 1
+            bias = (4 * np.pi / npix) * (ngal / npix) * var
 
         # value was averaged in each pixel for numerical stability
         # now compute the sum
         val *= wht
 
         # set metadata of array
-        update_metadata(val, spin=0, wbar=wbar, kernel="healpix", power=power)
+        update_metadata(
+            val,
+            spin=0,
+            wbar=wbar,
+            kernel="healpix",
+            power=power,
+            bias=bias,
+        )
 
         # return the value map
         return val
@@ -457,9 +498,15 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         wht = np.zeros(npix)
         val = np.zeros((2, npix))
 
+        # total weighted variance from online algorithm
+        ngal = 0
+        wmean, var = 0.0, 0.0
+
         # go through pages in catalogue and get the shear values,
         # randomise if asked to, and do the mapping
         def mapper(page: "CatalogPage") -> None:
+            nonlocal ngal, wmean, var
+
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -483,25 +530,46 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
             _map_complex(wht, val, ipix, w, re, im)
 
-        # call yields here to apply mapper over entire catalogue
+            ngal += page.size
+            wmean += (w - wmean).sum() / ngal
+            var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
+
+        # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
 
-        # compute average weight in nonzero pixels
-        wbar = wht.mean()
+        # when function resumes, mapping has finished
+
+        # compute mean visibility
+        if catalog.visibility is None:
+            vbar = 1
+        else:
+            vbar = np.mean(catalog.visibility)
+
+        # mean weight per visible pixel
+        wbar = ngal / npix / vbar * wmean
 
         # normalise the weight in each pixel if asked to
         if self.normalize:
             wht /= wbar
             power = 0
+            bias = 2 * np.pi * vbar**2 / ngal * (var / wmean**2)
         else:
             power = 1
+            bias = (2 * np.pi / npix) * (ngal / npix) * var
 
         # value was averaged in each pixel for numerical stability
         # now compute the sum
         val *= wht
 
         # set metadata of array
-        update_metadata(val, spin=self.spin, wbar=wbar, kernel="healpix", power=power)
+        update_metadata(
+            val,
+            spin=self.spin,
+            wbar=wbar,
+            kernel="healpix",
+            power=power,
+            bias=bias,
+        )
 
         # return the shear map
         return val
@@ -581,11 +649,15 @@ class WeightMap(HealpixMap, NormalizableMap):
 
             _map_weight(wht, ipix, w)
 
-        # call yields here to apply mapper over entire catalogue
+        # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
+
+        # when function resumes, mapping has finished
 
         # compute average weight in nonzero pixels
         wbar = wht.mean()
+        if catalog.visibility is not None:
+            wbar /= np.mean(catalog.visibility)
 
         # normalise the weight in each pixel if asked to
         if self.normalize:

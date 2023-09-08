@@ -88,13 +88,13 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
         md = {}
         if alm1.dtype.metadata:
             for key, value in alm1.dtype.metadata.items():
-                if key == "noisbias":
+                if key == "bias":
                     md[key] = value if k1 == k2 and i1 == i2 else 0.0
                 else:
                     md[f"{key}_1"] = value
         if alm2.dtype.metadata:
             for key, value in alm2.dtype.metadata.items():
-                if key == "noisbias":
+                if key == "bias":
                     pass
                 else:
                     md[f"{key}_2"] = value
@@ -116,19 +116,16 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
     return cls
 
 
-def debias_cls(cls, noisebias=None, *, inplace=False):
-    """remove noise bias from cls"""
+def debias_cls(cls, bias=None, *, inplace=False):
+    """remove bias from cls"""
 
     logger.info("debiasing %d cl(s)%s", len(cls), " in place" if inplace else "")
     t = time.monotonic()
 
-    # toc dict for noise biases
-    nbs = noisebias or {}
-
     # the output toc dict
     out = cls if inplace else {}
 
-    # subtract noise bias of each cl in turn
+    # subtract bias of each cl in turn
     for key in cls:
         logger.info("debiasing %s cl for bins %s, %s", *key)
 
@@ -142,14 +139,17 @@ def debias_cls(cls, noisebias=None, *, inplace=False):
         # minimum l for correction
         lmin = max(abs(md.get("spin_1", 0)), abs(md.get("spin_2", 0)))
 
-        # get noise bias from explicit dict, if given, or metadata
-        nb = nbs.get(key, md.get("noisbias", 0.0))
+        # get bias from explicit dict, if given, or metadata
+        if bias is None:
+            b = md.get("bias", 0.0)
+        else:
+            b = bias.get(key, 0.0)
 
-        # remove noise bias
-        cl[lmin:] -= nb
+        # remove bias
+        cl[lmin:] -= b
 
         # write noise bias to corrected cl
-        update_metadata(cl, noisbias=nb)
+        update_metadata(cl, bias=b)
 
         # store debiased cl in output set
         out[key] = cl
@@ -425,7 +425,7 @@ def binned_cls(cls, bins, *, weights=None, out=None):
     return out
 
 
-def random_noisebias(
+def random_bias(
     maps,
     catalogs,
     *,
@@ -437,13 +437,13 @@ def random_noisebias(
     progress=False,
     **kwargs,
 ):
-    """noise bias estimate from randomised position and shear maps
+    """bias estimate from randomised maps
 
     The ``include`` and ``exclude`` selection is applied to the maps.
 
     """
 
-    logger.info("estimating two-point noise bias for %d catalog(s)", len(catalogs))
+    logger.info("estimating two-point bias for %d catalog(s)", len(catalogs))
     logger.info("randomising %s maps", ", ".join(map(str, maps)))
     t = time.monotonic()
 
@@ -453,7 +453,7 @@ def random_noisebias(
     # include will be set below after we have the first set of alms
     include_cls = None
     if full:
-        logger.info("estimating cross-noise biases")
+        logger.info("estimating cross-biases")
 
     # set all input maps to randomize
     # store and later reset their initial state
@@ -466,7 +466,7 @@ def random_noisebias(
 
         for n in range(repeat):
             logger.info(
-                "estimating noise bias from randomised maps%s",
+                "estimating bias from randomised maps%s",
                 "" if n == 0 else f" (repeat {n+1})",
             )
 
@@ -495,7 +495,7 @@ def random_noisebias(
             m.randomize = randomize[k]
 
     logger.info(
-        "estimated %d two-point noise biases in %s",
+        "estimated %d two-point biases in %s",
         len(nbs),
         timedelta(seconds=(time.monotonic() - t)),
     )

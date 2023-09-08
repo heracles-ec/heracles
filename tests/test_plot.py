@@ -21,20 +21,20 @@ def test_postage_stamps():
         ("P", "P", 1, 1): cl,
     }
 
-    fig = postage_stamps(plot, transpose, shift_transpose=2, hatch_empty=True)
+    fig = postage_stamps(plot, transpose, trxshift=3, tryshift=2, hatch_empty=True)
 
-    assert len(fig.axes) == 2 * 4
+    assert len(fig.axes) == 5 * 4
 
-    axes = np.reshape(fig.axes, (2, 4))
+    axes = np.reshape(fig.axes, (5, 4))
 
-    for i in range(2):  # rows
-        for j in range(4):  # columns: 2 + shift
+    for i in range(5):  # rows: 2 + trxshift
+        for j in range(4):  # columns: 2 + tryshift
             lines = axes[i, j].get_lines()
-            if i >= j:
+            if i - j > 2:
                 assert len(lines) == 3  # E, B and axhline in lower
-            elif i + 1 == j:
-                assert len(lines) == 0  # empty diagonal
-            else:
+            elif i - j < -1:
                 assert len(lines) == 2  # P and axhline in upper
+            else:
+                assert len(lines) == 0  # empty diagonal
 
     plt.close()

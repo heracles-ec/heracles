@@ -222,8 +222,8 @@ def test_binned_cls(weights):
 
 
 @pytest.mark.parametrize("full", [False, True])
-def test_random_noisebias(full):
-    from heracles.twopoint import random_noisebias
+def test_random_bias(full):
+    from heracles.twopoint import random_bias
 
     nside = 64
     npix = 12 * nside**2
@@ -239,7 +239,7 @@ def test_random_noisebias(full):
     maps = {"A": map_a, "B": map_b}
     catalogs = {0: catalog, 1: catalog}
 
-    nbs = random_noisebias(maps, catalogs, repeat=5, full=full)
+    nbs = random_bias(maps, catalogs, repeat=5, full=full)
 
     for m, r in zip(maps.values(), initial_randomize):
         assert m.randomize is r
@@ -259,7 +259,7 @@ def test_random_noisebias(full):
 
     # filter with include and exclude
 
-    nbs = random_noisebias(
+    nbs = random_bias(
         maps,
         catalogs,
         repeat=5,
