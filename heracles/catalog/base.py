@@ -359,5 +359,4 @@ class CatalogBase(metaclass=ABCMeta):
                 filt(page)
 
             # yield the filtered page, unless empty
-            if page.size > 0:
-                yield page
+            yield page
