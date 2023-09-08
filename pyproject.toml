@@ -37,6 +37,7 @@ optional-dependencies = {docs = [
     "sphinxcontrib-katex",
 ], test = [
     "pytest",
+    "pytest-rerunfailures",
 ]}
 readme = "README.md"
 requires-python = ">=3.9"
@@ -54,6 +55,12 @@ force-exclude = """
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
+
+[tool.pytest.ini_options]
+addopts = "--color=yes -v"
+testpaths = [
+    "tests",
+]
 
 [tool.ruff]
 extend-exclude = [

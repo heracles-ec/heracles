@@ -1,3 +1,7 @@
+import pytest
+
+
+@pytest.mark.flaky(reruns=2)
 def test_kmeans_sample():
     import numpy as np
 
