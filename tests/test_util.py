@@ -37,6 +37,42 @@ def test_toc_filter():
         toc_filter(object())
 
 
+def test_tocdict():
+    from heracles.util import tocdict
+
+    d = tocdict(
+        {
+            ("a", "b", 1): "ab1",
+            ("a", "c", 1): "ac1",
+            ("b", "c", 2): "bc2",
+        },
+    )
+
+    assert d["a", "b", 1] == "ab1"
+    assert d["a", "c", 1] == "ac1"
+    assert d["b", "c", 2] == "bc2"
+    with pytest.raises(KeyError):
+        d["b", "c", 1]
+
+    assert d["a"] == {("a", "b", 1): "ab1", ("a", "c", 1): "ac1"}
+    assert d["a", ..., 1] == {("a", "b", 1): "ab1", ("a", "c", 1): "ac1"}
+    assert d[..., ..., 1] == {("a", "b", 1): "ab1", ("a", "c", 1): "ac1"}
+    assert d[..., "c", 1] == {("a", "c", 1): "ac1"}
+    assert d[..., "c"] == {("a", "c", 1): "ac1", ("b", "c", 2): "bc2"}
+    assert d[..., ..., 2] == {("b", "c", 2): "bc2"}
+    with pytest.raises(KeyError):
+        d["c"]
+
+    d = tocdict(a=1, b=2)
+    assert d["a"] == 1
+    assert d["b"] == 2
+    assert d[...] == d
+
+    d = tocdict(a=1) | tocdict(b=2)
+    assert type(d) is tocdict
+    assert d == {"a": 1, "b": 2}
+
+
 def test_progress():
     from io import StringIO
 

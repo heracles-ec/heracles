@@ -50,6 +50,36 @@ def toc_filter(obj, include=None, exclude=None):
     raise TypeError(msg)
 
 
+class tocdict(dict):
+    """ToC dictionary with filtering"""
+
+    def __getitem__(self, pattern):
+        try:
+            return super().__getitem__(pattern)
+        except (KeyError, TypeError):
+            pass
+        if not isinstance(pattern, tuple):
+            pattern = (pattern,)
+        found = self.__class__()
+        for key, value in self.items():
+            if isinstance(key, tuple):
+                if len(key) < len(pattern):
+                    continue
+                if all(p == k for p, k in zip(pattern, key) if p is not ...):
+                    found[key] = value
+            else:
+                if pattern == (...,) or pattern == (key,):
+                    found[key] = value
+        if not found:
+            raise KeyError(pattern)
+        return found
+
+    def __or__(self, other):
+        result = tocdict(self)
+        result.update(other)
+        return result
+
+
 class Progress:
     """simple progress bar for operations"""
 
