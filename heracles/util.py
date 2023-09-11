@@ -21,6 +21,7 @@
 import os
 import sys
 import time
+from collections import UserDict
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 
@@ -50,34 +51,45 @@ def toc_filter(obj, include=None, exclude=None):
     raise TypeError(msg)
 
 
-class tocdict(dict):
-    """ToC dictionary with filtering"""
+# subclassing UserDict here since that returns the correct type from methods
+# such as __copy__(), __or__(), etx.
+class TocDict(UserDict):
+    """Table-of-contents dictionary with pattern-based lookup"""
 
     def __getitem__(self, pattern):
+        """loop up one or many keys in dict"""
+        # first, see if pattern is a valid entry in the dict
+        # might fail with KeyError (no such entry) or TypeError (not hashable)
         try:
-            return super().__getitem__(pattern)
+            return self.data[pattern]
         except (KeyError, TypeError):
             pass
+        # pattern might be a single object such as e.g. "X"
         if not isinstance(pattern, tuple):
             pattern = (pattern,)
+        # no pattern == matches everything
+        if not pattern:
+            return self.copy()
+        # go through all keys in the dict and match them against the pattern
+        # return an object of the same type
         found = self.__class__()
-        for key, value in self.items():
+        for key, value in self.data.items():
             if isinstance(key, tuple):
+                # key too short, cannot possibly match pattern
                 if len(key) < len(pattern):
                     continue
+                # match every part of pattern against the given key
+                # Ellipsis (...) is a wildcard and comparison is skipped
                 if all(p == k for p, k in zip(pattern, key) if p is not ...):
                     found[key] = value
             else:
+                # key is a single entry, pattern must match it
                 if pattern == (...,) or pattern == (key,):
                     found[key] = value
+        # nothing matched the pattern, treat as usual dict lookup error
         if not found:
             raise KeyError(pattern)
         return found
-
-    def __or__(self, other):
-        result = tocdict(self)
-        result.update(other)
-        return result
 
 
 class Progress:

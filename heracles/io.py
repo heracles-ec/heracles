@@ -25,7 +25,7 @@ import fitsio
 import healpy as hp
 import numpy as np
 
-from .util import toc_match, tocdict
+from .util import TocDict, toc_match
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
     path = os.path.join(workdir, filename)
 
     # the returned set of maps
-    maps = tocdict()
+    maps = TocDict()
 
     # open the FITS file for reading
     with fitsio.FITS(path) as fits:
@@ -313,7 +313,7 @@ def read_alms(filename, workdir=".", *, include=None, exclude=None):
     path = os.path.join(workdir, filename)
 
     # the returned set of alms
-    alms = tocdict()
+    alms = TocDict()
 
     # open the FITS file for reading
     with fitsio.FITS(path) as fits:
@@ -439,7 +439,7 @@ def read_cls(filename, workdir=".", *, include=None, exclude=None):
     path = os.path.join(workdir, filename)
 
     # the returned set of cls
-    cls = tocdict()
+    cls = TocDict()
 
     # open the FITS file for reading
     with fitsio.FITS(path) as fits:
@@ -550,7 +550,7 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
     path = os.path.join(workdir, filename)
 
     # the returned set of mms
-    mms = tocdict()
+    mms = TocDict()
 
     # open the FITS file for reading
     with fitsio.FITS(path) as fits:
@@ -671,7 +671,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
     path = os.path.join(workdir, filename)
 
     # the returned set of covariances
-    cov = tocdict()
+    cov = TocDict()
 
     # open the FITS file for reading
     with fitsio.FITS(path) as fits:

@@ -38,9 +38,11 @@ def test_toc_filter():
 
 
 def test_tocdict():
-    from heracles.util import tocdict
+    from copy import copy, deepcopy
 
-    d = tocdict(
+    from heracles.util import TocDict
+
+    d = TocDict(
         {
             ("a", "b", 1): "ab1",
             ("a", "c", 1): "ac1",
@@ -63,13 +65,18 @@ def test_tocdict():
     with pytest.raises(KeyError):
         d["c"]
 
-    d = tocdict(a=1, b=2)
+    d = TocDict(a=1, b=2)
     assert d["a"] == 1
     assert d["b"] == 2
     assert d[...] == d
+    assert d[()] == d
 
-    d = tocdict(a=1) | tocdict(b=2)
-    assert type(d) is tocdict
+    assert type(d.copy()) == type(d)
+    assert type(copy(d)) == type(d)
+    assert type(deepcopy(d)) == type(d)
+
+    d = TocDict(a=1) | TocDict(b=2)
+    assert type(d) is TocDict
     assert d == {"a": 1, "b": 2}
 
 

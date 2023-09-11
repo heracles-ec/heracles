@@ -36,7 +36,7 @@ from .maps import (
 from .maps import (
     update_metadata,
 )
-from .util import toc_match, tocdict
+from .util import TocDict, toc_match
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 
     # compute cls for all alm pairs
     # do not compute duplicates
-    cls = tocdict()
+    cls = TocDict()
     for ((k1, i1), alm1), ((k2, i2), alm2) in alm_pairs:
         # get the two-point code in standard order
         if (k1, k2) not in twopoint_names and (k2, k1) in twopoint_names:
@@ -123,7 +123,7 @@ def debias_cls(cls, bias=None, *, inplace=False):
     t = time.monotonic()
 
     # the output toc dict
-    out = cls if inplace else tocdict()
+    out = cls if inplace else TocDict()
 
     # subtract bias of each cl in turn
     for key in cls:
@@ -176,7 +176,7 @@ def depixelate_cls(cls, *, inplace=False):
     }
 
     # the output toc dict
-    out = cls if inplace else tocdict()
+    out = cls if inplace else TocDict()
 
     # remove effect of convolution for each cl in turn
     for key in cls:
@@ -254,7 +254,7 @@ def mixing_matrices(cls, *, l1max=None, l2max=None, l3max=None):
     logger.info("using L1MAX = %s, L2MAX = %s, L3MAX = %s", l1max, l2max, l3max)
 
     # set of computed mixing matrices
-    mms = tocdict()
+    mms = TocDict()
 
     # go through the toc dict of cls and compute mixing matrices
     # which mixing matrix is computed depends on the combination of V/W maps
@@ -320,7 +320,7 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
     fl2 = fl2[:, np.newaxis]
 
     # the output toc dict
-    out = mms if inplace else tocdict()
+    out = mms if inplace else TocDict()
 
     # apply discretisation kernel from cl to each mm in turn
     for key in mms:
@@ -372,7 +372,7 @@ def binned_cls(cls, bins, *, weights=None, out=None):
     m = len(bins)
 
     if out is None:
-        out = tocdict()
+        out = TocDict()
 
     for key, cl in cls.items():
         ell = np.arange(len(cl))
@@ -462,7 +462,7 @@ def random_bias(
         for m in maps.values():
             m.randomize = True
 
-        nbs = tocdict()
+        nbs = TocDict()
 
         for n in range(repeat):
             logger.info(
