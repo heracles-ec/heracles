@@ -29,7 +29,7 @@ import healpy as hp
 import numpy as np
 from numba import njit
 
-from .util import Progress, toc_match
+from .util import Progress, TocDict, toc_match
 
 if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
@@ -702,7 +702,7 @@ def map_catalogs(
 
     # the toc dict of maps
     if out is None:
-        out = {}
+        out = TocDict()
 
     # display a progress bar if asked to
     if progress:
@@ -811,7 +811,7 @@ def transform_maps(
 
     # the output toc dict
     if out is None:
-        out = {}
+        out = TocDict()
 
     # display a progress bar if asked to
     if progress:
