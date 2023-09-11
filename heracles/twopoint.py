@@ -146,10 +146,10 @@ def debias_cls(cls, bias=None, *, inplace=False):
             b = bias.get(key, 0.0)
 
         # remove bias
-        if cl.dtype.names is not None:
-            cl["CL"][lmin:] -= b
-        else:
+        if cl.dtype.names is None:
             cl[lmin:] -= b
+        else:
+            cl["CL"][lmin:] -= b
 
         # write noise bias to corrected cl
         update_metadata(cl, bias=b)
@@ -227,19 +227,19 @@ def depixelate_cls(cls, *, inplace=False):
                 msg = f"unknown kernel: {kernel}"
                 raise ValueError(msg)
             if fl is not None:
-                if cl.dtype.names is not None:
-                    cl["CL"][lmin:] /= fl[lmin:]
-                else:
+                if cl.dtype.names is None:
                     cl[lmin:] /= fl[lmin:]
+                else:
+                    cl["CL"][lmin:] /= fl[lmin:]
             areas.append(a)
 
         # scale by area**power
         for a, p in zip(areas, powers):
             if a is not None and p != 0:
-                if cl.dtype.names is not None:
-                    cl["CL"][lmin:] /= a**p
-                else:
+                if cl.dtype.names is None:
                     cl[lmin:] /= a**p
+                else:
+                    cl["CL"][lmin:] /= a**p
 
         # store depixelated cl in output set
         out[key] = cl
