@@ -57,7 +57,7 @@ class TocDict(UserDict):
     """Table-of-contents dictionary with pattern-based lookup"""
 
     def __getitem__(self, pattern):
-        """loop up one or many keys in dict"""
+        """look up one or many keys in dict"""
         # first, see if pattern is a valid entry in the dict
         # might fail with KeyError (no such entry) or TypeError (not hashable)
         try:
