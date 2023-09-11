@@ -52,7 +52,7 @@ def toc_filter(obj, include=None, exclude=None):
 
 
 # subclassing UserDict here since that returns the correct type from methods
-# such as __copy__(), __or__(), etx.
+# such as __copy__(), __or__(), etc.
 class TocDict(UserDict):
     """Table-of-contents dictionary with pattern-based lookup"""
 
