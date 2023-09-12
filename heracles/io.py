@@ -25,7 +25,7 @@ import fitsio
 import healpy as hp
 import numpy as np
 
-from .util import TocDict, toc_match
+from .core import TocDict, toc_match
 
 logger = logging.getLogger(__name__)
 

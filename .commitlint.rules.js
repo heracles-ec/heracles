@@ -5,7 +5,16 @@ module.exports = {
     "scope-enum": [
       2,
       "always",
-      ["catalog", "covariance", "io", "maps", "plot", "twopoint", "util"],
+      [
+        "catalog",
+        "core",
+        "covariance",
+        "io",
+        "maps",
+        "plot",
+        "twopoint",
+        "util",
+      ],
     ],
     "scope-case": [0, "always", "lower-case"],
     "type-enum": [
