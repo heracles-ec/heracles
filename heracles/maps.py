@@ -29,7 +29,7 @@ import healpy as hp
 import numpy as np
 from numba import njit
 
-from .util import Progress, TocDict, toc_match
+from .core import TocDict, toc_match
 
 if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
@@ -706,6 +706,8 @@ def map_catalogs(
 
     # display a progress bar if asked to
     if progress:
+        from .util import Progress
+
         prog = Progress()
 
     # collect groups of catalogues to go through if parallel
@@ -815,6 +817,8 @@ def transform_maps(
 
     # display a progress bar if asked to
     if progress:
+        from .util import Progress
+
         prog = Progress()
         prog.start(len(maps))
 

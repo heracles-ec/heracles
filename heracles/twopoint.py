@@ -27,6 +27,7 @@ import healpy as hp
 import numpy as np
 from convolvecl import mixmat, mixmat_eb
 
+from .core import TocDict, toc_match
 from .maps import (
     map_catalogs as _map_catalogs,
 )
@@ -36,7 +37,6 @@ from .maps import (
 from .maps import (
     update_metadata,
 )
-from .util import TocDict, toc_match
 
 logger = logging.getLogger(__name__)
 
