@@ -373,65 +373,94 @@ def pixelate_mms_healpix(mms, nside, *, inplace=False):
     return out
 
 
-def binned_cls(cls, bins, *, weights=None, out=None):
-    """compute binned angular power spectra"""
+def bin2pt(arr, bins, name, *, weights=None):
+    """Compute binned two-point data."""
 
     def norm(a, b):
         """divide a by b if a is nonzero"""
-        return np.divide(a, b, where=(a != 0), out=np.zeros_like(a))
+        out = np.zeros(np.broadcast(a, b).shape)
+        return np.divide(a, b, where=(a != 0), out=out)
 
-    m = len(bins)
+    # flatten list of bins
+    bins = np.reshape(bins, -1)
+    m = bins.size
+
+    # shape of the data
+    n, *ds = np.shape(arr)
+    ell = np.arange(n)
+
+    # weights from string or given array
+    if weights is None:
+        w = np.ones(n)
+    elif isinstance(weights, str):
+        if weights == "l(l+1)":
+            w = ell * (ell + 1)
+        elif weights == "2l+1":
+            w = 2 * ell + 1
+        else:
+            msg = f"unknown weights string: {weights}"
+            raise ValueError(msg)
+    else:
+        w = np.asanyarray(weights)[:n]
+
+    # create the structured output array
+    # if input data is multi-dimensional, then so will the `name` column be
+    binned = np.empty(
+        m - 1,
+        [
+            ("L", float),
+            (name, float, ds) if ds else (name, float),
+            ("LMIN", float),
+            ("LMAX", float),
+            ("W", float),
+        ],
+    )
+
+    # get the bin index for each ell
+    i = np.digitize(ell, bins)
+
+    assert i.size == ell.size
+
+    # get the binned weights
+    wb = np.bincount(i, weights=w, minlength=m)[1:m]
+
+    # bin data in ell
+    binned["L"] = norm(np.bincount(i, w * ell, m)[1:m], wb)
+    for j in np.ndindex(*ds):
+        x = (slice(None), *j)
+        binned[name][x] = norm(np.bincount(i, w * arr[x], m)[1:m], wb)
+
+    # add bin edges
+    binned["LMIN"] = bins[:-1]
+    binned["LMAX"] = bins[1:]
+
+    # add weights
+    binned["W"] = wb
+
+    # all done
+    return binned
+
+
+def binned_cls(cls, bins, *, weights=None, out=None):
+    """compute binned angular power spectra"""
 
     if out is None:
         out = TocDict()
 
     for key, cl in cls.items():
-        ell = np.arange(len(cl))
+        out[key] = bin2pt(cl, bins, "CL", weights=weights)
 
-        if weights is None:
-            w = np.ones_like(cl)
-        elif isinstance(weights, str):
-            if weights == "l(l+1)":
-                w = ell * (ell + 1)
-            elif weights == "2l+1":
-                w = 2 * ell + 1
-            else:
-                msg = f"unknown weights string: {weights}"
-                raise ValueError(msg)
-        else:
-            w = weights[: len(cl)]
+    return out
 
-        # create the output data
-        binned = np.empty(
-            m - 1,
-            [
-                ("L", float),
-                ("CL", float),
-                ("LMIN", float),
-                ("LMAX", float),
-                ("W", float),
-            ],
-        )
 
-        # get the bin index for each ell
-        i = np.digitize(ell, bins)
+def binned_mms(mms, bins, *, weights=None, out=None):
+    """compute binned mixing matrices"""
 
-        # get the binned weights
-        wb = np.bincount(i, weights=w, minlength=m)[1:m]
+    if out is None:
+        out = TocDict()
 
-        # bin everything
-        binned["L"] = norm(np.bincount(i, weights=w * ell, minlength=m)[1:m], wb)
-        binned["CL"] = norm(np.bincount(i, weights=w * cl, minlength=m)[1:m], wb)
-
-        # add bin edges
-        binned["LMIN"] = bins[:-1]
-        binned["LMAX"] = bins[1:]
-
-        # add weights
-        binned["W"] = wb
-
-        # store result
-        out[key] = binned
+    for key, mm in mms.items():
+        out[key] = bin2pt(mm, bins, "MM", weights=weights)
 
     return out
 
