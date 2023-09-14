@@ -221,6 +221,50 @@ def test_binned_cls(weights):
         np.testing.assert_array_almost_equal(result[key]["W"], binned_w)
 
 
+@pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
+@pytest.mark.parametrize("ndim", [1, 2, 3])
+def test_bin2pt(ndim, weights):
+    from heracles.twopoint import bin2pt
+
+    data = np.random.randn(*[21, 31, 41][:ndim])
+
+    bins = [2, 5, 10, 15, 20]
+
+    if weights == "<rand>":
+        weights_ = np.random.rand(51)
+    else:
+        weights_ = weights
+
+    result = bin2pt(data, bins, "XY", weights=weights_)
+
+    ell = np.arange(len(data))
+
+    if weights is None:
+        w = np.ones_like(ell)
+    elif weights == "l(l+1)":
+        w = ell * (ell + 1)
+    elif weights == "2l+1":
+        w = 2 * ell + 1
+    else:
+        w = weights_[: len(ell)]
+
+    binned_ell = np.empty(len(bins) - 1)
+    binned_xy = np.empty((len(bins) - 1, *data.shape[1:]))
+    binned_w = np.empty(len(bins) - 1)
+    for i, (a, b) in enumerate(zip(bins[:-1], bins[1:])):
+        inbin = (a <= ell) & (ell < b)
+        binned_ell[i] = np.average(ell[inbin], weights=w[inbin])
+        for j in np.ndindex(*binned_xy.shape[1:]):
+            binned_xy[(i, *j)] = np.average(data[(inbin, *j)], weights=w[inbin])
+        binned_w[i] = w[inbin].sum()
+
+    np.testing.assert_array_almost_equal(result["L"], binned_ell)
+    np.testing.assert_array_almost_equal(result["XY"], binned_xy)
+    np.testing.assert_array_equal(result["LMIN"], bins[:-1])
+    np.testing.assert_array_equal(result["LMAX"], bins[1:])
+    np.testing.assert_array_almost_equal(result["W"], binned_w)
+
+
 @pytest.mark.parametrize("full", [False, True])
 def test_random_bias(full):
     from heracles.twopoint import random_bias
