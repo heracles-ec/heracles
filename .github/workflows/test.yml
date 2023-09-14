@@ -47,7 +47,9 @@ jobs:
           cache: "pip"
           cache-dependency-path: "pyproject.toml"
       - run: pip install -c .github/test-constraints.txt '.[test]'
-      - run: pytest
+      - run: pytest --cov --cov-report=lcov
+      - name: Coverage
+        uses: coverallsapp/github-action@v2
   build:
     name: Build
     runs-on: ubuntu-latest

@@ -4,5 +4,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/heracles)](https://www.python.org)
 [![Documentation](https://readthedocs.org/projects/heracles/badge/?version=latest)](https://heracles.readthedocs.io/en/latest/?badge=latest)
 [![Test](https://github.com/heracles-ec/heracles/actions/workflows/test.yml/badge.svg)](https://github.com/heracles-ec/heracles/actions/workflows/test.yml)
+[![Coverage](https://coveralls.io/repos/github/heracles-ec/heracles/badge.svg?branch=main)](https://coveralls.io/github/heracles-ec/heracles?branch=main)
 
 The _Heracles_ code was developed in the _Euclid_ Science Ground Segment.

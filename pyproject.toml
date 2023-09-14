@@ -45,6 +45,7 @@ optional-dependencies = {all = [
 ], test = [
     "ducc0",
     "pytest",
+    "pytest-cov",
     "pytest-rerunfailures",
 ]}
 readme = "README.md"
@@ -57,6 +58,12 @@ heracles = "heracles.cli:main"
 Documentation = "https://heracles.readthedocs.io/"
 Homepage = "https://github.com/heracles-ec/heracles"
 Issues = "https://github.com/heracles-ec/heracles/issues"
+
+[tool.coverage]
+report = {skip_covered = true, sort = "cover"}
+run = {branch = true, parallel = true, source = [
+    "heracles",
+]}
 
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
