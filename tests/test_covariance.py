@@ -2,15 +2,15 @@ import numpy as np
 import pytest
 
 
-def test_sample_covariance():
+def test_sample_covariance(random_generator):
     from heracles.covariance import SampleCovariance, add_sample
 
     n = 10
     size = 3
     size2 = 5
 
-    samples = [np.random.randn(size) for _ in range(n)]
-    samples2 = [np.random.randn(size2) for _ in range(n)]
+    samples = [random_generator.standard_normal(size) for _ in range(n)]
+    samples2 = [random_generator.standard_normal(size2) for _ in range(n)]
 
     cov = SampleCovariance(size)
 
@@ -53,7 +53,7 @@ def test_sample_covariance():
         add_sample(cov, np.zeros(size + 1), np.zeros(size2 - 1))
 
 
-def test_update_covariance():
+def test_update_covariance(random_generator):
     from itertools import combinations_with_replacement
 
     from heracles.covariance import update_covariance
@@ -62,7 +62,7 @@ def test_update_covariance():
 
     cov = {}
 
-    sample = {i: np.random.randn(i + 1) for i in range(n)}
+    sample = {i: random_generator.standard_normal(i + 1) for i in range(n)}
     update_covariance(cov, sample)
 
     assert len(cov) == n * (n + 1) // 2
@@ -71,7 +71,7 @@ def test_update_covariance():
         assert cov[k1, k2].shape == (sample[k1].size, sample[k2].size)
         assert np.all(cov[k1, k2] == 0)
 
-    sample2 = {i: np.random.randn(i + 1) for i in range(n)}
+    sample2 = {i: random_generator.standard_normal(i + 1) for i in range(n)}
     update_covariance(cov, sample2)
 
     assert len(cov) == n * (n + 1) // 2

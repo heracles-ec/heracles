@@ -35,6 +35,7 @@ if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
 
 logger = logging.getLogger(__name__)
+_RANDOM_SEED = 30
 
 
 def _nativebyteorder(fn):
@@ -242,7 +243,6 @@ class PositionMap(HealpixMap, RandomizableMap):
 
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map the given catalogue."""
-
         # get catalogue column definition
         col = self.columns
 
@@ -285,7 +285,8 @@ class PositionMap(HealpixMap, RandomizableMap):
                 p = np.full(npix, 1 / npix)
             else:
                 p = vmap / np.sum(vmap)
-            pos[:] = np.random.multinomial(ngal, p)
+            rng = np.random.default_rng(_RANDOM_SEED)
+            pos[:] = rng.multinomial(ngal, p)
 
         # compute average number density
         nbar = ngal / npix
@@ -521,7 +522,8 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
                 im = -im
 
             if randomize:
-                a = np.random.uniform(0.0, 2 * np.pi, size=page.size)
+                rng = np.random.default_rng(_RANDOM_SEED)
+                a = rng.uniform(0.0, 2 * np.pi, size=page.size)
                 r = np.hypot(re, im)
                 re, im = r * np.cos(a), r * np.sin(a)
                 del a, r

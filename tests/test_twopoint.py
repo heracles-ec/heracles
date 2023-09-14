@@ -15,7 +15,7 @@ def zbins():
 
 
 @pytest.fixture
-def mock_alms(zbins):
+def mock_alms(random_generator, zbins):
     import numpy as np
 
     lmax = 32
@@ -27,7 +27,7 @@ def mock_alms(zbins):
     alms = {}
     for n in names:
         for i in zbins:
-            a = np.random.randn(Nlm, 2) @ [1, 1j]
+            a = random_generator.standard_normal((Nlm, 2)) @ [1, 1j]
             a.dtype = np.dtype(a.dtype, metadata={"nside": 32})
             alms[n, i] = a
 
@@ -111,14 +111,14 @@ def test_debias_cls():
     assert np.all(cls["PP", 0, 0] == -1.23)
 
 
-def test_mixing_matrices():
+def test_mixing_matrices(random_generator):
     from heracles.twopoint import mixing_matrices
 
     # this only tests the function logic
     # the mixing matrix computation itself is tested elsewhere
 
     lmax = 20
-    cl = np.random.randn(lmax + 1)
+    cl = random_generator.standard_normal(lmax + 1)
 
     # compute pos-pos
     cls = {("V", "V", 0, 1): cl}
@@ -179,15 +179,15 @@ def test_pixelate_mms_healpix():
 
 
 @pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
-def test_binned_cls(weights):
+def test_binned_cls(random_generator, weights):
     from heracles.twopoint import binned_cls
 
-    cls = {"key": np.random.randn(21)}
+    cls = {"key": random_generator.standard_normal(21)}
 
     bins = [2, 5, 10, 15, 20]
 
     if weights == "<rand>":
-        weights_ = np.random.rand(40)
+        weights_ = random_generator.random(40)
     else:
         weights_ = weights
 
@@ -223,15 +223,15 @@ def test_binned_cls(weights):
 
 @pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
 @pytest.mark.parametrize("ndim", [1, 2, 3])
-def test_bin2pt(ndim, weights):
+def test_bin2pt(ndim, random_generator, weights):
     from heracles.twopoint import bin2pt
 
-    data = np.random.randn(*[21, 31, 41][:ndim])
+    data = random_generator.standard_normal((21, 31, 41)[:ndim])
 
     bins = [2, 5, 10, 15, 20]
 
     if weights == "<rand>":
-        weights_ = np.random.rand(51)
+        weights_ = random_generator.random(51)
     else:
         weights_ = weights
 
@@ -266,7 +266,7 @@ def test_bin2pt(ndim, weights):
 
 
 @pytest.mark.parametrize("full", [False, True])
-def test_random_bias(full):
+def test_random_bias(full, random_generator):
     from heracles.twopoint import random_bias
 
     nside = 64
@@ -275,8 +275,8 @@ def test_random_bias(full):
     catalog = unittest.mock.Mock()
     catalog.visibility = None
 
-    map_a = unittest.mock.Mock(side_effect=lambda _: np.random.rand(npix))
-    map_b = unittest.mock.Mock(side_effect=lambda _: np.random.rand(npix))
+    map_a = unittest.mock.Mock(side_effect=lambda _: random_generator.random(npix))
+    map_b = unittest.mock.Mock(side_effect=lambda _: random_generator.random(npix))
 
     initial_randomize = [map_a.randomize, map_b.randomize]
 
