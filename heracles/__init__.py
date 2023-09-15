@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 _logger = logging.getLogger(__name__)
 
 _formatter = logging.Formatter(
-    "%(levelname)s [%(asctime)s] sleplet: %(message)s",
+    "%(levelname)s [%(asctime)s] heracles: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 _console_handler = logging.StreamHandler()
