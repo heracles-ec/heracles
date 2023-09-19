@@ -379,9 +379,10 @@ class ScalarMap(HealpixMap, NormalizableMap):
 
             _map_real(wht, val, ipix, w, v)
 
-            ngal += page.size
-            wmean += (w - wmean).sum() / ngal
-            var += ((w * v) ** 2 - var).sum() / ngal
+            if page.size:
+                ngal += page.size
+                wmean += (w - wmean).sum() / ngal
+                var += ((w * v) ** 2 - var).sum() / ngal
 
         # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
@@ -530,9 +531,10 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
             _map_complex(wht, val, ipix, w, re, im)
 
-            ngal += page.size
-            wmean += (w - wmean).sum() / ngal
-            var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
+            if page.size:
+                ngal += page.size
+                wmean += (w - wmean).sum() / ngal
+                var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
 
         # the mapper function is yield-ed to be applied over the catalogue
         yield mapper
