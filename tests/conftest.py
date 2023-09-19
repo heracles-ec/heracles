@@ -26,13 +26,5 @@ def warns(*types):
 
 
 @pytest.fixture(scope="session")
-def random_generator(random_seed: int = 50) -> np.random.Generator:
-    """A generator object consistent across all tests
-
-    Args:
-        random_seed: A seed to initialise the BitGenerator
-
-    Returns:
-        The initialised generator object
-    """
-    return np.random.default_rng(random_seed)
+def rng(seed: int = 50) -> np.random.Generator:
+    return np.random.default_rng(seed)

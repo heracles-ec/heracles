@@ -30,12 +30,12 @@ def sigma_e():
 
 
 @pytest.fixture
-def vmap(nside, random_generator):
-    return np.round(random_generator.random(12 * nside**2))
+def vmap(nside, rng):
+    return np.round(rng.random(12 * nside**2))
 
 
 @pytest.fixture
-def page(nside, random_generator):
+def page(nside, rng):
     from unittest.mock import Mock
 
     ipix = np.ravel(
@@ -47,9 +47,9 @@ def page(nside, random_generator):
 
     size = ra.size
 
-    w = random_generator.random((size // 4, 4))
-    g1 = random_generator.standard_normal((size // 4, 4))
-    g2 = random_generator.standard_normal((size // 4, 4))
+    w = rng.random((size // 4, 4))
+    g1 = rng.standard_normal((size // 4, 4))
+    g2 = rng.standard_normal((size // 4, 4))
     g1 -= np.sum(w * g1, axis=-1, keepdims=True) / np.sum(w, axis=-1, keepdims=True)
     g2 -= np.sum(w * g2, axis=-1, keepdims=True) / np.sum(w, axis=-1, keepdims=True)
     w, g1, g2 = w.reshape(-1), g1.reshape(-1), g2.reshape(-1)
@@ -301,15 +301,15 @@ def test_weight_map(nside, catalog):
     np.testing.assert_array_almost_equal(m, w)
 
 
-def test_transform_maps(random_generator):
+def test_transform_maps(rng):
     from heracles.maps import transform_maps, update_metadata
 
     nside = 32
     npix = 12 * nside**2
 
-    t = random_generator.standard_normal(npix)
+    t = rng.standard_normal(npix)
     update_metadata(t, spin=0, a=1)
-    p = random_generator.standard_normal((2, npix))
+    p = rng.standard_normal((2, npix))
     update_metadata(p, spin=2, b=2)
 
     # single scalar map

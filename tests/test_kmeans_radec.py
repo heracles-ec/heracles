@@ -2,7 +2,7 @@ import pytest
 
 
 @pytest.mark.flaky(reruns=2)
-def test_kmeans_sample(random_generator):
+def test_kmeans_sample(rng):
     import numpy as np
 
     from heracles._kmeans_radec import kmeans_sample
@@ -11,8 +11,8 @@ def test_kmeans_sample(random_generator):
     ncen = 20
 
     pts = np.empty((npts, 2))
-    pts[:, 0] = random_generator.uniform(-180, 180, size=npts)
-    pts[:, 1] = np.degrees(np.arcsin(random_generator.uniform(-1, 1, size=npts)))
+    pts[:, 0] = rng.uniform(-180, 180, size=npts)
+    pts[:, 1] = np.degrees(np.arcsin(rng.uniform(-1, 1, size=npts)))
 
     km = kmeans_sample(pts, ncen, verbose=2)
 

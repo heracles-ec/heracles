@@ -9,7 +9,7 @@ def zbins():
 
 
 @pytest.fixture
-def mock_alms(random_generator, zbins):
+def mock_alms(rng, zbins):
     import numpy as np
 
     lmax = 32
@@ -21,7 +21,7 @@ def mock_alms(random_generator, zbins):
     alms = {}
     for n in names:
         for i in zbins:
-            a = random_generator.standard_normal((Nlm, 2)) @ [1, 1j]
+            a = rng.standard_normal((Nlm, 2)) @ [1, 1j]
             a.dtype = np.dtype(a.dtype, metadata={"nside": 32})
             alms[n, i] = a
 
@@ -29,10 +29,10 @@ def mock_alms(random_generator, zbins):
 
 
 @pytest.fixture
-def mock_cls(random_generator):
+def mock_cls(rng):
     import numpy as np
 
-    cl = random_generator.random(101)
+    cl = rng.random(101)
     cl.dtype = np.dtype(cl.dtype, metadata={"nside_1": 32, "nside_2": 64})
 
     return {
@@ -71,13 +71,13 @@ def datadir(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def mock_mask_fields(nside, random_generator):
+def mock_mask_fields(nside, rng):
     import healpy as hp
     import numpy as np
 
     npix = hp.nside2npix(nside)
-    maps = random_generator.random(npix * NFIELDS_TEST).reshape((npix, NFIELDS_TEST))
-    pixels = np.unique(random_generator.integers(0, npix, size=npix // 3))
+    maps = rng.random(npix * NFIELDS_TEST).reshape((npix, NFIELDS_TEST))
+    pixels = np.unique(rng.integers(0, npix, size=npix // 3))
     maskpix = np.delete(np.arange(0, npix), pixels)
     for i in range(NFIELDS_TEST):
         maps[:, i][maskpix] = 0
@@ -141,13 +141,13 @@ def mock_writemask_full(mock_mask_fields, nside, datadir):
 
 
 @pytest.fixture(scope="session")
-def mock_mask_extra(nside, random_generator):
+def mock_mask_extra(nside, rng):
     import healpy as hp
     import numpy as np
 
     npix = hp.nside2npix(nside)
-    maps = random_generator.random(npix)
-    pixels = np.unique(random_generator.integers(0, npix, size=npix // 3))
+    maps = rng.random(npix)
+    pixels = np.unique(rng.integers(0, npix, size=npix // 3))
     maskpix = np.delete(np.arange(0, npix), pixels)
     maps[maskpix] = 0
     return [maps, pixels]
@@ -178,7 +178,7 @@ def mock_writemask_extra(mock_mask_extra, nside, datadir):
     return filename
 
 
-def test_write_read_maps(random_generator, tmp_path):
+def test_write_read_maps(rng, tmp_path):
     import healpy as hp
     import numpy as np
 
@@ -187,9 +187,9 @@ def test_write_read_maps(random_generator, tmp_path):
     nside = 4
     npix = 12 * nside**2
 
-    p = random_generator.random(npix)
-    v = random_generator.random(npix)
-    g = random_generator.random((2, npix))
+    p = rng.random(npix)
+    v = rng.random(npix)
+    g = rng.random((2, npix))
 
     p.dtype = np.dtype(p.dtype, metadata={"spin": 0})
     v.dtype = np.dtype(v.dtype, metadata={"spin": 0})
@@ -254,7 +254,7 @@ def test_write_read_cls(mock_cls, tmp_path):
         assert cl.dtype.metadata == mock_cls[key].dtype.metadata
 
 
-def test_write_read_mms(random_generator, tmp_path):
+def test_write_read_mms(rng, tmp_path):
     import numpy as np
 
     from heracles.io import read_mms, write_mms
@@ -263,9 +263,9 @@ def test_write_read_mms(random_generator, tmp_path):
     workdir = str(tmp_path)
 
     mms = {
-        ("00", 0, 1): random_generator.standard_normal((10, 10)),
-        ("0+", 1, 2): random_generator.standard_normal((20, 5)),
-        ("++", 2, 3): random_generator.standard_normal((10, 5, 2)),
+        ("00", 0, 1): rng.standard_normal((10, 10)),
+        ("0+", 1, 2): rng.standard_normal((20, 5)),
+        ("++", 2, 3): rng.standard_normal((10, 5, 2)),
     }
 
     write_mms(filename, mms, workdir=workdir)

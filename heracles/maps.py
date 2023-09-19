@@ -35,7 +35,6 @@ if t.TYPE_CHECKING:
     from .catalog import Catalog, CatalogPage
 
 logger = logging.getLogger(__name__)
-_RANDOM_SEED = 30
 
 
 def _nativebyteorder(fn):
@@ -171,9 +170,19 @@ class RandomizableMap(Map):
 
     """
 
-    def __init__(self, randomize: bool, **kwargs) -> None:
+    default_rng: np.random.Generator = np.random.default_rng()
+    """Default random number generator for randomizable maps."""
+
+    def __init__(
+        self,
+        randomize: bool,
+        *,
+        rng: t.Optional[np.random.Generator] = None,
+        **kwargs,
+    ) -> None:
         """Initialise map with the given randomize property."""
         self._randomize = randomize
+        self._rng = rng
         super().__init__(**kwargs)
 
     @property
@@ -184,6 +193,16 @@ class RandomizableMap(Map):
     def randomize(self, randomize: bool) -> None:
         """Set the randomize flag."""
         self._randomize = randomize
+
+    @property
+    def rng(self) -> np.random.Generator:
+        """Random number generator of this map."""
+        return self._rng or self.default_rng
+
+    @rng.setter
+    def rng(self, rng: np.random.Generator) -> None:
+        """Set the random number generator of this map."""
+        self._rng = rng
 
 
 class NormalizableMap(Map):
@@ -227,9 +246,10 @@ class PositionMap(HealpixMap, RandomizableMap):
         *,
         overdensity: bool = True,
         randomize: bool = False,
+        rng: t.Optional[np.random.Generator] = None,
     ) -> None:
         """Create a position map with the given properties."""
-        super().__init__(columns=(lon, lat), nside=nside, randomize=randomize)
+        super().__init__(columns=(lon, lat), nside=nside, randomize=randomize, rng=rng)
         self._overdensity: bool = overdensity
 
     @property
@@ -285,8 +305,7 @@ class PositionMap(HealpixMap, RandomizableMap):
                 p = np.full(npix, 1 / npix)
             else:
                 p = vmap / np.sum(vmap)
-            rng = np.random.default_rng(_RANDOM_SEED)
-            pos[:] = rng.multinomial(ngal, p)
+            pos[:] = self.rng.multinomial(ngal, p)
 
         # compute average number density
         nbar = ngal / npix
@@ -449,6 +468,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         conjugate: bool = False,
         normalize: bool = True,
         randomize: bool = False,
+        rng: t.Optional[np.random.Generator] = None,
     ) -> None:
         """Create a new shear map."""
 
@@ -459,6 +479,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
             nside=nside,
             normalize=normalize,
             randomize=randomize,
+            rng=rng,
         )
 
     @property
@@ -522,8 +543,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
                 im = -im
 
             if randomize:
-                rng = np.random.default_rng(_RANDOM_SEED)
-                a = rng.uniform(0.0, 2 * np.pi, size=page.size)
+                a = self.rng.uniform(0.0, 2 * np.pi, size=page.size)
                 r = np.hypot(re, im)
                 re, im = r * np.cos(a), r * np.sin(a)
                 del a, r
