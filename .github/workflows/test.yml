@@ -54,9 +54,3 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pipx run build
-  # docs:
-  #   name: Docs
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #   - run: pipx run --spec '.[docs]' sphinx-build -W -b html docs _build/html
