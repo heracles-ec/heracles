@@ -4,14 +4,14 @@ import pytest
 
 
 @pytest.fixture
-def catalog():
+def catalog(rng):
     from heracles.catalog import CatalogBase, CatalogPage
 
     # fix a set of rows to be returned for testing
     size = 100
-    x = np.random.rand(size)
-    y = np.random.rand(size)
-    z = np.random.rand(size)
+    x = rng.random(size)
+    y = rng.random(size)
+    z = rng.random(size)
 
     class TestCatalog(CatalogBase):
         SIZE = size
@@ -299,19 +299,19 @@ def test_invalid_value_filter(catalog):
         npt.assert_array_equal(page.get(k), v[2:])
 
 
-def test_footprint_filter(catalog):
+def test_footprint_filter(catalog, rng):
     from healpy import ang2pix
 
     from heracles.catalog import FootprintFilter
 
     # footprint for northern hemisphere
     nside = 8
-    m = np.round(np.random.rand(12 * nside**2))
+    m = np.round(rng.random(12 * nside**2))
 
     # replace x and y in catalog with lon and lat
-    catalog.DATA["x"] = lon = np.random.uniform(-180, 180, size=catalog.SIZE)
+    catalog.DATA["x"] = lon = rng.uniform(-180, 180, size=catalog.SIZE)
     catalog.DATA["y"] = lat = np.degrees(
-        np.arcsin(np.random.uniform(-1, 1, size=catalog.SIZE)),
+        np.arcsin(rng.uniform(-1, 1, size=catalog.SIZE)),
     )
 
     filt = FootprintFilter(m, "x", "y")
@@ -329,12 +329,12 @@ def test_footprint_filter(catalog):
         np.testing.assert_array_equal(page[k], v[good])
 
 
-def test_array_catalog():
+def test_array_catalog(rng):
     from heracles.catalog import ArrayCatalog, Catalog
 
     arr = np.empty(100, [("lon", float), ("lat", float), ("x", float), ("y", float)])
     for name in arr.dtype.names:
-        arr[name] = np.random.rand(len(arr))
+        arr[name] = rng.random(len(arr))
 
     catalog = ArrayCatalog(arr)
 
@@ -372,15 +372,15 @@ def test_array_catalog():
     assert copied.__dict__ == catalog.__dict__
 
 
-def test_fits_catalog(tmp_path):
+def test_fits_catalog(rng, tmp_path):
     import fitsio
 
     from heracles.catalog import Catalog
     from heracles.catalog.fits import FitsCatalog
 
     size = 100
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.random.uniform(-90, 90, size=size)
+    ra = rng.uniform(-180, 180, size=size)
+    dec = rng.uniform(-90, 90, size=size)
 
     filename = str(tmp_path / "catalog.fits")
 
@@ -436,7 +436,7 @@ def test_fits_catalog(tmp_path):
     assert copied._ext == catalog._ext
 
 
-def test_fits_catalog_caching(tmp_path):
+def test_fits_catalog_caching(rng, tmp_path):
     import gc
 
     import fitsio
@@ -444,8 +444,8 @@ def test_fits_catalog_caching(tmp_path):
     from heracles.catalog.fits import FitsCatalog
 
     size = 100
-    ra = np.random.uniform(-180, 180, size=size)
-    dec = np.random.uniform(-90, 90, size=size)
+    ra = rng.uniform(-180, 180, size=size)
+    dec = rng.uniform(-90, 90, size=size)
 
     filename = str(tmp_path / "cached.fits")
 
