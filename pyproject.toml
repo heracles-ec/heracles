@@ -14,6 +14,10 @@ classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
@@ -30,11 +34,10 @@ dynamic = [
 license = "LGPL-3.0-or-later"
 name = "heracles"
 optional-dependencies = {docs = [
-    "furo",
-    "matplotlib",
-    "numpydoc",
-    "sphinx",
-    "sphinxcontrib-katex",
+    "mkdocs",
+    "mkdocs-include-markdown-plugin",
+    "mkdocs-material",
+    "mkdocstrings[python]",
 ], test = [
     "pytest",
     "pytest-rerunfailures",
