@@ -31,9 +31,9 @@ def test_postage_stamps():
         for j in range(4):  # columns: 2 + tryshift
             lines = axes[i, j].get_lines()
             if i - j > 2:
-                assert len(lines) == 3  # E, B and axhline in lower
+                assert len(lines) == 2  # E, B in lower
             elif i - j < -1:
-                assert len(lines) == 2  # P and axhline in upper
+                assert len(lines) == 1  # P in upper
             else:
                 assert len(lines) == 0  # empty diagonal
 

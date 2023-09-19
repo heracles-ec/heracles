@@ -42,6 +42,12 @@ def _dont_draw_zero_tick(tick):
     return wrap
 
 
+def _pad_xlim(xmin, xmax, margin=0.05):
+    """pad the x axis range depending on signs"""
+    f = (xmax / xmin) ** margin
+    return xmin / f, xmax * f
+
+
 def _pad_ylim(ymin, ymax):
     """pad the y axis range depending on signs"""
     return (ymin * 10 ** (-np.sign(ymin) / 2), ymax * 10 ** (np.sign(ymax) / 2))
@@ -55,6 +61,7 @@ def postage_stamps(
     trxshift=0,
     tryshift=0,
     stampsize=1.0,
+    space=0.05,
     hatch_empty=False,
     linscale=0.01,
     cycler=None,
@@ -96,10 +103,13 @@ def postage_stamps(
         nx += trxshift
         ny += tryshift
 
+    figw = (ny + (ny - 1) * space) * stampsize
+    figh = (nx + (nx - 1) * space) * stampsize
+
     fig, axes = plt.subplots(
         nx,
         ny,
-        figsize=(ny * stampsize, nx * stampsize),
+        figsize=(figw, figh),
         squeeze=False,
         sharex=False,
         sharey=False,
@@ -154,8 +164,8 @@ def postage_stamps(
             else:
                 cl = scale * cl
 
-            xmin = np.nanmin(ell, initial=xmin)
-            xmax = np.nanmax(ell, initial=xmax)
+            xmin = np.nanmin(ell[ell != 0], initial=xmin)
+            xmax = np.nanmax(ell[ell != 0], initial=xmax)
             if n < len(keys):
                 ymin = np.nanmin(cl, initial=ymin)
                 ymax = np.nanmax(cl, initial=ymax)
@@ -163,11 +173,18 @@ def postage_stamps(
                 trymin = np.nanmin(cl, initial=trymin)
                 trymax = np.nanmax(cl, initial=trymax)
 
-            ax.plot(ell, cl, lw=1.5, label=label, **{**oprop, **iprop})
+            ax.plot(
+                ell,
+                cl,
+                label=label,
+                zorder=2 + 0.4 / (n + 1),
+                **{**oprop, **iprop},
+            )
 
             # prevent multiple labels with same colour
             label = None
 
+    xmin, xmax = _pad_xlim(xmin, xmax)
     ymin, ymax = _pad_ylim(ymin, ymax)
     ylin = 10 ** np.ceil(np.log10(max(abs(ymin), abs(ymax)) * linscale))
 
@@ -184,8 +201,6 @@ def postage_stamps(
 
         ax = axes[idx]
 
-        ax.axhline(0.0, c="k", lw=0.8, ls="--")
-
         ax.tick_params(
             axis="both",
             which="both",
@@ -194,10 +209,10 @@ def postage_stamps(
             bottom=True,
             left=True,
             right=True,
-            labeltop=(idx == (0, 0) or idx == (0, ny - 1)),
-            labelbottom=(idx == (nx - 1, 0) or idx == (nx - 1, ny - 1)),
-            labelleft=(idx == (0, 0) or idx == (nx - 1, 0)),
-            labelright=(idx == (0, ny - 1) or idx == (nx - 1, ny - 1)),
+            labeltop=(idx[0] == 0),
+            labelbottom=(idx[0] == nx - 1),
+            labelleft=(idx[1] == 0),
+            labelright=(idx[1] == ny - 1),
         )
         ax.set_axisbelow(False)
 
@@ -219,15 +234,12 @@ def postage_stamps(
             hnds = leg.legendHandles
         for hnd in hnds:
             hnd.set_visible(False)
-        leg.set_zorder(2)
+        leg.set_zorder(3)
 
         ax.set_xlim(xmin, xmax)
-        ax.set_xscale(
-            "symlog",
-            linthresh=10,
-            linscale=0.45,
-            subs=[2, 3, 4, 5, 6, 7, 8, 9],
-        )
+        ax.set_xscale("log")
+        ax.xaxis.get_major_locator().set_params(numticks=99)
+        ax.xaxis.get_minor_locator().set_params(numticks=99)
 
         ax.set_ylim(ymin_, ymax_)
         ax.set_yscale(
@@ -271,12 +283,12 @@ def postage_stamps(
                 ax.axis("off")
 
     fig.tight_layout(pad=0.0)
-    fig.subplots_adjust(wspace=0, hspace=0)
+    fig.subplots_adjust(wspace=space, hspace=space)
 
     # adjust figure size for spacing
     fig.set_size_inches(
-        ny * stampsize / (fig.subplotpars.right - fig.subplotpars.left),
-        nx * stampsize / (fig.subplotpars.top - fig.subplotpars.bottom),
+        figw / (fig.subplotpars.right - fig.subplotpars.left),
+        figh / (fig.subplotpars.top - fig.subplotpars.bottom),
     )
 
     return fig
