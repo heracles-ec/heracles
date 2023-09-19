@@ -276,7 +276,11 @@ def test_write_read_mms(tmp_path):
 
     assert mms_.keys() == mms.keys()
     for key in mms:
-        np.testing.assert_array_equal(mms_[key], mms[key])
+        assert key in mms_
+        mm = mms_[key]
+        assert mm.dtype.names == ("L", "MM", "LMIN", "LMAX", "W")
+        np.testing.assert_array_equal(mm["L"], np.arange(len(mms[key])))
+        np.testing.assert_array_equal(mm["MM"], mms[key])
 
 
 def test_write_read_cov(mock_cls, tmp_path):
