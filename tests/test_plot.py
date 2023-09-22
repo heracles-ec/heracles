@@ -21,14 +21,14 @@ def test_postage_stamps():
         ("P", "P", 1, 1): cl,
     }
 
-    fig = postage_stamps(plot, transpose, trxshift=3, tryshift=2, hatch_empty=True)
+    fig = postage_stamps(plot, transpose, trxshift=2, tryshift=3, hatch_empty=True)
 
     assert len(fig.axes) == 5 * 4
 
     axes = np.reshape(fig.axes, (5, 4))
 
-    for i in range(5):  # rows: 2 + trxshift
-        for j in range(4):  # columns: 2 + tryshift
+    for i in range(5):  # rows: 2 + tryshift
+        for j in range(4):  # columns: 2 + trxshift
             lines = axes[i, j].get_lines()
             if i - j > 2:
                 assert len(lines) == 2  # E, B in lower
