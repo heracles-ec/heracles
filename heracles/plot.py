@@ -167,8 +167,11 @@ def postage_stamps(
 
             if cl.dtype.names is None:
                 ell = np.arange(len(cl), dtype=float)
+                err = None
             else:
-                ell, cl = cl["L"].astype(float), cl["CL"]
+                ell = cl["L"].astype(float)
+                err = cl["ERR"] if "ERR" in cl.dtype.names else None
+                cl = cl["CL"]
 
             if scale is None:
                 pass
@@ -180,19 +183,37 @@ def postage_stamps(
             xmin = np.nanmin(ell[ell != 0], initial=xmin)
             xmax = np.nanmax(ell[ell != 0], initial=xmax)
             if n < len(keys):
-                ymin = np.nanmin(cl, initial=ymin)
-                ymax = np.nanmax(cl, initial=ymax)
+                if err is None:
+                    ymin = np.nanmin(cl, initial=ymin)
+                    ymax = np.nanmax(cl, initial=ymax)
+                else:
+                    ymin = np.nanmin(cl - err, initial=ymin)
+                    ymax = np.nanmax(cl + err, initial=ymax)
             else:
-                trymin = np.nanmin(cl, initial=trymin)
-                trymax = np.nanmax(cl, initial=trymax)
+                if err is None:
+                    trymin = np.nanmin(cl, initial=trymin)
+                    trymax = np.nanmax(cl, initial=trymax)
+                else:
+                    trymin = np.nanmin(cl - err, initial=trymin)
+                    trymax = np.nanmax(cl + err, initial=trymax)
 
-            ax.plot(
+            lines = ax.plot(
                 ell,
                 cl,
                 label=label,
                 zorder=2 + 0.4 / (n + 1),
                 **{**oprop, **iprop},
             )
+
+            if err is not None:
+                ax.fill_between(
+                    ell,
+                    cl - err,
+                    cl + err,
+                    ec="none",
+                    fc=lines[-1].get_color(),
+                    alpha=0.2,
+                )
 
             # prevent multiple labels with same colour
             label = None
