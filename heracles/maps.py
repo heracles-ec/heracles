@@ -22,7 +22,7 @@ import logging
 import typing as t
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from functools import partial, wraps
 
 import healpy as hp
@@ -829,6 +829,7 @@ def map_catalogs(
 def transform_maps(
     maps: t.Mapping[tuple[t.Any, t.Any], MapData],
     *,
+    lmax: t.Union[int, t.Mapping[t.Any, int], None] = None,
     out: t.MutableMapping[t.Any, t.Any] = None,
     progress: bool = False,
     **kwargs,
@@ -849,6 +850,10 @@ def transform_maps(
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():
         nside = hp.get_nside(m)
+        if isinstance(lmax, Mapping):
+            _lmax = lmax.get((k, i)) or lmax.get(k)
+        else:
+            _lmax = lmax
 
         md = m.dtype.metadata or {}
         spin = md.get("spin", 0)
@@ -864,7 +869,7 @@ def transform_maps(
             msg = f"spin-{spin} maps not yet supported"
             raise NotImplementedError(msg)
 
-        alms = hp.map2alm(m, pol=pol, **kwargs)
+        alms = hp.map2alm(m, lmax=_lmax, pol=pol, **kwargs)
 
         if spin == 0:
             alms = {(k, i): alms}

@@ -351,6 +351,17 @@ def test_transform_maps(rng):
     assert alms["P_E", 1].dtype.metadata["nside"] == nside
     assert alms["P_B", 1].dtype.metadata["nside"] == nside
 
+    # explicit lmax per map
+    maps = {("T", 0): t, ("P", 1): p}
+    lmax = {"T": 10, "P": 20}
+    alms = transform_maps(maps, lmax=lmax)
+
+    assert len(alms) == 3
+    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
+    assert alms["T", 0].size == (lmax["T"] + 1) * (lmax["T"] + 2) // 2
+    assert alms["P_E", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
+    assert alms["P_B", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
+
 
 def test_update_metadata():
     from heracles.maps import update_metadata
