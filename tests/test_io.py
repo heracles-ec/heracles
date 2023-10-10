@@ -448,3 +448,33 @@ def test_tocfits(tmp_path):
     assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
     np.testing.assert_array_equal(tocfits2[1, 2], data12)
     np.testing.assert_array_equal(tocfits2[2, 2], data22)
+
+
+def test_tocfits_is_lazy(tmp_path):
+    import fitsio
+
+    from heracles.io import TocFits
+
+    path = tmp_path / "bad.fits"
+
+    # test keys(), values(), and items() are not eagerly reading data
+    tocfits = TocFits(path, clobber=True)
+
+    # manually enter some non-existent rows into the ToC
+    assert tocfits._toc == {}
+    tocfits._toc[0,] = "BAD0"
+    tocfits._toc[1,] = "BAD1"
+    tocfits._toc[2,] = "BAD2"
+
+    # these should not error
+    tocfits.keys()
+    tocfits.values()
+    tocfits.items()
+
+    # make sure nothing is in the FITS
+    with fitsio.FITS(path, "r") as fits:
+        assert len(fits) == 2
+
+    # make sure there are errors when acualising the generators
+    with pytest.raises(OSError):
+        list(tocfits.values())

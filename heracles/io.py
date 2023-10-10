@@ -21,8 +21,10 @@
 import logging
 import os
 from collections.abc import MutableMapping
+from functools import partial
 from pathlib import Path
 from types import MappingProxyType
+from weakref import WeakValueDictionary
 
 import fitsio
 import healpy as hp
@@ -782,18 +784,28 @@ class TocFits(MutableMapping):
                 # store the ToC as a mapping
                 self._toc = {tuple(key): str(ext) for ext, *key in toc}
 
+        # set up a weakly-referenced cache for extension data
+        self._cache = WeakValueDictionary()
+
     def __len__(self):
         return len(self._toc)
 
     def __iter__(self):
         return iter(self._toc)
 
+    def __contains__(self, key):
+        return key in self._toc
+
     def __getitem__(self, key):
         if not isinstance(key, tuple):
             key = (key,)
-        ext = self._toc[key]
-        with self.fits as fits:
-            return self.reader(fits, ext)
+        value = self._cache.get(key)
+        if value is None:
+            ext = self._toc[key]
+            with self.fits as fits:
+                value = self.reader(fits, ext)
+            self._cache[key] = value
+        return value
 
     def __setitem__(self, key, value):
         # keys are always tuples
@@ -838,15 +850,15 @@ class ClsFits(TocFits):
     """FITS-backed mapping for cls."""
 
     tag = "CL"
-    columns = {"EXT": "10A", "NAME1": "10A", "NAME2": "10A", "BIN1": "I", "BIN2": "I"}
+    columns = {"NAME1": "10A", "NAME2": "10A", "BIN1": "I", "BIN2": "I"}
     reader = staticmethod(_read_twopoint)
-    writer = staticmethod(_write_twopoint)
+    writer = partial(_write_twopoint, name=tag)
 
 
 class MmsFits(TocFits):
     """FITS-backed mapping for mixing matrices."""
 
     tag = "MM"
-    columns = {"EXT": "10A", "NAME": "10A", "BIN1": "I", "BIN2": "I"}
+    columns = {"NAME": "10A", "BIN1": "I", "BIN2": "I"}
     reader = staticmethod(_read_twopoint)
-    writer = staticmethod(_write_twopoint)
+    writer = partial(_write_twopoint, name=tag)
