@@ -375,3 +375,115 @@ def test_read_mask_extra(
         extra_mask_name=mock_writemask_extra,
     )
     assert (mask == maps[:, ibin] * maps_extra[:]).all()
+
+
+def test_tocfits(tmp_path):
+    import fitsio
+    import numpy as np
+
+    from heracles.io import TocFits
+
+    class TestFits(TocFits):
+        tag = "test"
+        columns = {"col1": "I", "col2": "J"}
+
+    path = tmp_path / "test.fits"
+
+    assert not path.exists()
+
+    tocfits = TestFits(path, clobber=True)
+
+    assert path.exists()
+
+    with fitsio.FITS(path) as fits:
+        assert len(fits) == 2
+        toc = fits["TESTTOC"].read()
+    assert toc.dtype.names == ("EXT", "col1", "col2")
+    assert len(toc) == 0
+
+    assert len(tocfits) == 0
+    assert list(tocfits) == []
+    assert tocfits.toc == {}
+
+    data12 = np.zeros(5, dtype=[("X", float), ("Y", int)])
+    data22 = np.ones(5, dtype=[("X", float), ("Y", int)])
+
+    tocfits[1, 2] = data12
+
+    with fitsio.FITS(path) as fits:
+        assert len(fits) == 3
+        toc = fits["TESTTOC"].read()
+        assert len(toc) == 1
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+
+    assert len(tocfits) == 1
+    assert list(tocfits) == [(1, 2)]
+    assert tocfits.toc == {(1, 2): "TEST0"}
+    np.testing.assert_array_equal(tocfits[1, 2], data12)
+
+    tocfits[2, 2] = data22
+
+    with fitsio.FITS(path) as fits:
+        assert len(fits) == 4
+        toc = fits["TESTTOC"].read()
+        assert len(toc) == 2
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
+
+    assert len(tocfits) == 2
+    assert list(tocfits) == [(1, 2), (2, 2)]
+    assert tocfits.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
+    np.testing.assert_array_equal(tocfits[1, 2], data12)
+    np.testing.assert_array_equal(tocfits[2, 2], data22)
+
+    with pytest.raises(NotImplementedError):
+        del tocfits[1, 2]
+
+    del tocfits
+
+    tocfits2 = TestFits(path, clobber=False)
+
+    assert len(tocfits2) == 2
+    assert list(tocfits2) == [(1, 2), (2, 2)]
+    assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
+    np.testing.assert_array_equal(tocfits2[1, 2], data12)
+    np.testing.assert_array_equal(tocfits2[2, 2], data22)
+
+
+def test_tocfits_is_lazy(tmp_path):
+    import fitsio
+
+    from heracles.io import TocFits
+
+    path = tmp_path / "bad.fits"
+
+    # test keys(), values(), and items() are not eagerly reading data
+    tocfits = TocFits(path, clobber=True)
+
+    # manually enter some non-existent rows into the ToC
+    assert tocfits._toc == {}
+    tocfits._toc[0,] = "BAD0"
+    tocfits._toc[1,] = "BAD1"
+    tocfits._toc[2,] = "BAD2"
+
+    # these should not error
+    tocfits.keys()
+    tocfits.values()
+    tocfits.items()
+
+    # contains and iteration are lazy
+    assert 0 in tocfits
+    assert list(tocfits) == [(0,), (1,), (2,)]
+
+    # subselection should work fine
+    selected = tocfits[...]
+    assert isinstance(selected, TocFits)
+    assert len(selected) == 3
+
+    # make sure nothing is in the FITS
+    with fitsio.FITS(path, "r") as fits:
+        assert len(fits) == 2
+
+    # make sure there are errors when acualising the generators
+    with pytest.raises(OSError):
+        list(tocfits.values())

@@ -41,7 +41,15 @@ from .maps import (
 logger = logging.getLogger(__name__)
 
 
-def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=None):
+def angular_power_spectra(
+    alms,
+    alms2=None,
+    *,
+    lmax=None,
+    include=None,
+    exclude=None,
+    out=None,
+):
     """compute angular power spectra from a set of alms"""
 
     logger.info(
@@ -55,31 +63,46 @@ def angular_power_spectra(alms, alms2=None, *, lmax=None, include=None, exclude=
 
     # collect all alm combinations for computing cls
     if alms2 is None:
-        alm_pairs = combinations_with_replacement(alms.items(), 2)
+        pairs = combinations_with_replacement(alms, 2)
+        alms2 = alms
     else:
-        alm_pairs = product(alms.items(), alms2.items())
+        pairs = product(alms, alms2)
 
     # keep track of the twopoint combinations we have seen here
     twopoint_names = set()
 
+    # output tocdict, use given or empty
+    if out is None:
+        cls = TocDict()
+    else:
+        cls = out
+
     # compute cls for all alm pairs
     # do not compute duplicates
-    cls = TocDict()
-    for ((k1, i1), alm1), ((k2, i2), alm2) in alm_pairs:
+    for (k1, i1), (k2, i2) in pairs:
+        # skip duplicate cls in any order
+        if (k1, k2, i1, i2) in cls or (k2, k1, i2, i1) in cls:
+            continue
+
         # get the two-point code in standard order
         if (k1, k2) not in twopoint_names and (k2, k1) in twopoint_names:
             i1, i2 = i2, i1
             k1, k2 = k2, k1
-
-        # skip duplicate cls in any order
-        if (k1, k2, i1, i2) in cls or (k2, k1, i2, i1) in cls:
-            continue
+            swapped = True
+        else:
+            swapped = False
 
         # check if cl is skipped by explicit include or exclude list
         if not toc_match((k1, k2, i1, i2), include, exclude):
             continue
 
         logger.info("computing %s x %s cl for bins %s, %s", k1, k2, i1, i2)
+
+        # retrieve alms from keys; make sure swap is respected
+        # this is done only now because alms might lazy-load from file
+        alm1, alm2 = alms[k1, i1], alms2[k2, i2]
+        if swapped:
+            alm1, alm2 = alm2, alm1
 
         # compute the raw cl from the alms
         cl = hp.alm2cl(alm1, alm2, lmax_out=lmax)
