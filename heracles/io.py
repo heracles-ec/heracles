@@ -719,11 +719,11 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
 class TocFits(MutableMapping):
     """A FITS-backed TocDict."""
 
-    tag = ""
+    tag = "EXT"
     """Tag for FITS extensions."""
 
     columns = {}
-    """Columns and formats in the FITS table of contents."""
+    """Columns and their formats in the FITS table of contents."""
 
     @staticmethod
     def reader(fits, ext):
@@ -773,7 +773,7 @@ class TocFits(MutableMapping):
                 self.dtype = fits[self.ext].get_rec_dtype()[0]
 
                 # empty ToC
-                self._toc = {}
+                self._toc = TocDict()
             else:
                 # read existing ToC from FITS
                 toc = fits[self.ext].read()
@@ -782,7 +782,7 @@ class TocFits(MutableMapping):
                 toc.dtype = toc.dtype
 
                 # store the ToC as a mapping
-                self._toc = {tuple(key): str(ext) for ext, *key in toc}
+                self._toc = TocDict({tuple(key): str(ext) for ext, *key in toc})
 
         # set up a weakly-referenced cache for extension data
         self._cache = WeakValueDictionary()
@@ -794,18 +794,31 @@ class TocFits(MutableMapping):
         return iter(self._toc)
 
     def __contains__(self, key):
+        if not isinstance(key, tuple):
+            key = (key,)
         return key in self._toc
 
     def __getitem__(self, key):
-        if not isinstance(key, tuple):
-            key = (key,)
-        value = self._cache.get(key)
-        if value is None:
-            ext = self._toc[key]
+        ext = self._toc[key]
+
+        # if a TocDict is returned, we have the result of a selection
+        if isinstance(ext, TocDict):
+            # make a new instance and copy attributes
+            selected = object.__new__(self.__class__)
+            selected.path = self.path
+            # shared cache since both instances read the same file
+            selected._cache = self._cache
+            # the new toc contains the result of the selection
+            selected._toc = ext
+            return selected
+
+        # a specific extension was requested, fetch data
+        data = self._cache.get(ext)
+        if data is None:
             with self.fits as fits:
-                value = self.reader(fits, ext)
-            self._cache[key] = value
-        return value
+                data = self.reader(fits, ext)
+            self._cache[ext] = data
+        return data
 
     def __setitem__(self, key, value):
         # keys are always tuples

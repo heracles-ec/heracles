@@ -471,6 +471,15 @@ def test_tocfits_is_lazy(tmp_path):
     tocfits.values()
     tocfits.items()
 
+    # contains and iteration are lazy
+    assert 0 in tocfits
+    assert list(tocfits) == [(0,), (1,), (2,)]
+
+    # subselection should work fine
+    selected = tocfits[...]
+    assert isinstance(selected, TocFits)
+    assert len(selected) == 3
+
     # make sure nothing is in the FITS
     with fitsio.FITS(path, "r") as fits:
         assert len(fits) == 2
