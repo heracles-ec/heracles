@@ -180,6 +180,10 @@ def test_catalog_base_properties(catalog):
     catalog.filters = []
     assert catalog.filters == []
 
+    assert catalog.label is None
+    catalog.label = "label 123"
+    assert catalog.label == "label 123"
+
     v = object()
     assert catalog.visibility is None
     catalog.visibility = v
@@ -235,6 +239,7 @@ def test_catalog_base_copy():
 def test_catalog_view(catalog):
     from heracles.catalog import Catalog
 
+    catalog.label = "label 123"
     catalog.visibility = cvis = object()
 
     where = object()
@@ -247,8 +252,12 @@ def test_catalog_view(catalog):
     assert catalog.base is None
     assert catalog.selection is None
     assert view.base is catalog
+    assert view.label == "label 123"
     assert view.selection is where
     assert view.visibility is catalog.visibility
+
+    with pytest.raises(AttributeError):
+        view.label = "different label"
 
     view.visibility = vvis = object()
 
