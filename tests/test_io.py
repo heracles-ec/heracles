@@ -33,7 +33,15 @@ def mock_cls(rng):
     import numpy as np
 
     cl = rng.random(101)
-    cl.dtype = np.dtype(cl.dtype, metadata={"nside_1": 32, "nside_2": 64})
+    cl.dtype = np.dtype(
+        cl.dtype,
+        metadata={
+            "catalog_1": "cat-a.fits",
+            "nside_1": 32,
+            "catalog_2": "cat-b.fits",
+            "nside_2": 64,
+        },
+    )
 
     return {
         ("P", "P", 0, 0): cl,
@@ -191,9 +199,9 @@ def test_write_read_maps(rng, tmp_path):
     v = rng.random(npix)
     g = rng.random((2, npix))
 
-    p.dtype = np.dtype(p.dtype, metadata={"spin": 0})
-    v.dtype = np.dtype(v.dtype, metadata={"spin": 0})
-    g.dtype = np.dtype(g.dtype, metadata={"spin": 0})
+    p.dtype = np.dtype(p.dtype, metadata={"catalog": "cat.fits", "spin": 0})
+    v.dtype = np.dtype(v.dtype, metadata={"catalog": "cat.fits", "spin": 0})
+    g.dtype = np.dtype(g.dtype, metadata={"catalog": "cat.fits", "spin": 2})
 
     maps = {
         ("P", 1): p,

@@ -331,9 +331,11 @@ class PositionMap(HealpixMap, RandomizableMap):
         # set metadata of array
         update_metadata(
             pos,
+            catalog=catalog.label,
             spin=0,
             nbar=nbar,
             kernel="healpix",
+            nside=self.nside,
             power=power,
             bias=bias,
         )
@@ -434,9 +436,11 @@ class ScalarMap(HealpixMap, NormalizableMap):
         # set metadata of array
         update_metadata(
             val,
+            catalog=catalog.label,
             spin=0,
             wbar=wbar,
             kernel="healpix",
+            nside=self.nside,
             power=power,
             bias=bias,
         )
@@ -588,9 +592,11 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         # set metadata of array
         update_metadata(
             val,
+            catalog=catalog.label,
             spin=self.spin,
             wbar=wbar,
             kernel="healpix",
+            nside=self.nside,
             power=power,
             bias=bias,
         )
@@ -627,7 +633,14 @@ class VisibilityMap(HealpixMap):
             # make a copy for updates to metadata
             vmap = np.copy(vmap)
 
-        update_metadata(vmap, spin=0, kernel="healpix", power=0)
+        update_metadata(
+            vmap,
+            catalog=catalog.label,
+            spin=0,
+            kernel="healpix",
+            nside=self.nside,
+            power=0,
+        )
 
         return vmap
 
@@ -691,7 +704,15 @@ class WeightMap(HealpixMap, NormalizableMap):
             power = 1
 
         # set metadata of arrays
-        update_metadata(wht, spin=0, wbar=wbar, kernel="healpix", power=power)
+        update_metadata(
+            wht,
+            catalog=catalog.label,
+            spin=0,
+            wbar=wbar,
+            kernel="healpix",
+            nside=self.nside,
+            power=power,
+        )
 
         # return the weight map
         return wht
@@ -849,7 +870,6 @@ def transform_maps(
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():
-        nside = hp.get_nside(m)
         if isinstance(lmax, Mapping):
             _lmax = lmax.get((k, i)) or lmax.get(k)
         else:
@@ -877,8 +897,7 @@ def transform_maps(
             alms = {(f"{k}_E", i): alms[1], (f"{k}_B", i): alms[2]}
 
         for ki, alm in alms.items():
-            if md:
-                update_metadata(alm, nside=nside, **md)
+            update_metadata(alm, **md)
             out[ki] = alm
 
         del m, alms, alm

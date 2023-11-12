@@ -100,7 +100,13 @@ def test_visibility_map(nside, vmap):
         assert result is not vmap
 
         assert result.shape == (12 * nside_out**2,)
-        assert result.dtype.metadata == {"spin": 0, "kernel": "healpix", "power": 0}
+        assert result.dtype.metadata == {
+            "catalog": catalog.label,
+            "spin": 0,
+            "kernel": "healpix",
+            "nside": nside_out,
+            "power": 0,
+        }
         assert np.isclose(result.mean(), fsky)
 
     # test missing visibility map
@@ -124,15 +130,15 @@ def test_position_map(nside, catalog, vmap):
 
     nbar = 4.0
     assert m.shape == (npix,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "nbar": nbar,
-            "kernel": "healpix",
-            "power": 0,
-            "bias": bias / nbar**2,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "nbar": nbar,
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 0,
+        "bias": pytest.approx(bias / nbar**2),
+    }
     np.testing.assert_array_equal(m, 0)
 
     # compute number count map
@@ -140,15 +146,15 @@ def test_position_map(nside, catalog, vmap):
     m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
     assert m.shape == (npix,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "nbar": 4.0,
-            "kernel": "healpix",
-            "power": 1,
-            "bias": bias,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "nbar": 4.0,
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 1,
+        "bias": pytest.approx(bias),
+    }
     np.testing.assert_array_equal(m, 4)
 
     # compute overdensity maps with visibility map
@@ -159,30 +165,30 @@ def test_position_map(nside, catalog, vmap):
     m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
 
     assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "nbar": nbar,
-            "kernel": "healpix",
-            "power": 0,
-            "bias": bias / nbar**2,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "nbar": pytest.approx(nbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 0,
+        "bias": pytest.approx(bias / nbar**2),
+    }
 
     # compute number count map with visibility map
 
     m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
 
     assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "nbar": nbar,
-            "kernel": "healpix",
-            "power": 1,
-            "bias": bias,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "nbar": pytest.approx(nbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 1,
+        "bias": pytest.approx(bias),
+    }
 
 
 def test_scalar_map(nside, catalog):
@@ -200,29 +206,29 @@ def test_scalar_map(nside, catalog):
     bias = (4 * np.pi / npix / npix) * v2
 
     assert m.shape == (npix,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "wbar": wbar,
-            "kernel": "healpix",
-            "power": 0,
-            "bias": bias / wbar**2,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "wbar": pytest.approx(wbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 0,
+        "bias": pytest.approx(bias / wbar**2),
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
     m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False), catalog)
 
     assert m.shape == (npix,)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 0,
-            "wbar": wbar,
-            "kernel": "healpix",
-            "power": 1,
-            "bias": bias,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 0,
+        "wbar": pytest.approx(wbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 1,
+        "bias": pytest.approx(bias),
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
 
@@ -242,15 +248,15 @@ def test_complex_map(nside, catalog):
     bias = (4 * np.pi / npix / npix) * v2 / 2
 
     assert m.shape == (2, npix)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 2,
-            "wbar": wbar,
-            "kernel": "healpix",
-            "power": 0,
-            "bias": bias / wbar**2,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 2,
+        "wbar": pytest.approx(wbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 0,
+        "bias": pytest.approx(bias / wbar**2),
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
     m = map_catalog(
@@ -259,15 +265,15 @@ def test_complex_map(nside, catalog):
     )
 
     assert m.shape == (2, npix)
-    assert m.dtype.metadata == pytest.approx(
-        {
-            "spin": 1,
-            "wbar": wbar,
-            "kernel": "healpix",
-            "power": 1,
-            "bias": bias,
-        },
-    )
+    assert m.dtype.metadata == {
+        "catalog": catalog.label,
+        "spin": 1,
+        "wbar": pytest.approx(wbar),
+        "kernel": "healpix",
+        "nside": nside,
+        "power": 1,
+        "bias": pytest.approx(bias),
+    }
     np.testing.assert_array_almost_equal(m, 0)
 
 
@@ -282,9 +288,11 @@ def test_weight_map(nside, catalog):
 
     assert m.shape == (12 * nside**2,)
     assert m.dtype.metadata == {
+        "catalog": catalog.label,
         "spin": 0,
         "wbar": wbar,
         "kernel": "healpix",
+        "nside": nside,
         "power": 0,
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
@@ -293,9 +301,11 @@ def test_weight_map(nside, catalog):
 
     assert m.shape == (12 * nside**2,)
     assert m.dtype.metadata == {
+        "catalog": catalog.label,
         "spin": 0,
         "wbar": wbar,
         "kernel": "healpix",
+        "nside": nside,
         "power": 1,
     }
     np.testing.assert_array_almost_equal(m, w)
@@ -308,9 +318,9 @@ def test_transform_maps(rng):
     npix = 12 * nside**2
 
     t = rng.standard_normal(npix)
-    update_metadata(t, spin=0, a=1)
+    update_metadata(t, spin=0, nside=nside, a=1)
     p = rng.standard_normal((2, npix))
-    update_metadata(p, spin=2, b=2)
+    update_metadata(p, spin=2, nside=nside, b=2)
 
     # single scalar map
     maps = {("T", 0): t}
