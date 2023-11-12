@@ -118,6 +118,11 @@ class Catalog(Protocol):
         ...
 
     @property
+    def label(self):
+        """return a human-friendly identifier for the source of data"""
+        ...
+
+    @property
     def base(self):
         """return the base catalogue of a view, or ``None`` if not a view"""
         ...
@@ -187,6 +192,11 @@ class CatalogView:
         return self._catalog
 
     @property
+    def label(self):
+        """human-friendly label of the catalogue (not settable in view)"""
+        return self._catalog.label
+
+    @property
     def selection(self):
         """selection of this view"""
         return self._selection
@@ -251,6 +261,7 @@ class CatalogBase(metaclass=ABCMeta):
 
         self._page_size = self.default_page_size
         self._filters = []
+        self._label = None
         self._visibility = None
 
     def __copy__(self):
@@ -259,6 +270,7 @@ class CatalogBase(metaclass=ABCMeta):
         other = self.__class__.__new__(self.__class__)
         other._page_size = self._page_size
         other._filters = self._filters.copy()
+        other._label = self._label
         other._visibility = self._visibility
         return other
 
@@ -303,6 +315,15 @@ class CatalogBase(metaclass=ABCMeta):
     def base(self):
         """returns ``None`` since this is not a view of another catalogue"""
         return
+
+    @property
+    def label(self):
+        """optional human-friendly label for catalogue"""
+        return self._label
+
+    @label.setter
+    def label(self, label):
+        self._label = label
 
     @property
     def selection(self):
