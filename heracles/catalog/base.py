@@ -52,11 +52,20 @@ class CatalogPage:
             v.flags.writeable = False
         self._update()
 
+    def _getdata(self, key):
+        """
+        Return data for one single column.  Supports negating columns
+        (``-COLUMN``), possibly more in the future.
+        """
+        if key[:1] == "-":
+            return -self._data[key[1:]]
+        return self._data[key]
+
     def __getitem__(self, col):
         """Return one or more columns without checking."""
         if isinstance(col, (list, tuple)):
-            return tuple(self._data[c] for c in col)
-        return self._data[col]
+            return tuple(self._getdata(c) for c in col)
+        return self._getdata(col)
 
     def __len__(self):
         """Number of columns in the page."""
@@ -89,7 +98,7 @@ class CatalogPage:
         """Return one or more columns with checking."""
         val = []
         for c in col:
-            v = self._data[c]
+            v = self._getdata(c)
             if np.any(np.isnan(v)):
                 msg = f'invalid values in column "{c}"'
                 raise ValueError(msg)

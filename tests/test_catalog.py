@@ -43,8 +43,8 @@ def catalog(rng):
 def test_catalog_page():
     from heracles.catalog import CatalogPage
 
-    a = [1.0, 2.0, 3.0, 4.0]
-    b = [5.0, 6.0, 7.0, 8.0]
+    a = np.array([1.0, 2.0, 3.0, 4.0])
+    b = np.array([5.0, 6.0, 7.0, 8.0])
 
     page = CatalogPage({"a": a, "b": b})
 
@@ -54,6 +54,7 @@ def test_catalog_page():
     npt.assert_array_equal(page["b"], b)
     npt.assert_array_equal(page["a", "b"], [a, b])
     npt.assert_array_equal(page[["a", "b"]], [a, b])
+    npt.assert_array_equal(page[["a", "-b"]], [a, -b])
 
     # test names attribute
     assert page.names == ["a", "b"]
