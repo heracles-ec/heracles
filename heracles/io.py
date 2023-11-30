@@ -24,6 +24,7 @@ from collections.abc import MutableMapping
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
+from warnings import warn
 from weakref import WeakValueDictionary
 
 import fitsio
@@ -196,33 +197,19 @@ def _read_twopoint(fits, ext):
     return arr
 
 
-def read_mask(mask_name, nside=None, field=0, extra_mask_name=None):
+def read_vmap(filename, nside=None, field=0):
     """read visibility map from a HEALPix map file"""
-    mask = hp.read_map(mask_name, field=field)
+    vmap = hp.read_map(filename, field=field, dtype=float)
 
     # set unseen pixels to zero
-    unseen = np.where(mask == hp.UNSEEN)
-    mask[unseen] = 0
+    vmap[vmap == hp.UNSEEN] = 0
 
-    nside_mask = hp.get_nside(mask)
+    if nside is not None and nside != hp.get_nside(vmap):
+        # vmap is provided at a different resolution
+        warn(f"{filename}: changing NSIDE to {nside}")
+        vmap = hp.ud_grade(vmap, nside)
 
-    if nside is not None:
-        # mask is provided at a different resolution
-        if nside_mask < nside:
-            print("WARNING: Nside of mask < Nside of requested maps")
-        if nside_mask != nside:
-            mask = hp.ud_grade(mask, nside)
-            nside_mask = nside
-
-    # apply extra mask if given
-    if extra_mask_name is not None:
-        extra_mask = hp.read_map(extra_mask_name)
-        nside_extra = hp.get_nside(extra_mask)
-        if nside_extra != nside_mask:
-            extra_mask = hp.ud_grade(extra_mask, nside_mask)
-        mask *= extra_mask
-
-    return mask
+    return vmap
 
 
 def write_maps(
