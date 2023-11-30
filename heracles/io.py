@@ -72,6 +72,64 @@ def _read_metadata(hdu):
     return md
 
 
+def _write_map(fits, ext, m, *, names=None):
+    """write HEALPix map to FITS table"""
+
+    # prepare column data and names
+    cols = list(np.atleast_2d(m))
+    if names is None:
+        if len(cols) == 1:
+            names = ["MAP"]
+        else:
+            names = [f"MAP{j}" for j in range(1, len(cols) + 1)]
+
+    # write the data
+    fits.write_table(cols, names=names, extname=ext)
+
+    # HEALPix metadata
+    npix = np.shape(m)[-1]
+    nside = hp.npix2nside(npix)
+    fits[ext].write_key("PIXTYPE", "HEALPIX", "HEALPIX pixelisation")
+    fits[ext].write_key(
+        "ORDERING",
+        "RING",
+        "Pixel ordering scheme, either RING or NESTED",
+    )
+    fits[ext].write_key("NSIDE", nside, "Resolution parameter of HEALPIX")
+    fits[ext].write_key("FIRSTPIX", 0, "First pixel # (0 based)")
+    fits[ext].write_key("LASTPIX", npix - 1, "Last pixel # (0 based)")
+    fits[ext].write_key(
+        "INDXSCHM",
+        "IMPLICIT",
+        "Indexing: IMPLICIT or EXPLICIT",
+    )
+    fits[ext].write_key(
+        "OBJECT",
+        "FULLSKY",
+        "Sky coverage, either FULLSKY or PARTIAL",
+    )
+
+    # write the metadata
+    _write_metadata(fits[ext], m.dtype.metadata)
+
+
+def _read_map(fits, ext):
+    """read HEALPix map from FITS table"""
+
+    # read the map from the extension
+    m = fits[ext].read()
+
+    # turn the structured array of columns into an unstructured array
+    # transpose so that columns become rows (as that is how maps are)
+    # then squeeze out degenerate axes
+    m = np.squeeze(np.lib.recfunctions.structured_to_unstructured(m).T)
+
+    # read and attach metadata
+    m.dtype = np.dtype(m.dtype, metadata=_read_metadata(fits[ext]))
+
+    return m
+
+
 def _write_complex(fits, ext, arr):
     """write complex-valued data to FITS table"""
     # write the data
@@ -223,41 +281,8 @@ def write_maps(
             ext = f"MAP{mapn}"
             mapn += 1
 
-            # prepare column data and names
-            cols = list(np.atleast_2d(m))
-            if len(cols) == 1:
-                colnames = [n]
-            else:
-                colnames = [f"{n}{j+1}" for j in range(len(cols))]
-
-            # write the data
-            fits.write_table(cols, names=colnames, extname=ext)
-
-            # write the metadata
-            _write_metadata(fits[ext], m.dtype.metadata)
-
-            # HEALPix metadata
-            npix = np.shape(m)[-1]
-            nside = hp.npix2nside(npix)
-            fits[ext].write_key("PIXTYPE", "HEALPIX", "HEALPIX pixelisation")
-            fits[ext].write_key(
-                "ORDERING",
-                "RING",
-                "Pixel ordering scheme, either RING or NESTED",
-            )
-            fits[ext].write_key("NSIDE", nside, "Resolution parameter of HEALPIX")
-            fits[ext].write_key("FIRSTPIX", 0, "First pixel # (0 based)")
-            fits[ext].write_key("LASTPIX", npix - 1, "Last pixel # (0 based)")
-            fits[ext].write_key(
-                "INDXSCHM",
-                "IMPLICIT",
-                "Indexing: IMPLICIT or EXPLICIT",
-            )
-            fits[ext].write_key(
-                "OBJECT",
-                "FULLSKY",
-                "Sky coverage, either FULLSKY or PARTIAL",
-            )
+            # write the map in HEALPix FITS format
+            _write_map(fits, ext, m)
 
             # write the TOC entry
             tocentry[0] = (ext, n, i)
@@ -292,19 +317,8 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
 
             logger.info("reading %s map for bin %s", n, i)
 
-            # read the map from the extension
-            m = fits[ext].read()
-
-            # turn the structured array of columns into an unstructured array
-            # transpose so that columns become rows (as that is how maps are)
-            # then squeeze out degenerate axes
-            m = np.squeeze(np.lib.recfunctions.structured_to_unstructured(m).T)
-
-            # read and attach metadata
-            m.dtype = np.dtype(m.dtype, metadata=_read_metadata(fits[ext]))
-
-            # store in set of maps
-            maps[n, i] = m
+            # read the map from the extension and store in set of maps
+            maps[n, i] = _read_map(fits, ext)
 
     logger.info("done with %d maps", len(maps))
 
@@ -854,6 +868,15 @@ class TocFits(MutableMapping):
         # fitsio does not support deletion of extensions
         msg = "deleting FITS extensions is not supported"
         raise NotImplementedError(msg)
+
+
+class MapFits(TocFits):
+    """FITS-backed mapping for maps."""
+
+    tag = "MAP"
+    columns = {"NAME": "10A", "BIN": "I"}
+    reader = staticmethod(_read_map)
+    writer = staticmethod(_write_map)
 
 
 class AlmFits(TocFits):
