@@ -455,9 +455,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
     Complex maps can have non-zero spin weight, set using the ``spin=``
     parameter.
 
-    Can optionally flip the sign of the second shear component,
-    depending on the ``conjugate`` property.
-
     """
 
     def __init__(
@@ -470,7 +467,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         weight: t.Optional[str] = None,
         *,
         spin: int = 0,
-        conjugate: bool = False,
         normalize: bool = True,
         randomize: bool = False,
         rng: t.Optional[np.random.Generator] = None,
@@ -478,7 +474,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         """Create a new shear map."""
 
         self._spin: int = spin
-        self._conjugate: bool = conjugate
         super().__init__(
             columns=(lon, lat, real, imag, weight),
             nside=nside,
@@ -497,16 +492,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         """Set the spin weight."""
         self._spin = spin
 
-    @property
-    def conjugate(self) -> bool:
-        """Flag to conjugate shear maps."""
-        return self._conjugate
-
-    @conjugate.setter
-    def conjugate(self, conjugate: bool) -> None:
-        """Set the conjugate flag."""
-        self._conjugate = conjugate
-
     def __call__(self, catalog: "Catalog") -> MapGenerator:
         """Map shears from catalogue to HEALPix map."""
 
@@ -514,7 +499,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         *col, wcol = self.columns
 
         # get the map properties
-        conjugate = self.conjugate
         randomize = self.randomize
 
         # number of pixels for nside
@@ -543,9 +527,6 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
                 w = np.ones(page.size)
             else:
                 w = page.get(wcol)
-
-            if conjugate:
-                im = -im
 
             if randomize:
                 a = self.rng.uniform(0.0, 2 * np.pi, size=page.size)
