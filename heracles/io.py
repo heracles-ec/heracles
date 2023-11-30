@@ -28,7 +28,6 @@ from warnings import warn
 from weakref import WeakValueDictionary
 
 import fitsio
-import healpy as hp
 import numpy as np
 
 from .core import TocDict, toc_match
@@ -75,6 +74,8 @@ def _read_metadata(hdu):
 
 def _write_map(fits, ext, m, *, names=None):
     """write HEALPix map to FITS table"""
+
+    import healpy as hp
 
     # prepare column data and names
     cols = list(np.atleast_2d(m))
@@ -199,6 +200,9 @@ def _read_twopoint(fits, ext):
 
 def read_vmap(filename, nside=None, field=0):
     """read visibility map from a HEALPix map file"""
+
+    import healpy as hp
+
     vmap = hp.read_map(filename, field=field, dtype=float)
 
     # set unseen pixels to zero

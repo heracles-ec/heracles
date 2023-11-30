@@ -20,7 +20,6 @@
 
 import warnings
 
-import healpy as hp
 import numpy as np
 
 
@@ -65,8 +64,10 @@ class FootprintFilter:
 
     def __init__(self, footprint, lon, lat):
         """Filter using the given footprint map and position columns."""
+        from healpy import get_nside
+
         self._footprint = footprint
-        self._nside = hp.get_nside(footprint)
+        self._nside = get_nside(footprint)
         self._lonlat = (lon, lat)
 
     @property
@@ -87,7 +88,9 @@ class FootprintFilter:
     def __call__(self, page):
         """filter catalog page"""
 
+        from healpy import ang2pix
+
         lon, lat = self._lonlat
-        ipix = hp.ang2pix(self._nside, page[lon], page[lat], lonlat=True)
+        ipix = ang2pix(self._nside, page[lon], page[lat], lonlat=True)
         exclude = np.where(self._footprint[ipix] == 0)[0]
         page.delete(exclude)
