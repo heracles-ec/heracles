@@ -2,8 +2,6 @@ import healpy as hp
 import numpy as np
 import pytest
 
-from .conftest import warns
-
 
 def map_catalog(m, catalog):
     g = m(catalog)
@@ -82,6 +80,7 @@ def catalog(page):
 
 
 def test_visibility_map(nside, vmap):
+    from contextlib import nullcontext
     from unittest.mock import Mock
 
     from heracles.maps import VisibilityMap
@@ -94,7 +93,7 @@ def test_visibility_map(nside, vmap):
 
         mapper = VisibilityMap(nside_out)
 
-        with warns(UserWarning if nside != nside_out else None):
+        with pytest.warns(UserWarning) if nside != nside_out else nullcontext():
             result = mapper(catalog)
 
         assert result is not vmap
