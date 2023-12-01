@@ -392,13 +392,13 @@ def test_fits_catalog(rng, tmp_path):
     ra = rng.uniform(-180, 180, size=size)
     dec = rng.uniform(-90, 90, size=size)
 
-    filename = str(tmp_path / "catalog.fits")
+    path = tmp_path / "catalog.fits"
 
-    with fitsio.FITS(filename, "rw") as fits:
+    with fitsio.FITS(path, "rw") as fits:
         fits.write(None)
         fits.write_table([ra, dec], names=["RA", "DEC"], extname="MYEXT")
 
-    catalog = FitsCatalog(filename)
+    catalog = FitsCatalog(path)
 
     assert isinstance(catalog, Catalog)
 
@@ -441,7 +441,7 @@ def test_fits_catalog(rng, tmp_path):
 
     assert isinstance(copied, FitsCatalog)
     assert copied is not catalog
-    assert copied._filename == catalog._filename
+    assert copied._path == catalog._path
     assert copied._columns == catalog._columns
     assert copied._ext == catalog._ext
 
@@ -457,13 +457,13 @@ def test_fits_catalog_caching(rng, tmp_path):
     ra = rng.uniform(-180, 180, size=size)
     dec = rng.uniform(-90, 90, size=size)
 
-    filename = str(tmp_path / "cached.fits")
+    path = tmp_path / "cached.fits"
 
-    with fitsio.FITS(filename, "rw") as fits:
+    with fitsio.FITS(path, "rw") as fits:
         fits.write(None)
         fits.write_table([ra, dec], names=["RA", "DEC"], extname="MYEXT")
 
-    catalog = FitsCatalog(filename)
+    catalog = FitsCatalog(path)
 
     hdu = catalog.hdu()
     assert catalog.hdu() is hdu
@@ -472,7 +472,7 @@ def test_fits_catalog_caching(rng, tmp_path):
 
     _fits = hdu._FITS
 
-    assert _fits.filename() == filename
+    assert _fits.filename() == str(path)
 
     del hdu
     gc.collect()

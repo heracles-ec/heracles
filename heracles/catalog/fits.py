@@ -38,31 +38,36 @@ def rowfilter(array, expr):
 class FitsCatalog(CatalogBase):
     """flexible reader for catalogues from FITS files"""
 
-    def __init__(self, filename, *, columns=None, ext=None):
+    def __init__(self, path, *, columns=None, ext=None):
         """create a new FITS catalogue reader
 
         Neither opens the FITS file nor reads the catalogue immediately.
 
         """
         super().__init__()
-        self._filename = filename
+        self._path = path
         self._columns = columns
         self._ext = ext
 
     def __copy__(self):
         """return a copy of this catalog"""
         other = super().__copy__()
-        other._filename = self._filename
+        other._path = self._path
         other._columns = self._columns
         other._ext = self._ext
         return other
 
     def __repr__(self):
         """string representation of FitsCatalog"""
-        s = self._filename
+        s = self._path
         if self._ext is not None:
             s = s + f"[{self._ext!r}]"
         return s
+
+    @property
+    def path(self):
+        """path of the FITS file"""
+        return self._path
 
     def hdu(self):
         """HDU for catalogue data"""
@@ -77,7 +82,7 @@ class FitsCatalog(CatalogBase):
         if hdu is None:
             # need to open the fits file explicitly, not via context manager
             # we will not close it, to keep the HDU alive
-            fits = fitsio.FITS(self._filename)
+            fits = fitsio.FITS(self._path)
 
             # but ensure fits gets closed in case of error
             try:
