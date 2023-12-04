@@ -94,6 +94,23 @@ def test_angular_power_spectra(mock_alms):
 
     assert cls.keys() == {(k1, k2, i1, i2) for k1, k2, i1, i2 in comb if i1 != 1}
 
+    # explicit cross with separate alms
+
+    mock_alms1 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 0}
+    mock_alms2 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 1}
+
+    order = ["P", "G_E", "G_B"]
+
+    comb12 = {
+        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
+        for k1, i1 in mock_alms1.keys()
+        for k2, i2 in mock_alms2.keys()
+    }
+
+    cls = angular_power_spectra(mock_alms1, mock_alms2)
+
+    assert cls.keys() == comb12
+
 
 def test_debias_cls():
     from heracles.twopoint import debias_cls
