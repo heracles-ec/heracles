@@ -100,9 +100,10 @@ def angular_power_spectra(
 
         # retrieve alms from keys; make sure swap is respected
         # this is done only now because alms might lazy-load from file
-        alm1, alm2 = alms[k1, i1], alms2[k2, i2]
         if swapped:
-            alm1, alm2 = alm2, alm1
+            alm1, alm2 = alms2[k1, i1], alms[k2, i2]
+        else:
+            alm1, alm2 = alms[k1, i1], alms2[k2, i2]
 
         # compute the raw cl from the alms
         cl = hp.alm2cl(alm1, alm2, lmax_out=lmax)
