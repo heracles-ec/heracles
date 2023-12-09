@@ -18,23 +18,29 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for map-making"""
 
-import logging
-import typing as t
+from __future__ import annotations
+
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Generator, Mapping
+from collections.abc import Mapping
 from functools import partial, wraps
+from typing import TYPE_CHECKING
 
+import coroutines
 import healpy as hp
 import numpy as np
 from numba import njit
 
 from .core import TocDict, toc_match
 
-if t.TYPE_CHECKING:
-    from .catalog import Catalog, CatalogPage
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable, MutableMapping, Sequence
+    from typing import Any
 
-logger = logging.getLogger(__name__)
+    from numpy.typing import ArrayLike
+
+    from .catalog import Catalog, CatalogPage
+    from .progress import Progress, ProgressTask
 
 
 def _nativebyteorder(fn):
@@ -104,16 +110,6 @@ def update_metadata(array, **metadata):
     array.dtype = dt
 
 
-# type alias for map data
-MapData = np.ndarray
-
-# type hint for functions returned by map generators
-MapFunction = t.Callable[["CatalogPage"], None]
-
-# type hint for map generators
-MapGenerator = t.Generator[MapFunction, None, MapData]
-
-
 class Map(metaclass=ABCMeta):
     """Abstract base class for map making from catalogues.
 
@@ -122,18 +118,23 @@ class Map(metaclass=ABCMeta):
 
     """
 
-    def __init__(self, columns: tuple[t.Optional[str]]) -> None:
+    def __init__(self, columns: tuple[str | None]) -> None:
         """Initialise the map."""
         self._columns = columns
         super().__init__()
 
     @property
-    def columns(self) -> tuple[t.Optional[str]]:
+    def columns(self) -> tuple[str | None]:
         """Return the catalogue columns used by this map."""
         return self._columns
 
     @abstractmethod
-    def __call__(self, catalog: "Catalog") -> t.Union[MapData, MapGenerator]:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Implementation for mapping a catalogue."""
         ...
 
@@ -177,7 +178,7 @@ class RandomizableMap(Map):
         self,
         randomize: bool,
         *,
-        rng: t.Optional[np.random.Generator] = None,
+        rng: np.random.Generator | None = None,
         **kwargs,
     ) -> None:
         """Initialise map with the given randomize property."""
@@ -230,6 +231,28 @@ class NormalizableMap(Map):
         self._normalize = normalize
 
 
+async def _pages(
+    catalog: Catalog,
+    progress: ProgressTask | None,
+) -> AsyncIterable[CatalogPage]:
+    """
+    Asynchronous generator for the pages of a catalogue.  Also manages
+    progress updates.
+    """
+    page_size = catalog.page_size
+    if progress:
+        progress.update(total=catalog.size)
+    for page in catalog:
+        await coroutines.sleep()
+        yield page
+        if progress:
+            progress.update(advance=page_size)
+    if progress:
+        progress.update(completed=0, total=None, refresh=True)
+    # suspend again to give all concurrent loops a chance to finish
+    await coroutines.sleep()
+
+
 class PositionMap(HealpixMap, RandomizableMap):
     """Create HEALPix maps from positions in a catalogue.
 
@@ -246,7 +269,7 @@ class PositionMap(HealpixMap, RandomizableMap):
         *,
         overdensity: bool = True,
         randomize: bool = False,
-        rng: t.Optional[np.random.Generator] = None,
+        rng: np.random.Generator | None = None,
     ) -> None:
         """Create a position map with the given properties."""
         super().__init__(columns=(lon, lat), nside=nside, randomize=randomize, rng=rng)
@@ -261,8 +284,14 @@ class PositionMap(HealpixMap, RandomizableMap):
     def overdensity(self, overdensity: bool) -> None:
         self._overdensity = overdensity
 
-    def __call__(self, catalog: "Catalog") -> MapGenerator:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Map the given catalogue."""
+
         # get catalogue column definition
         col = self.columns
 
@@ -275,10 +304,8 @@ class PositionMap(HealpixMap, RandomizableMap):
         # keep track of the total number of galaxies
         ngal = 0
 
-        # function to map catalogue data
-        def mapper(page: "CatalogPage") -> None:
-            nonlocal ngal
-
+        # map catalogue data asynchronously
+        async for page in _pages(catalog, progress):
             if not self._randomize:
                 lon, lat = page.get(*col)
                 ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
@@ -286,10 +313,11 @@ class PositionMap(HealpixMap, RandomizableMap):
 
             ngal += page.size
 
-        # the mapper function is yield-ed to be applied over the catalogue
-        yield mapper
+            # clean up to free unneeded memory
+            del page, lon, lat
 
-        # when function resumes, mapping has finished
+        if progress:
+            progress.update(completed=0, total=5)
 
         # get visibility map if present in catalogue
         vmap = catalog.visibility
@@ -299,6 +327,9 @@ class PositionMap(HealpixMap, RandomizableMap):
             warnings.warn("position and visibility maps have different NSIDE")
             vmap = hp.ud_grade(vmap, self.nside)
 
+        if progress:
+            progress.update(advance=1)
+
         # randomise position map if asked to
         if self._randomize:
             if vmap is None:
@@ -307,6 +338,9 @@ class PositionMap(HealpixMap, RandomizableMap):
                 p = vmap / np.sum(vmap)
             pos[:] = self.rng.multinomial(ngal, p)
 
+        if progress:
+            progress.update(advance=1)
+
         # compute average number density
         nbar = ngal / npix
         if vmap is None:
@@ -314,6 +348,9 @@ class PositionMap(HealpixMap, RandomizableMap):
         else:
             vbar = np.mean(vmap)
             nbar /= vbar
+
+        if progress:
+            progress.update(advance=1)
 
         # compute overdensity if asked to
         if self._overdensity:
@@ -328,6 +365,9 @@ class PositionMap(HealpixMap, RandomizableMap):
             power = 1
             bias = (4 * np.pi / npix) * (ngal / npix)
 
+        if progress:
+            progress.update(advance=1)
+
         # set metadata of array
         update_metadata(
             pos,
@@ -339,6 +379,9 @@ class PositionMap(HealpixMap, RandomizableMap):
             power=power,
             bias=bias,
         )
+
+        if progress:
+            progress.update(advance=1)
 
         # return the position map
         return pos
@@ -353,7 +396,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         lon: str,
         lat: str,
         value: str,
-        weight: t.Optional[str] = None,
+        weight: str | None = None,
         *,
         normalize: bool = True,
     ) -> None:
@@ -365,7 +408,12 @@ class ScalarMap(HealpixMap, NormalizableMap):
             normalize=normalize,
         )
 
-    def __call__(self, catalog: "Catalog") -> MapGenerator:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Map real values from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
@@ -384,9 +432,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and map values
-        def mapper(page: "CatalogPage") -> None:
-            nonlocal ngal, wmean, var
-
+        async for page in _pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -406,10 +452,8 @@ class ScalarMap(HealpixMap, NormalizableMap):
                 wmean += (w - wmean).sum() / ngal
                 var += ((w * v) ** 2 - var).sum() / ngal
 
-        # the mapper function is yield-ed to be applied over the catalogue
-        yield mapper
-
-        # when function resumes, mapping has finished
+            # clean up and yield control to main loop
+            del page, lon, lat, v, w
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -464,12 +508,12 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         lat: str,
         real: str,
         imag: str,
-        weight: t.Optional[str] = None,
+        weight: str | None = None,
         *,
         spin: int = 0,
         normalize: bool = True,
         randomize: bool = False,
-        rng: t.Optional[np.random.Generator] = None,
+        rng: np.random.Generator | None = None,
     ) -> None:
         """Create a new shear map."""
 
@@ -492,7 +536,12 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         """Set the spin weight."""
         self._spin = spin
 
-    def __call__(self, catalog: "Catalog") -> MapGenerator:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Map shears from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
@@ -515,9 +564,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
         # go through pages in catalogue and get the shear values,
         # randomise if asked to, and do the mapping
-        def mapper(page: "CatalogPage") -> None:
-            nonlocal ngal, wmean, var
-
+        async for page in _pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -543,10 +590,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
                 wmean += (w - wmean).sum() / ngal
                 var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
 
-        # the mapper function is yield-ed to be applied over the catalogue
-        yield mapper
-
-        # when function resumes, mapping has finished
+            del page, lon, lat, re, im, w
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -593,7 +637,12 @@ class VisibilityMap(HealpixMap):
         """Create visibility map at given NSIDE parameter."""
         super().__init__(columns=(), nside=nside)
 
-    def __call__(self, catalog: "Catalog") -> MapData:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Create a visibility map from the given catalogue."""
 
         # make sure that catalogue has a visibility map
@@ -641,7 +690,12 @@ class WeightMap(HealpixMap, NormalizableMap):
         """Create a new weight map."""
         super().__init__(columns=(lon, lat, weight), nside=nside, normalize=normalize)
 
-    def __call__(self, catalog: "Catalog") -> MapGenerator:
+    async def __call__(
+        self,
+        catalog: Catalog,
+        *,
+        progress: ProgressTask | None = None,
+    ) -> ArrayLike:
         """Map catalogue weights."""
 
         # get the columns for this map
@@ -655,7 +709,7 @@ class WeightMap(HealpixMap, NormalizableMap):
         wht = np.zeros(npix)
 
         # map catalogue
-        def mapper(page: "CatalogPage") -> None:
+        async for page in _pages(catalog, progress):
             lon, lat = page.get(*col)
 
             if wcol is None:
@@ -667,10 +721,7 @@ class WeightMap(HealpixMap, NormalizableMap):
 
             _map_weight(wht, ipix, w)
 
-        # the mapper function is yield-ed to be applied over the catalogue
-        yield mapper
-
-        # when function resumes, mapping has finished
+            del page, lon, lat, w
 
         # compute average weight in nonzero pixels
         wbar = wht.mean()
@@ -704,138 +755,112 @@ ShearMap = Spin2Map
 EllipticityMap = Spin2Map
 
 
-def _close_and_return(generator):
+async def _mapper_task(
+    key: tuple[Any, ...],
+    mapper: Map,
+    catalog: Catalog,
+    progress: Progress,
+) -> ArrayLike:
+    """
+    Removes the task when coroutine finishes.
+    """
+    name = "[" + ", ".join(map(str, key)) + "]"
+    task = progress.task(name, subtask=True, total=None)
     try:
-        next(generator)
-    except StopIteration as end:
-        return end.value
-    else:
-        msg = "generator did not stop"
-        raise RuntimeError(msg)
+        return await mapper(catalog, progress=task)
+    finally:
+        task.remove()
+        progress.advance(progress.task_ids[0])
 
 
 def map_catalogs(
-    maps: t.Mapping[t.Any, Map],
-    catalogs: t.Mapping[t.Any, "Catalog"],
+    maps: Mapping[Any, Map],
+    catalogs: Mapping[Any, Catalog],
     *,
     parallel: bool = False,
-    out: t.MutableMapping[t.Any, t.Any] = None,
-    include: t.Optional[t.Sequence[tuple[t.Any, t.Any]]] = None,
-    exclude: t.Optional[t.Sequence[tuple[t.Any, t.Any]]] = None,
+    out: MutableMapping[Any, Any] = None,
+    include: Sequence[tuple[Any, Any]] | None = None,
+    exclude: Sequence[tuple[Any, Any]] | None = None,
     progress: bool = False,
-) -> dict[tuple[t.Any, t.Any], MapData]:
+) -> dict[tuple[Any, Any], ArrayLike]:
     """Make maps for a set of catalogues."""
 
     # the toc dict of maps
     if out is None:
         out = TocDict()
 
+    # collect groups of items to go through
+    # groups are tuples of (name, items)
+    # items are tuples of (key, mapper, catalog, name)
+    if parallel:
+        # one group of all items
+        groups = [
+            (
+                None,
+                [
+                    ((k, i), mapper, catalog)
+                    for i, catalog in catalogs.items()
+                    for k, mapper in maps.items()
+                ],
+            ),
+        ]
+    else:
+        # one group for each catalogue
+        groups = [
+            (i, [((k, i), mapper, catalog) for k, mapper in maps.items()])
+            for i, catalog in catalogs.items()
+        ]
+
     # display a progress bar if asked to
     if progress:
-        from .util import Progress
+        from .progress import Progress
 
-        prog = Progress()
+        # create the progress bar
+        # add the main task -- this must be the first task
+        _progress = Progress()
+        total_items = sum(len(items) for _, items in groups)
+        _progress.add_task("mapping", total=total_items)
+        _progress.start()
 
-    # collect groups of catalogues to go through if parallel
-    if parallel:
-        groups = {}
-        for i, catalog in catalogs.items():
-            if (catalog.size, catalog.page_size) not in groups:
-                groups[catalog.size, catalog.page_size] = {}
-            groups[catalog.size, catalog.page_size][i] = catalog
-        # unnamed groups of catalogues
-        items = ((None, group) for group in groups.values())
-    else:
-        # consider each catalogue its own named group
-        items = ((i, {i: catalog}) for i, catalog in catalogs.items())
-
-    # map each group: run through catalogues and maps
-    for name, group in items:
-        # apply the maps to each catalogue in the group
-        results = {}
-        if progress:
-            prog.start(len(maps) * len(group), name)
-        for i, catalog in group.items():
-            for k, mapper in maps.items():
-                if toc_match((k, i), include, exclude):
-                    results[k, i] = mapper(catalog)
+    # process all groups of mappers and catalogues
+    for name, items in groups:
+        # mappers return coroutines, which are ran concurrently
+        keys, coros = [], []
+        for key, mapper, catalog in items:
+            if toc_match(key, include, exclude):
                 if progress:
-                    prog.update()
-        if progress:
-            prog.stop()
+                    coro = _mapper_task(key, mapper, catalog, _progress)
+                else:
+                    coro = mapper(catalog)
+                keys.append(key)
+                coros.append(coro)
 
-        # collect map generators from results
-        gen = {ki: v for ki, v in results.items() if isinstance(v, Generator)}
+        # run all coroutines concurrently
+        results = coroutines.run(coroutines.gather(*coros))
 
-        # if there are any generators, feed them the catalogue pages
-        if gen:
-            # get an iterator over each catalogue
-            # by construction, these have all the same length and page size
-            its = {i: iter(catalog) for i, catalog in group.items()}
+        # store results; extra results are truncated to length of keys
+        for key, value in zip(keys, results):
+            out[key] = value
 
-            # get the iteration limits of this group from first catalog
-            size, page_size = next((c.size, c.page_size) for c in group.values())
-
-            # get the mapping functions from each generator
-            fns = {ki: next(g) for ki, g in gen.items()}
-
-            # go through each page of each catalogue once
-            # give each page to each generator
-            # make copies to that generators can delete() etc.
-            if progress:
-                prog.start(size, name)
-            for rownum in range(0, size, page_size):
-                for i, it in its.items():
-                    try:
-                        page = next(it)
-                    except StopIteration:
-                        msg = f"catalog {i} finished prematurely in page started at row {rownum}"
-                        raise RuntimeError(
-                            msg,
-                        )
-                    for k in maps:
-                        if (fn := fns.get((k, i))) is not None:
-                            fn(page.copy())
-                if progress:
-                    prog.update(page_size)
-            if progress:
-                prog.stop()
-
-            # done with the mapping functions
-            del fn, fns
-
-            # terminate generators and store results
-            if progress:
-                prog.start(len(gen), name)
-            for ki, g in gen.items():
-                results[ki] = _close_and_return(g)
-                if progress:
-                    prog.update()
-            if progress:
-                prog.stop()
-
-            # done with the generators
-            del gen
-
-        # store results
-        for ki, v in results.items():
-            out[ki] = v
-
-        # results are no longer needed
+        # free up memory for next group
         del results
+
+    if progress:
+        _progress.refresh()
+        _progress.stop()
 
     # return the toc dict
     return out
 
 
 def transform_maps(
-    maps: t.Mapping[tuple[t.Any, t.Any], MapData],
+    maps: Mapping[tuple[Any, Any], ArrayLike],
     *,
-    lmax: t.Union[int, t.Mapping[t.Any, int], None] = None,
-    out: t.MutableMapping[t.Any, t.Any] = None,
+    lmax: int | Mapping[Any, int] | None = None,
+    out: MutableMapping[Any, Any] = None,
     progress: bool = False,
     **kwargs,
-) -> dict[tuple[t.Any, t.Any], np.ndarray]:
+) -> dict[tuple[Any, Any], ArrayLike]:
     """transform a set of maps to alms"""
 
     # the output toc dict
@@ -844,10 +869,11 @@ def transform_maps(
 
     # display a progress bar if asked to
     if progress:
-        from .util import Progress
+        from .progress import Progress
 
-        prog = Progress()
-        prog.start(len(maps))
+        _progress = Progress()
+        _task = _progress.task("transform", total=len(maps))
+        _progress.start()
 
     # convert maps to alms, taking care of complex and spin-weighted maps
     for (k, i), m in maps.items():
@@ -859,7 +885,13 @@ def transform_maps(
         md = m.dtype.metadata or {}
         spin = md.get("spin", 0)
 
-        logger.info("transforming %s map (spin %s) for bin %s", k, spin, i)
+        if progress:
+            _subtask = _progress.task(
+                f"[{k}, {i}]",
+                subtask=True,
+                start=False,
+                total=None,
+            )
 
         if spin == 0:
             pol = False
@@ -884,10 +916,12 @@ def transform_maps(
         del m, alms, alm
 
         if progress:
-            prog.update()
+            _subtask.remove()
+            _task.update(advance=1)
 
     if progress:
-        prog.stop()
+        _progress.refresh()
+        _progress.stop()
 
     # return the toc dict of alms
     return out
