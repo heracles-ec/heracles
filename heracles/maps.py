@@ -826,7 +826,7 @@ def map_catalogs(
         # run all coroutines concurrently
         results = coroutines.run(coroutines.gather(*coros))
 
-        # store results; extra results are truncated to length of keys
+        # store results
         for key, value in zip(keys, results):
             out[key] = value
 
