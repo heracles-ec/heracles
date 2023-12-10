@@ -790,26 +790,15 @@ def map_catalogs(
         out = TocDict()
 
     # collect groups of items to go through
-    # groups are tuples of (name, items)
-    # items are tuples of (key, mapper, catalog, name)
+    # items are tuples of (key, mapper, catalog)
+    groups = [
+        [((k, i), mapper, catalog) for k, mapper in maps.items()]
+        for i, catalog in catalogs.items()
+    ]
+
+    # flatten groups for parallel processing
     if parallel:
-        # one group of all items
-        groups = [
-            (
-                None,
-                [
-                    ((k, i), mapper, catalog)
-                    for i, catalog in catalogs.items()
-                    for k, mapper in maps.items()
-                ],
-            ),
-        ]
-    else:
-        # one group for each catalogue
-        groups = [
-            (i, [((k, i), mapper, catalog) for k, mapper in maps.items()])
-            for i, catalog in catalogs.items()
-        ]
+        groups = [sum(groups, [])]
 
     # display a progress bar if asked to
     if progress:
@@ -818,12 +807,11 @@ def map_catalogs(
         # create the progress bar
         # add the main task -- this must be the first task
         _progress = Progress()
-        total_items = sum(len(items) for _, items in groups)
-        _progress.add_task("mapping", total=total_items)
+        _progress.add_task("mapping", total=sum(map(len, groups)))
         _progress.start()
 
     # process all groups of mappers and catalogues
-    for name, items in groups:
+    for items in groups:
         # mappers return coroutines, which are ran concurrently
         keys, coros = [], []
         for key, mapper, catalog in items:
