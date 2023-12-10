@@ -241,14 +241,12 @@ async def _pages(
     """
     page_size = catalog.page_size
     if progress:
-        progress.update(total=catalog.size)
+        progress.update(completed=0, total=catalog.size)
     for page in catalog:
         await coroutines.sleep()
         yield page
         if progress:
             progress.update(advance=page_size)
-    if progress:
-        progress.update(completed=0, total=None, refresh=True)
     # suspend again to give all concurrent loops a chance to finish
     await coroutines.sleep()
 
@@ -316,9 +314,6 @@ class PositionMap(HealpixMap, RandomizableMap):
             # clean up to free unneeded memory
             del page, lon, lat
 
-        if progress:
-            progress.update(completed=0, total=5)
-
         # get visibility map if present in catalogue
         vmap = catalog.visibility
 
@@ -326,9 +321,6 @@ class PositionMap(HealpixMap, RandomizableMap):
         if vmap is not None and hp.get_nside(vmap) != self.nside:
             warnings.warn("position and visibility maps have different NSIDE")
             vmap = hp.ud_grade(vmap, self.nside)
-
-        if progress:
-            progress.update(advance=1)
 
         # randomise position map if asked to
         if self._randomize:
@@ -338,9 +330,6 @@ class PositionMap(HealpixMap, RandomizableMap):
                 p = vmap / np.sum(vmap)
             pos[:] = self.rng.multinomial(ngal, p)
 
-        if progress:
-            progress.update(advance=1)
-
         # compute average number density
         nbar = ngal / npix
         if vmap is None:
@@ -348,9 +337,6 @@ class PositionMap(HealpixMap, RandomizableMap):
         else:
             vbar = np.mean(vmap)
             nbar /= vbar
-
-        if progress:
-            progress.update(advance=1)
 
         # compute overdensity if asked to
         if self._overdensity:
@@ -365,9 +351,6 @@ class PositionMap(HealpixMap, RandomizableMap):
             power = 1
             bias = (4 * np.pi / npix) * (ngal / npix)
 
-        if progress:
-            progress.update(advance=1)
-
         # set metadata of array
         update_metadata(
             pos,
@@ -379,9 +362,6 @@ class PositionMap(HealpixMap, RandomizableMap):
             power=power,
             bias=bias,
         )
-
-        if progress:
-            progress.update(advance=1)
 
         # return the position map
         return pos
@@ -792,8 +772,8 @@ def map_catalogs(
     # collect groups of items to go through
     # items are tuples of (key, mapper, catalog)
     groups = [
-        [((k, i), mapper, catalog) for k, mapper in maps.items()]
-        for i, catalog in catalogs.items()
+        [((i, j), mapper, catalog) for i, mapper in maps.items()]
+        for j, catalog in catalogs.items()
     ]
 
     # flatten groups for parallel processing
