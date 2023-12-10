@@ -1,20 +1,7 @@
+import coroutines
 import healpy as hp
 import numpy as np
 import pytest
-
-
-def map_catalog(m, catalog):
-    g = m(catalog)
-    fn = next(g)
-    for page in catalog:
-        fn(page)
-    try:
-        next(g)
-    except StopIteration as stop:
-        return stop.value
-    else:
-        msg = "generator did not stop"
-        raise RuntimeError(msg)
 
 
 @pytest.fixture
@@ -94,7 +81,7 @@ def test_visibility_map(nside, vmap):
         mapper = VisibilityMap(nside_out)
 
         with pytest.warns(UserWarning) if nside != nside_out else nullcontext():
-            result = mapper(catalog)
+            result = coroutines.run(mapper(catalog))
 
         assert result is not vmap
 
@@ -113,7 +100,7 @@ def test_visibility_map(nside, vmap):
     catalog.visibility = None
     mapper = VisibilityMap(nside)
     with pytest.raises(ValueError, match="no visibility"):
-        mapper(catalog)
+        coroutines.run(mapper(catalog))
 
 
 def test_position_map(nside, catalog, vmap):
@@ -125,7 +112,8 @@ def test_position_map(nside, catalog, vmap):
 
     # normal mode: compute overdensity maps with metadata
 
-    m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
+    mapper = PositionMap(nside, "ra", "dec")
+    m = coroutines.run(mapper(catalog))
 
     nbar = 4.0
     assert m.shape == (npix,)
@@ -142,7 +130,8 @@ def test_position_map(nside, catalog, vmap):
 
     # compute number count map
 
-    m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
+    mapper = PositionMap(nside, "ra", "dec", overdensity=False)
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (npix,)
     assert m.dtype.metadata == {
@@ -161,7 +150,8 @@ def test_position_map(nside, catalog, vmap):
     catalog.visibility = vmap
     nbar /= vmap.mean()
 
-    m = map_catalog(PositionMap(nside, "ra", "dec"), catalog)
+    mapper = PositionMap(nside, "ra", "dec")
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
     assert m.dtype.metadata == {
@@ -176,7 +166,8 @@ def test_position_map(nside, catalog, vmap):
 
     # compute number count map with visibility map
 
-    m = map_catalog(PositionMap(nside, "ra", "dec", overdensity=False), catalog)
+    mapper = PositionMap(nside, "ra", "dec", overdensity=False)
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
     assert m.dtype.metadata == {
@@ -195,7 +186,8 @@ def test_scalar_map(nside, catalog):
 
     npix = 12 * nside**2
 
-    m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w"), catalog)
+    mapper = ScalarMap(nside, "ra", "dec", "g1", "w")
+    m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
@@ -216,7 +208,8 @@ def test_scalar_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    m = map_catalog(ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False), catalog)
+    mapper = ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False)
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (npix,)
     assert m.dtype.metadata == {
@@ -236,7 +229,8 @@ def test_complex_map(nside, catalog):
 
     npix = 12 * nside**2
 
-    m = map_catalog(ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2), catalog)
+    mapper = ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2)
+    m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
     re = next(iter(catalog))["g1"]
@@ -258,10 +252,8 @@ def test_complex_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    m = map_catalog(
-        ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False),
-        catalog,
-    )
+    mapper = ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False)
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (2, npix)
     assert m.dtype.metadata == {
@@ -279,7 +271,8 @@ def test_complex_map(nside, catalog):
 def test_weight_map(nside, catalog):
     from heracles.maps import WeightMap
 
-    m = map_catalog(WeightMap(nside, "ra", "dec", "w"), catalog)
+    mapper = WeightMap(nside, "ra", "dec", "w")
+    m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
@@ -296,7 +289,8 @@ def test_weight_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
 
-    m = map_catalog(WeightMap(nside, "ra", "dec", "w", normalize=False), catalog)
+    mapper = WeightMap(nside, "ra", "dec", "w", normalize=False)
+    m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
     assert m.dtype.metadata == {
@@ -416,7 +410,7 @@ class MockMap:
         self.args = []
         self.return_value = object()
 
-    def __call__(self, catalog):
+    async def __call__(self, catalog):
         self.args.append(catalog)
         return self.return_value
 
@@ -425,15 +419,6 @@ class MockMap:
 
     def assert_any_call(self, value):
         assert value in self.args
-
-
-class MockMapGen(MockMap):
-    def __call__(self, catalog):
-        def f(page):
-            pass
-
-        yield f
-        return super().__call__(catalog)
 
 
 class MockCatalog:
@@ -445,12 +430,11 @@ class MockCatalog:
             yield {}
 
 
-@pytest.mark.parametrize("Map", [MockMap, MockMapGen])
 @pytest.mark.parametrize("parallel", [False, True])
-def test_map_catalogs(Map, parallel):
+def test_map_catalogs(parallel):
     from heracles.maps import map_catalogs
 
-    maps = {"a": Map(), "b": Map(), "z": Map()}
+    maps = {"a": MockMap(), "b": MockMap(), "z": MockMap()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
     data = map_catalogs(maps, catalogs, parallel=parallel)
@@ -461,11 +445,10 @@ def test_map_catalogs(Map, parallel):
             assert data[k, i] is maps[k].return_value
 
 
-@pytest.mark.parametrize("Map", [MockMap, MockMapGen])
-def test_map_catalogs_match(Map):
+def test_map_catalogs_match():
     from heracles.maps import map_catalogs
 
-    maps = {"a": Map(), "b": Map(), "c": Map()}
+    maps = {"a": MockMap(), "b": MockMap(), "c": MockMap()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
     data = map_catalogs(maps, catalogs, include=[(..., "y")])

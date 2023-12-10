@@ -292,8 +292,11 @@ def test_random_bias(full, rng):
     catalog = unittest.mock.Mock()
     catalog.visibility = None
 
-    map_a = unittest.mock.Mock(side_effect=lambda _: rng.random(npix))
-    map_b = unittest.mock.Mock(side_effect=lambda _: rng.random(npix))
+    async def _call(_):
+        return rng.random(npix)
+
+    map_a = unittest.mock.Mock(side_effect=_call)
+    map_b = unittest.mock.Mock(side_effect=_call)
 
     initial_randomize = [map_a.randomize, map_b.randomize]
 

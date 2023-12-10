@@ -18,6 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for catalogue processing"""
 
+from functools import lru_cache
 from weakref import finalize, ref
 
 import fitsio
@@ -37,6 +38,9 @@ def rowfilter(array, expr):
 
 class FitsCatalog(CatalogBase):
     """flexible reader for catalogues from FITS files"""
+
+    READ_CACHE = 3
+    SELECT_CACHE = 3
 
     def __init__(self, path, *, columns=None, ext=None):
         """create a new FITS catalogue reader
@@ -127,6 +131,27 @@ class FitsCatalog(CatalogBase):
             return None
         return "(" + ") & (".join(map(str, filter(None, where))) + ")"
 
+    @lru_cache(maxsize=READ_CACHE)
+    def _read(self, start, stop):
+        """
+        Read a range of rows from FITS.
+        """
+
+        hdu = self.hdu()
+        names = self._names()
+        return hdu[names][start:stop]
+
+    @lru_cache(maxsize=SELECT_CACHE)
+    def _select(self, start, stop, selection):
+        """
+        Read a range of rows from FITS and apply selection.
+        """
+
+        rows = self._read(start, stop)
+        if selection is not None:
+            rows = rows[rowfilter(rows, selection)]
+        return rows
+
     def _pages(self, selection):
         """iterate pages of rows in FITS file, optionally using the query"""
 
@@ -139,32 +164,7 @@ class FitsCatalog(CatalogBase):
         # use all rows or selection if one is given
         nrows = hdu.get_nrows()
 
-        # information for caching
-        hduid = id(hdu)
-
         # now iterate all rows in batches
         for start in range(0, nrows, page_size):
-            stop = start + page_size
-
-            # see if rows were cached
-            try:
-                if self._rowinfo == (hduid, start, stop):
-                    rows = self._rows
-                else:
-                    rows = None
-            except AttributeError:
-                rows = None
-
-            # retrieve rows if not cached
-            if rows is None:
-                rows = hdu[names][start:stop]
-
-                # update row cache
-                self._rowinfo = (hduid, start, stop)
-                self._rows = rows
-
-            # apply selection if given
-            if selection is not None:
-                rows = rows[rowfilter(rows, selection)]
-
+            rows = self._select(start, start + page_size, selection)
             yield CatalogPage({name: rows[name] for name in names})

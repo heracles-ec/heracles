@@ -22,6 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "convolvecl",
+    "coroutines",
     "fitsio",
     "healpy",
     "numba",
@@ -33,7 +34,9 @@ dynamic = [
 ]
 license = "LGPL-3.0-or-later"
 name = "heracles"
-optional-dependencies = {docs = [
+optional-dependencies = {all = [
+    "rich",
+], docs = [
     "mkdocs",
     "mkdocs-include-markdown-plugin",
     "mkdocs-material",
