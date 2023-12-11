@@ -222,11 +222,6 @@ class Normalizable:
     def normalize(self) -> bool:
         return self._normalize
 
-    @normalize.setter
-    def normalize(self, normalize: bool) -> None:
-        """Set the normalize flag."""
-        self._normalize = normalize
-
 
 async def _pages(
     catalog: Catalog,
@@ -279,10 +274,6 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
     def overdensity(self) -> bool:
         """Flag to create overdensity maps."""
         return self.normalize
-
-    @overdensity.setter
-    def overdensity(self, overdensity: bool) -> None:
-        self.normalize = overdensity
 
     async def __call__(
         self,
