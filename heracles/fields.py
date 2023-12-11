@@ -24,6 +24,7 @@ import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from functools import partial, wraps
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import coroutines
@@ -97,15 +98,30 @@ class Field(metaclass=ABCMeta):
 
     """
 
-    def __init__(self, columns: tuple[str | None]) -> None:
+    def __init__(self, columns: tuple[str | None], spin: int = 0) -> None:
         """Initialise the map."""
-        self._columns = columns
         super().__init__()
+        self._columns = columns
+        self._metadata = dict(spin=spin)
 
     @property
     def columns(self) -> tuple[str | None]:
-        """Return the catalogue columns used by this map."""
+        """Return the catalogue columns used by this field."""
         return self._columns
+
+    @property
+    def metadata(self) -> Mapping[str, Any]:
+        """Return the static metadata for this field."""
+        return MappingProxyType(self._metadata)
+
+    @property
+    def spin(self) -> int:
+        """Spin weight of field."""
+        return self._metadata["spin"]
+
+    def metadata_for_result(self, result: ArrayLike, **metadata) -> ArrayLike:
+        """Apply static and dynamic metadata to map data."""
+        update_metadata(result, **{**self._metadata, **metadata})
 
     @abstractmethod
     async def __call__(
@@ -126,20 +142,22 @@ class Healpix:
 
     """
 
-    def __init__(self, nside: int, **kwargs) -> None:
+    def __init__(self, nside: int, power: int = 0, **kwargs) -> None:
         """Initialize field with the given nside parameter."""
-        self._nside: int = nside
         super().__init__(**kwargs)
+        self._metadata["kernel"] = "healpix"
+        self._metadata["nside"] = nside
+        self._metadata["power"] = power
 
     @property
     def nside(self) -> int:
         """The resolution parameter of the HEALPix map."""
-        return self._nside
+        return self._metadata["nside"]
 
-    @nside.setter
-    def nside(self, nside: int) -> None:
-        """Set the resolution parameter of the HEALPix map."""
-        self._nside = nside
+    @property
+    def area_power(self) -> int:
+        """The spectrum scales with this power of the pixel area."""
+        return self._metadata["power"]
 
 
 class Randomizable:
@@ -161,9 +179,9 @@ class Randomizable:
         **kwargs,
     ) -> None:
         """Initialise field with the given randomize property."""
+        super().__init__(**kwargs)
         self._randomize = randomize
         self._rng = rng
-        super().__init__(**kwargs)
 
     @property
     def randomize(self) -> bool:
@@ -197,8 +215,8 @@ class Normalizable:
 
     def __init__(self, normalize: bool, **kwargs) -> None:
         """Initialise field with the given normalize property."""
+        super().__init__(**kwargs, power=0 if normalize else 1)
         self._normalize = normalize
-        super().__init__(**kwargs)
 
     @property
     def normalize(self) -> bool:
@@ -230,7 +248,7 @@ async def _pages(
     await coroutines.sleep()
 
 
-class Positions(Randomizable, Healpix, Field):
+class Positions(Randomizable, Normalizable, Healpix, Field):
     """Create HEALPix maps from positions in a catalogue.
 
     Can produce both overdensity maps and number count maps, depending
@@ -249,17 +267,22 @@ class Positions(Randomizable, Healpix, Field):
         rng: np.random.Generator | None = None,
     ) -> None:
         """Create a position field with the given properties."""
-        super().__init__(columns=(lon, lat), nside=nside, randomize=randomize, rng=rng)
-        self._overdensity: bool = overdensity
+        super().__init__(
+            columns=(lon, lat),
+            nside=nside,
+            randomize=randomize,
+            normalize=overdensity,
+            rng=rng,
+        )
 
     @property
     def overdensity(self) -> bool:
         """Flag to create overdensity maps."""
-        return self._overdensity
+        return self.normalize
 
     @overdensity.setter
     def overdensity(self, overdensity: bool) -> None:
-        self._overdensity = overdensity
+        self.normalize = overdensity
 
     async def __call__(
         self,
@@ -302,7 +325,7 @@ class Positions(Randomizable, Healpix, Field):
             vmap = hp.ud_grade(vmap, self.nside)
 
         # randomise position map if asked to
-        if self._randomize:
+        if self.randomize:
             if vmap is None:
                 p = np.full(npix, 1 / npix)
             else:
@@ -318,27 +341,21 @@ class Positions(Randomizable, Healpix, Field):
             nbar /= vbar
 
         # compute overdensity if asked to
-        if self._overdensity:
+        if self.normalize:
             pos /= nbar
             if vmap is None:
                 pos -= 1
             else:
                 pos -= vmap
-            power = 0
             bias = 4 * np.pi * vbar**2 / ngal
         else:
-            power = 1
             bias = (4 * np.pi / npix) * (ngal / npix)
 
         # set metadata of array
-        update_metadata(
+        self.metadata_for_result(
             pos,
             catalog=catalog.label,
-            spin=0,
             nbar=nbar,
-            kernel="healpix",
-            nside=self.nside,
-            power=power,
             bias=bias,
         )
 
@@ -360,7 +377,6 @@ class ScalarField(Normalizable, Healpix, Field):
         normalize: bool = True,
     ) -> None:
         """Create a new scalar field."""
-
         super().__init__(
             columns=(lon, lat, value, weight),
             nside=nside,
@@ -424,12 +440,11 @@ class ScalarField(Normalizable, Healpix, Field):
         wbar = ngal / npix / vbar * wmean
 
         # normalise the weight in each pixel if asked to
+        # compute bias for both cases here, giving more numerical accuracy
         if self.normalize:
             wht /= wbar
-            power = 0
             bias = 4 * np.pi * vbar**2 / ngal * (var / wmean**2)
         else:
-            power = 1
             bias = (4 * np.pi / npix) * (ngal / npix) * var
 
         # value was averaged in each pixel for numerical stability
@@ -437,14 +452,10 @@ class ScalarField(Normalizable, Healpix, Field):
         val *= wht
 
         # set metadata of array
-        update_metadata(
+        self.metadata_for_result(
             val,
             catalog=catalog.label,
-            spin=0,
             wbar=wbar,
-            kernel="healpix",
-            nside=self.nside,
-            power=power,
             bias=bias,
         )
 
@@ -475,25 +486,14 @@ class ComplexField(Normalizable, Randomizable, Healpix, Field):
         rng: np.random.Generator | None = None,
     ) -> None:
         """Create a new complex field."""
-
-        self._spin: int = spin
         super().__init__(
             columns=(lon, lat, real, imag, weight),
+            spin=spin,
             nside=nside,
             normalize=normalize,
             randomize=randomize,
             rng=rng,
         )
-
-    @property
-    def spin(self) -> int:
-        """Spin weight of field."""
-        return self._spin
-
-    @spin.setter
-    def spin(self, spin: int) -> None:
-        """Set the spin weight of the map."""
-        self._spin = spin
 
     async def __call__(
         self,
@@ -561,12 +561,11 @@ class ComplexField(Normalizable, Randomizable, Healpix, Field):
         wbar = ngal / npix / vbar * wmean
 
         # normalise the weight in each pixel if asked to
+        # compute bias for both cases here, giving more numerical accuracy
         if self.normalize:
             wht /= wbar
-            power = 0
             bias = 2 * np.pi * vbar**2 / ngal * (var / wmean**2)
         else:
-            power = 1
             bias = (2 * np.pi / npix) * (ngal / npix) * var
 
         # value was averaged in each pixel for numerical stability
@@ -574,14 +573,10 @@ class ComplexField(Normalizable, Randomizable, Healpix, Field):
         val *= wht
 
         # set metadata of array
-        update_metadata(
+        self.metadata_for_result(
             val,
             catalog=catalog.label,
-            spin=self.spin,
             wbar=wbar,
-            kernel="healpix",
-            nside=self.nside,
-            power=power,
             bias=bias,
         )
 
@@ -622,13 +617,9 @@ class Visibility(Healpix, Field):
             # make a copy for updates to metadata
             vmap = np.copy(vmap)
 
-        update_metadata(
+        self.metadata_for_result(
             vmap,
             catalog=catalog.label,
-            spin=0,
-            kernel="healpix",
-            nside=self.nside,
-            power=0,
         )
 
         return vmap
@@ -690,19 +681,12 @@ class Weights(Normalizable, Healpix, Field):
         # normalise the weight in each pixel if asked to
         if self.normalize:
             wht /= wbar
-            power = 0
-        else:
-            power = 1
 
         # set metadata of arrays
-        update_metadata(
+        self.metadata_for_result(
             wht,
             catalog=catalog.label,
-            spin=0,
             wbar=wbar,
-            kernel="healpix",
-            nside=self.nside,
-            power=power,
         )
 
         # return the weight map
