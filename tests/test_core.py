@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 
@@ -78,3 +79,42 @@ def test_tocdict():
     d = TocDict(a=1) | TocDict(b=2)
     assert type(d) is TocDict
     assert d == {"a": 1, "b": 2}
+
+
+def test_update_metadata():
+    from heracles.core import update_metadata
+
+    a = np.empty(0)
+
+    assert a.dtype.metadata is None
+
+    update_metadata(a, x=1)
+
+    assert a.dtype.metadata == {"x": 1}
+
+    update_metadata(a, y=2)
+
+    assert a.dtype.metadata == {"x": 1, "y": 2}
+
+    update_metadata(a, x=3)
+
+    assert a.dtype.metadata == {"x": 3, "y": 2}
+
+    # check dtype fields are preserved
+
+    a = np.array(
+        [("Alice", 37, 56.0), ("Bob", 25, 73.0)],
+        dtype=[("f0", "U10"), ("f1", "i4"), ("f2", "f4")],
+    )
+
+    a_fields_original = np.copy(a.dtype.fields)
+
+    update_metadata(a, x=1)
+
+    assert a.dtype.fields == a_fields_original
+    assert a.dtype.metadata == {"x": 1}
+
+    update_metadata(a, y=2)
+
+    assert a.dtype.fields == a_fields_original
+    assert a.dtype.metadata == {"x": 1, "y": 2}

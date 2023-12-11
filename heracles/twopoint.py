@@ -27,16 +27,7 @@ import healpy as hp
 import numpy as np
 from convolvecl import mixmat, mixmat_eb
 
-from .core import TocDict, toc_match
-from .maps import (
-    map_catalogs as _map_catalogs,
-)
-from .maps import (
-    transform_maps as _transform_maps,
-)
-from .maps import (
-    update_metadata,
-)
+from .core import TocDict, toc_match, update_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -507,6 +498,8 @@ def random_bias(
 
     """
 
+    from .fields import map_catalogs, transform_maps
+
     logger.info("estimating two-point bias for %d catalog(s)", len(catalogs))
     logger.info("randomising %s maps", ", ".join(map(str, maps)))
     t = time.monotonic()
@@ -534,7 +527,7 @@ def random_bias(
                 "" if n == 0 else f" (repeat {n+1})",
             )
 
-            data = _map_catalogs(
+            data = map_catalogs(
                 maps,
                 catalogs,
                 parallel=parallel,
@@ -542,7 +535,7 @@ def random_bias(
                 exclude=exclude,
                 progress=progress,
             )
-            alms = _transform_maps(data, progress=progress, **kwargs)
+            alms = transform_maps(data, progress=progress, **kwargs)
 
             # set the includes cls if full is false now that we know the alms
             if not full and include_cls is None:
