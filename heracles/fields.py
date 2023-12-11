@@ -16,7 +16,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for map-making"""
+"""module for field definitions"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import healpy as hp
 import numpy as np
 from numba import njit
 
-from .core import TocDict, toc_match
+from .core import TocDict, toc_match, update_metadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, MutableMapping, Sequence
@@ -89,32 +89,11 @@ def _map_weight(wht, ipix, w):
         wht[i] += w_i
 
 
-def update_metadata(array, **metadata):
-    """update metadata of an array dtype"""
-    md = {}
-    if array.dtype.metadata is not None:
-        md.update(array.dtype.metadata)
-    md.update(metadata)
-    # create the new dtype with only the new metadata
-    dt = array.dtype
-    if dt.fields is not None:
-        dt = dt.fields
-    else:
-        dt = dt.str
-    dt = np.dtype(dt, metadata=md)
-    # check that new dtype is compatible with old one
-    if not np.can_cast(dt, array.dtype, casting="no"):
-        msg = "array with unsupported dtype"
-        raise ValueError(msg)
-    # set the new dtype in array
-    array.dtype = dt
+class Field(metaclass=ABCMeta):
+    """Abstract base class for field definitions.
 
-
-class Map(metaclass=ABCMeta):
-    """Abstract base class for map making from catalogues.
-
-    Concrete classes must implement the `__call__()` method which takes a
-    catalogue instance and returns a generator for mapping.
+    Concrete classes must implement the `__call__()` method which takes
+    a catalogue instance and returns a coroutine for mapping.
 
     """
 
@@ -139,16 +118,16 @@ class Map(metaclass=ABCMeta):
         ...
 
 
-class HealpixMap(Map):
-    """Abstract base class for HEALPix map making.
+class Healpix:
+    """Mixin class for HEALPix map making.
 
-    HEALPix maps have a resolution parameter, available as the ``nside``
-    property.
+    HEALPix fields have a resolution parameter, available as the
+    ``nside`` property.
 
     """
 
     def __init__(self, nside: int, **kwargs) -> None:
-        """Initialize map with the given nside parameter."""
+        """Initialize field with the given nside parameter."""
         self._nside: int = nside
         super().__init__(**kwargs)
 
@@ -163,16 +142,16 @@ class HealpixMap(Map):
         self._nside = nside
 
 
-class RandomizableMap(Map):
-    """Abstract base class for randomisable maps.
+class Randomizable:
+    """Mixin for randomisable fields.
 
-    Randomisable maps have a ``randomize`` property that determines
-    whether or not the maps are randomised.
+    Randomisable fields have a ``randomize`` property that determines
+    whether or not their maps are randomised.
 
     """
 
     default_rng: np.random.Generator = np.random.default_rng()
-    """Default random number generator for randomizable maps."""
+    """Default random number generator for randomisable fields."""
 
     def __init__(
         self,
@@ -181,7 +160,7 @@ class RandomizableMap(Map):
         rng: np.random.Generator | None = None,
         **kwargs,
     ) -> None:
-        """Initialise map with the given randomize property."""
+        """Initialise field with the given randomize property."""
         self._randomize = randomize
         self._rng = rng
         super().__init__(**kwargs)
@@ -197,27 +176,27 @@ class RandomizableMap(Map):
 
     @property
     def rng(self) -> np.random.Generator:
-        """Random number generator of this map."""
+        """Random number generator of this field."""
         return self._rng or self.default_rng
 
     @rng.setter
     def rng(self, rng: np.random.Generator) -> None:
-        """Set the random number generator of this map."""
+        """Set the random number generator of this field."""
         self._rng = rng
 
 
-class NormalizableMap(Map):
-    """Abstract base class for normalisable maps.
+class Normalizable:
+    """Mixin class for normalisable fields.
 
-    A normalised map is a map that is divided by its mean weight.
+    A normalised field is a field that is divided by its mean weight.
 
-    Normalisable maps have a ``normalize`` property that determines
-    whether or not the maps are normalised.
+    Normalisable fields have a ``normalize`` property that determines
+    whether or not their maps are normalised.
 
     """
 
     def __init__(self, normalize: bool, **kwargs) -> None:
-        """Initialise map with the given normalize property."""
+        """Initialise field with the given normalize property."""
         self._normalize = normalize
         super().__init__(**kwargs)
 
@@ -251,7 +230,7 @@ async def _pages(
     await coroutines.sleep()
 
 
-class PositionMap(HealpixMap, RandomizableMap):
+class Positions(Randomizable, Healpix, Field):
     """Create HEALPix maps from positions in a catalogue.
 
     Can produce both overdensity maps and number count maps, depending
@@ -269,7 +248,7 @@ class PositionMap(HealpixMap, RandomizableMap):
         randomize: bool = False,
         rng: np.random.Generator | None = None,
     ) -> None:
-        """Create a position map with the given properties."""
+        """Create a position field with the given properties."""
         super().__init__(columns=(lon, lat), nside=nside, randomize=randomize, rng=rng)
         self._overdensity: bool = overdensity
 
@@ -367,7 +346,7 @@ class PositionMap(HealpixMap, RandomizableMap):
         return pos
 
 
-class ScalarMap(HealpixMap, NormalizableMap):
+class ScalarField(Normalizable, Healpix, Field):
     """Create HEALPix maps from real scalar values in a catalogue."""
 
     def __init__(
@@ -380,7 +359,7 @@ class ScalarMap(HealpixMap, NormalizableMap):
         *,
         normalize: bool = True,
     ) -> None:
-        """Create a new real map."""
+        """Create a new scalar field."""
 
         super().__init__(
             columns=(lon, lat, value, weight),
@@ -473,11 +452,11 @@ class ScalarMap(HealpixMap, NormalizableMap):
         return val
 
 
-class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
+class ComplexField(Normalizable, Randomizable, Healpix, Field):
     """Create HEALPix maps from complex values in a catalogue.
 
-    Complex maps can have non-zero spin weight, set using the ``spin=``
-    parameter.
+    Complex fields can have non-zero spin weight, set using the
+    ``spin=`` parameter.
 
     """
 
@@ -495,7 +474,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         randomize: bool = False,
         rng: np.random.Generator | None = None,
     ) -> None:
-        """Create a new shear map."""
+        """Create a new complex field."""
 
         self._spin: int = spin
         super().__init__(
@@ -508,12 +487,12 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
 
     @property
     def spin(self) -> int:
-        """Spin weight of map."""
+        """Spin weight of field."""
         return self._spin
 
     @spin.setter
     def spin(self, spin: int) -> None:
-        """Set the spin weight."""
+        """Set the spin weight of the map."""
         self._spin = spin
 
     async def __call__(
@@ -522,7 +501,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
-        """Map shears from catalogue to HEALPix map."""
+        """Map complex values from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
         *col, wcol = self.columns
@@ -610,7 +589,7 @@ class ComplexMap(HealpixMap, NormalizableMap, RandomizableMap):
         return val
 
 
-class VisibilityMap(HealpixMap):
+class Visibility(Healpix, Field):
     """Copy visibility map from catalogue at given resolution."""
 
     def __init__(self, nside: int) -> None:
@@ -655,7 +634,7 @@ class VisibilityMap(HealpixMap):
         return vmap
 
 
-class WeightMap(HealpixMap, NormalizableMap):
+class Weights(Normalizable, Healpix, Field):
     """Create a HEALPix weight map from a catalogue."""
 
     def __init__(
@@ -730,14 +709,14 @@ class WeightMap(HealpixMap, NormalizableMap):
         return wht
 
 
-Spin2Map = partial(ComplexMap, spin=2)
-ShearMap = Spin2Map
-EllipticityMap = Spin2Map
+Spin2Field = partial(ComplexField, spin=2)
+Shears = Spin2Field
+Ellipticities = Spin2Field
 
 
-async def _mapper_task(
+async def _map_task(
     key: tuple[Any, ...],
-    mapper: Map,
+    field: Field,
     catalog: Catalog,
     progress: Progress,
 ) -> ArrayLike:
@@ -747,14 +726,14 @@ async def _mapper_task(
     name = "[" + ", ".join(map(str, key)) + "]"
     task = progress.task(name, subtask=True, total=None)
     try:
-        return await mapper(catalog, progress=task)
+        return await field(catalog, progress=task)
     finally:
         task.remove()
         progress.advance(progress.task_ids[0])
 
 
 def map_catalogs(
-    maps: Mapping[Any, Map],
+    fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
     parallel: bool = False,
@@ -770,9 +749,9 @@ def map_catalogs(
         out = TocDict()
 
     # collect groups of items to go through
-    # items are tuples of (key, mapper, catalog)
+    # items are tuples of (key, field, catalog)
     groups = [
-        [((i, j), mapper, catalog) for i, mapper in maps.items()]
+        [((i, j), field, catalog) for i, field in fields.items()]
         for j, catalog in catalogs.items()
     ]
 
@@ -790,16 +769,16 @@ def map_catalogs(
         _progress.add_task("mapping", total=sum(map(len, groups)))
         _progress.start()
 
-    # process all groups of mappers and catalogues
+    # process all groups of fields and catalogues
     for items in groups:
-        # mappers return coroutines, which are ran concurrently
+        # fields return coroutines, which are ran concurrently
         keys, coros = [], []
-        for key, mapper, catalog in items:
+        for key, field, catalog in items:
             if toc_match(key, include, exclude):
                 if progress:
-                    coro = _mapper_task(key, mapper, catalog, _progress)
+                    coro = _map_task(key, field, catalog, _progress)
                 else:
-                    coro = mapper(catalog)
+                    coro = field(catalog)
                 keys.append(key)
                 coros.append(coro)
 

@@ -21,6 +21,8 @@
 from collections import UserDict
 from collections.abc import Mapping, Sequence
 
+import numpy as np
+
 
 def toc_match(key, include=None, exclude=None):
     """return whether a tocdict entry matches include/exclude criteria"""
@@ -86,3 +88,24 @@ class TocDict(UserDict):
         if not found:
             raise KeyError(pattern)
         return found
+
+
+def update_metadata(array, **metadata):
+    """update metadata of an array dtype"""
+    md = {}
+    if array.dtype.metadata is not None:
+        md.update(array.dtype.metadata)
+    md.update(metadata)
+    # create the new dtype with only the new metadata
+    dt = array.dtype
+    if dt.fields is not None:
+        dt = dt.fields
+    else:
+        dt = dt.str
+    dt = np.dtype(dt, metadata=md)
+    # check that new dtype is compatible with old one
+    if not np.can_cast(dt, array.dtype, casting="no"):
+        msg = "array with unsupported dtype"
+        raise ValueError(msg)
+    # set the new dtype in array
+    array.dtype = dt

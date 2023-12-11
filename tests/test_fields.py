@@ -66,11 +66,11 @@ def catalog(page):
     return catalog
 
 
-def test_visibility_map(nside, vmap):
+def test_visibility(nside, vmap):
     from contextlib import nullcontext
     from unittest.mock import Mock
 
-    from heracles.maps import VisibilityMap
+    from heracles.fields import Visibility
 
     fsky = vmap.mean()
 
@@ -78,7 +78,7 @@ def test_visibility_map(nside, vmap):
         catalog = Mock()
         catalog.visibility = vmap
 
-        mapper = VisibilityMap(nside_out)
+        mapper = Visibility(nside_out)
 
         with pytest.warns(UserWarning) if nside != nside_out else nullcontext():
             result = coroutines.run(mapper(catalog))
@@ -98,13 +98,13 @@ def test_visibility_map(nside, vmap):
     # test missing visibility map
     catalog = Mock()
     catalog.visibility = None
-    mapper = VisibilityMap(nside)
+    mapper = Visibility(nside)
     with pytest.raises(ValueError, match="no visibility"):
         coroutines.run(mapper(catalog))
 
 
-def test_position_map(nside, catalog, vmap):
-    from heracles.maps import PositionMap
+def test_positions(nside, catalog, vmap):
+    from heracles.fields import Positions
 
     # bias
     npix = 12 * nside**2
@@ -112,7 +112,7 @@ def test_position_map(nside, catalog, vmap):
 
     # normal mode: compute overdensity maps with metadata
 
-    mapper = PositionMap(nside, "ra", "dec")
+    mapper = Positions(nside, "ra", "dec")
     m = coroutines.run(mapper(catalog))
 
     nbar = 4.0
@@ -130,7 +130,7 @@ def test_position_map(nside, catalog, vmap):
 
     # compute number count map
 
-    mapper = PositionMap(nside, "ra", "dec", overdensity=False)
+    mapper = Positions(nside, "ra", "dec", overdensity=False)
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (npix,)
@@ -150,7 +150,7 @@ def test_position_map(nside, catalog, vmap):
     catalog.visibility = vmap
     nbar /= vmap.mean()
 
-    mapper = PositionMap(nside, "ra", "dec")
+    mapper = Positions(nside, "ra", "dec")
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
@@ -166,7 +166,7 @@ def test_position_map(nside, catalog, vmap):
 
     # compute number count map with visibility map
 
-    mapper = PositionMap(nside, "ra", "dec", overdensity=False)
+    mapper = Positions(nside, "ra", "dec", overdensity=False)
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
@@ -181,12 +181,12 @@ def test_position_map(nside, catalog, vmap):
     }
 
 
-def test_scalar_map(nside, catalog):
-    from heracles.maps import ScalarMap
+def test_scalar_field(nside, catalog):
+    from heracles.fields import ScalarField
 
     npix = 12 * nside**2
 
-    mapper = ScalarMap(nside, "ra", "dec", "g1", "w")
+    mapper = ScalarField(nside, "ra", "dec", "g1", "w")
     m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
@@ -208,7 +208,7 @@ def test_scalar_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    mapper = ScalarMap(nside, "ra", "dec", "g1", "w", normalize=False)
+    mapper = ScalarField(nside, "ra", "dec", "g1", "w", normalize=False)
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (npix,)
@@ -224,12 +224,12 @@ def test_scalar_map(nside, catalog):
     np.testing.assert_array_almost_equal(m, 0)
 
 
-def test_complex_map(nside, catalog):
-    from heracles.maps import ComplexMap
+def test_complex_field(nside, catalog):
+    from heracles.fields import ComplexField
 
     npix = 12 * nside**2
 
-    mapper = ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=2)
+    mapper = ComplexField(nside, "ra", "dec", "g1", "g2", "w", spin=2)
     m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
@@ -252,7 +252,7 @@ def test_complex_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    mapper = ComplexMap(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False)
+    mapper = ComplexField(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False)
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (2, npix)
@@ -268,10 +268,10 @@ def test_complex_map(nside, catalog):
     np.testing.assert_array_almost_equal(m, 0)
 
 
-def test_weight_map(nside, catalog):
-    from heracles.maps import WeightMap
+def test_weights(nside, catalog):
+    from heracles.fields import Weights
 
-    mapper = WeightMap(nside, "ra", "dec", "w")
+    mapper = Weights(nside, "ra", "dec", "w")
     m = coroutines.run(mapper(catalog))
 
     w = next(iter(catalog))["w"]
@@ -289,7 +289,7 @@ def test_weight_map(nside, catalog):
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
 
-    mapper = WeightMap(nside, "ra", "dec", "w", normalize=False)
+    mapper = Weights(nside, "ra", "dec", "w", normalize=False)
     m = coroutines.run(mapper(catalog))
 
     assert m.shape == (12 * nside**2,)
@@ -305,7 +305,8 @@ def test_weight_map(nside, catalog):
 
 
 def test_transform_maps(rng):
-    from heracles.maps import transform_maps, update_metadata
+    from heracles.core import update_metadata
+    from heracles.fields import transform_maps
 
     nside = 32
     npix = 12 * nside**2
@@ -366,46 +367,7 @@ def test_transform_maps(rng):
     assert alms["P_B", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
 
 
-def test_update_metadata():
-    from heracles.maps import update_metadata
-
-    a = np.empty(0)
-
-    assert a.dtype.metadata is None
-
-    update_metadata(a, x=1)
-
-    assert a.dtype.metadata == {"x": 1}
-
-    update_metadata(a, y=2)
-
-    assert a.dtype.metadata == {"x": 1, "y": 2}
-
-    update_metadata(a, x=3)
-
-    assert a.dtype.metadata == {"x": 3, "y": 2}
-
-    # check dtype fields are preserved
-
-    a = np.array(
-        [("Alice", 37, 56.0), ("Bob", 25, 73.0)],
-        dtype=[("f0", "U10"), ("f1", "i4"), ("f2", "f4")],
-    )
-
-    a_fields_original = np.copy(a.dtype.fields)
-
-    update_metadata(a, x=1)
-
-    assert a.dtype.fields == a_fields_original
-    assert a.dtype.metadata == {"x": 1}
-
-    update_metadata(a, y=2)
-
-    assert a.dtype.fields == a_fields_original
-    assert a.dtype.metadata == {"x": 1, "y": 2}
-
-
-class MockMap:
+class MockField:
     def __init__(self):
         self.args = []
         self.return_value = object()
@@ -432,29 +394,29 @@ class MockCatalog:
 
 @pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(parallel):
-    from heracles.maps import map_catalogs
+    from heracles.fields import map_catalogs
 
-    maps = {"a": MockMap(), "b": MockMap(), "z": MockMap()}
+    fields = {"a": MockField(), "b": MockField(), "z": MockField()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    data = map_catalogs(maps, catalogs, parallel=parallel)
+    maps = map_catalogs(fields, catalogs, parallel=parallel)
 
-    for k in maps:
+    for k in fields:
         for i in catalogs:
-            maps[k].assert_any_call(catalogs[i])
-            assert data[k, i] is maps[k].return_value
+            fields[k].assert_any_call(catalogs[i])
+            assert maps[k, i] is fields[k].return_value
 
 
 def test_map_catalogs_match():
-    from heracles.maps import map_catalogs
+    from heracles.fields import map_catalogs
 
-    maps = {"a": MockMap(), "b": MockMap(), "c": MockMap()}
+    fields = {"a": MockField(), "b": MockField(), "c": MockField()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    data = map_catalogs(maps, catalogs, include=[(..., "y")])
+    maps = map_catalogs(fields, catalogs, include=[(..., "y")])
 
-    assert set(data.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
+    assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
 
-    data = map_catalogs(maps, catalogs, exclude=[("a", ...)])
+    maps = map_catalogs(fields, catalogs, exclude=[("a", ...)])
 
-    assert set(data.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
+    assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
