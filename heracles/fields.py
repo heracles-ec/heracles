@@ -258,6 +258,7 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
         lat: str,
         *,
         overdensity: bool = True,
+        nbar: float | None = None,
         randomize: bool = False,
         rng: np.random.Generator | None = None,
     ) -> None:
@@ -269,11 +270,26 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
             normalize=overdensity,
             rng=rng,
         )
+        if nbar is not None:
+            self._metadata["nbar"] = nbar
 
     @property
     def overdensity(self) -> bool:
         """Flag to create overdensity maps."""
         return self.normalize
+
+    @property
+    def nbar(self) -> float | None:
+        """Mean number count."""
+        return self._metadata.get("nbar")
+
+    @nbar.setter
+    def nbar(self, nbar: float | None) -> None:
+        """Set the mean number count."""
+        if nbar is not None:
+            self._metadata["nbar"] = nbar
+        else:
+            self._metadata.pop("nbar", None)
 
     async def __call__(
         self,
@@ -323,13 +339,27 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
                 p = vmap / np.sum(vmap)
             pos[:] = self.rng.multinomial(ngal, p)
 
-        # compute average number density
-        nbar = ngal / npix
+        # mean visibility (i.e. f_sky)
         if vmap is None:
             vbar = 1
         else:
             vbar = np.mean(vmap)
-            nbar /= vbar
+
+        # compute average number count from map
+        nbar = ngal / vbar / npix
+        # override with provided value, but check that it makes sense
+        if (nbar_ := self.nbar) is not None:
+            sigma_nbar = (nbar / vbar / npix) ** 0.5
+            if abs(nbar - nbar_) > 3 * sigma_nbar:
+                warnings.warn(
+                    f"The provided mean density ({nbar_:g}) differs from the "
+                    f"estimated mean density ({nbar:g}) by more than 3 sigma.",
+                )
+            nbar = nbar_
+
+        # compute bias of number counts
+        pix_area = 4 * np.pi / npix
+        bias = ngal / (4 * np.pi) * pix_area**2
 
         # compute overdensity if asked to
         if self.normalize:
@@ -338,9 +368,7 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
                 pos -= 1
             else:
                 pos -= vmap
-            bias = 4 * np.pi * vbar**2 / ngal
-        else:
-            bias = (4 * np.pi / npix) * (ngal / npix)
+            bias /= nbar**2
 
         # set metadata of array
         self.metadata_for_result(

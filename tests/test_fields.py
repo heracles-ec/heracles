@@ -180,6 +180,15 @@ def test_positions(nside, catalog, vmap):
         "bias": pytest.approx(bias),
     }
 
+    # compute overdensity maps with given (incorrect) nbar
+
+    mapper = Positions(nside, "ra", "dec", nbar=2 * nbar)
+    with pytest.warns(UserWarning, match="mean density"):
+        m = coroutines.run(mapper(catalog))
+
+    assert m.dtype.metadata["nbar"] == 2 * nbar
+    assert m.dtype.metadata["bias"] == pytest.approx(bias / (2 * nbar) ** 2)
+
 
 def test_scalar_field(nside, catalog):
     from heracles.fields import ScalarField
