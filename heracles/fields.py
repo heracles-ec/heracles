@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 
 
 # type alias for column specification
-Columns = tuple[str | None, ...]
+Columns = tuple["str | None", ...]
 
 
 class Field(metaclass=ABCMeta):
