@@ -14,6 +14,15 @@ def sigma_e():
     return 0.1
 
 
+# use HEALPix mapper for testing
+# TODO: mock mapper
+@pytest.fixture
+def mapper(nside):
+    from heracles.maps import Healpix
+
+    return Healpix(nside)
+
+
 @pytest.fixture
 def vmap(nside, rng):
     return np.round(rng.random(12 * nside**2))
@@ -61,27 +70,67 @@ def catalog(page):
     catalog = Mock()
     catalog.size = page.size
     catalog.visibility = None
+    catalog.metadata = {"catalog": catalog.label}
     catalog.__iter__ = lambda self: iter([page])
 
     return catalog
 
 
-def test_visibility(nside, vmap):
+def test_field_abc():
+    from heracles.fields import Columns, Field
+
+    with pytest.raises(TypeError):
+        Field()
+
+    class TestField(Field):
+        @staticmethod
+        def _init_columns(lon: str, lat: str, weight: str | None = None) -> Columns:
+            return lon, lat, weight
+
+        async def __call__(self):
+            pass
+
+    f = TestField()
+
+    assert f.columns is None
+    assert f.spin == 0
+
+    assert f.metadata == {
+        "spin": 0,
+    }
+
+    with pytest.raises(ValueError):
+        f.columns_or_error
+
+    with pytest.raises(TypeError, match=r"TestField\.__init__\(\) missing 1 required"):
+        TestField("lon")
+
+    f = TestField("lon", "lat")
+
+    assert f.columns == ("lon", "lat", None)
+
+
+def test_visibility(mapper, vmap):
     from contextlib import nullcontext
     from unittest.mock import Mock
 
     from heracles.fields import Visibility
+    from heracles.maps import Healpix
 
     fsky = vmap.mean()
+    nside = mapper.nside
 
     for nside_out in [nside // 2, nside, nside * 2]:
         catalog = Mock()
         catalog.visibility = vmap
+        catalog.metadata = {"catalog": catalog.label}
 
-        mapper = Visibility(nside_out)
+        mapper_out = Healpix(nside_out)
+
+        f = Visibility()
 
         with pytest.warns(UserWarning) if nside != nside_out else nullcontext():
-            result = coroutines.run(mapper(catalog))
+            result = coroutines.run(f(catalog, mapper_out))
 
         assert result is not vmap
 
@@ -91,29 +140,35 @@ def test_visibility(nside, vmap):
             "spin": 0,
             "kernel": "healpix",
             "nside": nside_out,
-            "power": 0,
         }
         assert np.isclose(result.mean(), fsky)
 
     # test missing visibility map
     catalog = Mock()
     catalog.visibility = None
-    mapper = Visibility(nside)
+    f = Visibility()
     with pytest.raises(ValueError, match="no visibility"):
-        coroutines.run(mapper(catalog))
+        coroutines.run(f(catalog, mapper))
 
 
-def test_positions(nside, catalog, vmap):
+def test_positions(mapper, catalog, vmap):
     from heracles.fields import Positions
 
     # bias
-    npix = 12 * nside**2
+    npix = 12 * mapper.nside**2
     bias = (4 * np.pi / npix) * (catalog.size / npix)
 
     # normal mode: compute overdensity maps with metadata
 
-    mapper = Positions(nside, "ra", "dec")
-    m = coroutines.run(mapper(catalog))
+    f = Positions("ra", "dec")
+
+    # test some default settings
+    assert f.spin == 0
+    assert f.overdensity
+    assert f.nbar is None
+
+    # create map
+    m = coroutines.run(f(catalog, mapper))
 
     nbar = 4.0
     assert m.shape == (npix,)
@@ -122,16 +177,15 @@ def test_positions(nside, catalog, vmap):
         "spin": 0,
         "nbar": nbar,
         "kernel": "healpix",
-        "nside": nside,
-        "power": 0,
+        "nside": mapper.nside,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 0)
 
     # compute number count map
 
-    mapper = Positions(nside, "ra", "dec", overdensity=False)
-    m = coroutines.run(mapper(catalog))
+    f = Positions("ra", "dec", overdensity=False)
+    m = coroutines.run(f(catalog, mapper))
 
     assert m.shape == (npix,)
     assert m.dtype.metadata == {
@@ -139,64 +193,61 @@ def test_positions(nside, catalog, vmap):
         "spin": 0,
         "nbar": 4.0,
         "kernel": "healpix",
-        "nside": nside,
-        "power": 1,
-        "bias": pytest.approx(bias),
+        "nside": mapper.nside,
+        "bias": pytest.approx(bias / nbar**2),
     }
-    np.testing.assert_array_equal(m, 4)
+    np.testing.assert_array_equal(m, 1.0)
 
     # compute overdensity maps with visibility map
 
     catalog.visibility = vmap
     nbar /= vmap.mean()
 
-    mapper = Positions(nside, "ra", "dec")
-    m = coroutines.run(mapper(catalog))
+    f = Positions("ra", "dec")
+    m = coroutines.run(f(catalog, mapper))
 
-    assert m.shape == (12 * nside**2,)
+    assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 0,
         "nbar": pytest.approx(nbar),
         "kernel": "healpix",
-        "nside": nside,
-        "power": 0,
+        "nside": mapper.nside,
         "bias": pytest.approx(bias / nbar**2),
     }
 
     # compute number count map with visibility map
 
-    mapper = Positions(nside, "ra", "dec", overdensity=False)
-    m = coroutines.run(mapper(catalog))
+    f = Positions("ra", "dec", overdensity=False)
+    m = coroutines.run(f(catalog, mapper))
 
-    assert m.shape == (12 * nside**2,)
+    assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 0,
         "nbar": pytest.approx(nbar),
         "kernel": "healpix",
-        "nside": nside,
-        "power": 1,
-        "bias": pytest.approx(bias),
+        "nside": mapper.nside,
+        "bias": pytest.approx(bias / nbar**2),
     }
 
     # compute overdensity maps with given (incorrect) nbar
 
-    mapper = Positions(nside, "ra", "dec", nbar=2 * nbar)
+    f = Positions("ra", "dec", nbar=2 * nbar)
     with pytest.warns(UserWarning, match="mean density"):
-        m = coroutines.run(mapper(catalog))
+        m = coroutines.run(f(catalog, mapper))
 
     assert m.dtype.metadata["nbar"] == 2 * nbar
     assert m.dtype.metadata["bias"] == pytest.approx(bias / (2 * nbar) ** 2)
 
 
-def test_scalar_field(nside, catalog):
+def test_scalar_field(mapper, catalog):
     from heracles.fields import ScalarField
 
-    npix = 12 * nside**2
+    npix = 12 * mapper.nside**2
 
-    mapper = ScalarField(nside, "ra", "dec", "g1", "w")
-    m = coroutines.run(mapper(catalog))
+    f = ScalarField("ra", "dec", "g1", "w")
+    m = coroutines.run(f(catalog, mapper))
 
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
@@ -211,35 +262,19 @@ def test_scalar_field(nside, catalog):
         "spin": 0,
         "wbar": pytest.approx(wbar),
         "kernel": "healpix",
-        "nside": nside,
-        "power": 0,
+        "nside": mapper.nside,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    mapper = ScalarField(nside, "ra", "dec", "g1", "w", normalize=False)
-    m = coroutines.run(mapper(catalog))
 
-    assert m.shape == (npix,)
-    assert m.dtype.metadata == {
-        "catalog": catalog.label,
-        "spin": 0,
-        "wbar": pytest.approx(wbar),
-        "kernel": "healpix",
-        "nside": nside,
-        "power": 1,
-        "bias": pytest.approx(bias),
-    }
-    np.testing.assert_array_almost_equal(m, 0)
-
-
-def test_complex_field(nside, catalog):
+def test_complex_field(mapper, catalog):
     from heracles.fields import ComplexField
 
-    npix = 12 * nside**2
+    npix = 12 * mapper.nside**2
 
-    mapper = ComplexField(nside, "ra", "dec", "g1", "g2", "w", spin=2)
-    m = coroutines.run(mapper(catalog))
+    f = ComplexField("ra", "dec", "g1", "g2", "w", spin=2)
+    m = coroutines.run(f(catalog, mapper))
 
     w = next(iter(catalog))["w"]
     re = next(iter(catalog))["g1"]
@@ -255,177 +290,28 @@ def test_complex_field(nside, catalog):
         "spin": 2,
         "wbar": pytest.approx(wbar),
         "kernel": "healpix",
-        "nside": nside,
-        "power": 0,
+        "nside": mapper.nside,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
-    mapper = ComplexField(nside, "ra", "dec", "g1", "g2", "w", spin=1, normalize=False)
-    m = coroutines.run(mapper(catalog))
 
-    assert m.shape == (2, npix)
-    assert m.dtype.metadata == {
-        "catalog": catalog.label,
-        "spin": 1,
-        "wbar": pytest.approx(wbar),
-        "kernel": "healpix",
-        "nside": nside,
-        "power": 1,
-        "bias": pytest.approx(bias),
-    }
-    np.testing.assert_array_almost_equal(m, 0)
-
-
-def test_weights(nside, catalog):
+def test_weights(mapper, catalog):
     from heracles.fields import Weights
 
-    mapper = Weights(nside, "ra", "dec", "w")
-    m = coroutines.run(mapper(catalog))
+    f = Weights("ra", "dec", "w")
+    m = coroutines.run(f(catalog, mapper))
 
     w = next(iter(catalog))["w"]
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
 
-    assert m.shape == (12 * nside**2,)
+    assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 0,
         "wbar": wbar,
         "kernel": "healpix",
-        "nside": nside,
-        "power": 0,
+        "nside": mapper.nside,
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
-
-    mapper = Weights(nside, "ra", "dec", "w", normalize=False)
-    m = coroutines.run(mapper(catalog))
-
-    assert m.shape == (12 * nside**2,)
-    assert m.dtype.metadata == {
-        "catalog": catalog.label,
-        "spin": 0,
-        "wbar": wbar,
-        "kernel": "healpix",
-        "nside": nside,
-        "power": 1,
-    }
-    np.testing.assert_array_almost_equal(m, w)
-
-
-def test_transform_maps(rng):
-    from heracles.core import update_metadata
-    from heracles.fields import transform_maps
-
-    nside = 32
-    npix = 12 * nside**2
-
-    t = rng.standard_normal(npix)
-    update_metadata(t, spin=0, nside=nside, a=1)
-    p = rng.standard_normal((2, npix))
-    update_metadata(p, spin=2, nside=nside, b=2)
-
-    # single scalar map
-    maps = {("T", 0): t}
-    alms = transform_maps(maps)
-
-    assert len(alms) == 1
-    assert alms.keys() == maps.keys()
-    assert alms["T", 0].dtype.metadata["spin"] == 0
-    assert alms["T", 0].dtype.metadata["a"] == 1
-    assert alms["T", 0].dtype.metadata["nside"] == nside
-
-    # polarisation map
-    maps = {("P", 0): p}
-    alms = transform_maps(maps)
-
-    assert len(alms) == 2
-    assert alms.keys() == {("P_E", 0), ("P_B", 0)}
-    assert alms["P_E", 0].dtype.metadata["spin"] == 2
-    assert alms["P_B", 0].dtype.metadata["spin"] == 2
-    assert alms["P_E", 0].dtype.metadata["b"] == 2
-    assert alms["P_B", 0].dtype.metadata["b"] == 2
-    assert alms["P_E", 0].dtype.metadata["nside"] == nside
-    assert alms["P_B", 0].dtype.metadata["nside"] == nside
-
-    # mixed
-    maps = {("T", 0): t, ("P", 1): p}
-    alms = transform_maps(maps)
-
-    assert len(alms) == 3
-    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
-    assert alms["T", 0].dtype.metadata["spin"] == 0
-    assert alms["P_E", 1].dtype.metadata["spin"] == 2
-    assert alms["P_B", 1].dtype.metadata["spin"] == 2
-    assert alms["T", 0].dtype.metadata["a"] == 1
-    assert alms["P_E", 1].dtype.metadata["b"] == 2
-    assert alms["P_B", 1].dtype.metadata["b"] == 2
-    assert alms["T", 0].dtype.metadata["nside"] == nside
-    assert alms["P_E", 1].dtype.metadata["nside"] == nside
-    assert alms["P_B", 1].dtype.metadata["nside"] == nside
-
-    # explicit lmax per map
-    maps = {("T", 0): t, ("P", 1): p}
-    lmax = {"T": 10, "P": 20}
-    alms = transform_maps(maps, lmax=lmax)
-
-    assert len(alms) == 3
-    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
-    assert alms["T", 0].size == (lmax["T"] + 1) * (lmax["T"] + 2) // 2
-    assert alms["P_E", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
-    assert alms["P_B", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
-
-
-class MockField:
-    def __init__(self):
-        self.args = []
-        self.return_value = object()
-
-    async def __call__(self, catalog):
-        self.args.append(catalog)
-        return self.return_value
-
-    def assert_called_with(self, value):
-        assert self.args[-1] is value
-
-    def assert_any_call(self, value):
-        assert value in self.args
-
-
-class MockCatalog:
-    size = 10
-    page_size = 1
-
-    def __iter__(self):
-        for i in range(0, self.size, self.page_size):
-            yield {}
-
-
-@pytest.mark.parametrize("parallel", [False, True])
-def test_map_catalogs(parallel):
-    from heracles.fields import map_catalogs
-
-    fields = {"a": MockField(), "b": MockField(), "z": MockField()}
-    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
-
-    maps = map_catalogs(fields, catalogs, parallel=parallel)
-
-    for k in fields:
-        for i in catalogs:
-            fields[k].assert_any_call(catalogs[i])
-            assert maps[k, i] is fields[k].return_value
-
-
-def test_map_catalogs_match():
-    from heracles.fields import map_catalogs
-
-    fields = {"a": MockField(), "b": MockField(), "c": MockField()}
-    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
-
-    maps = map_catalogs(fields, catalogs, include=[(..., "y")])
-
-    assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
-
-    maps = map_catalogs(fields, catalogs, exclude=[("a", ...)])
-
-    assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}

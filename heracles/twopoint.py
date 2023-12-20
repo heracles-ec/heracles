@@ -211,8 +211,6 @@ def depixelate_cls(cls, *, inplace=False):
 
         spins = [md.get("spin_1", 0), md.get("spin_2", 0)]
         kernels = [md.get("kernel_1"), md.get("kernel_2")]
-        powers = [md.get("power_1", 0), md.get("power_2", 0)]
-        areas = []
 
         # minimum l for corrections
         lmin = max(map(abs, spins))
@@ -222,7 +220,6 @@ def depixelate_cls(cls, *, inplace=False):
             logger.info("- spin-%s %s kernel", spin, kernel)
             if kernel is None:
                 fl = None
-                a = None
             elif kernel == "healpix":
                 nside = md[f"nside_{i}"]
                 if (nside, lmax, spin) not in fls[kernel]:
@@ -237,7 +234,6 @@ def depixelate_cls(cls, *, inplace=False):
                         lmax,
                         spin,
                     )
-                a = hp.nside2pixarea(nside)
             else:
                 msg = f"unknown kernel: {kernel}"
                 raise ValueError(msg)
@@ -246,15 +242,6 @@ def depixelate_cls(cls, *, inplace=False):
                     cl[lmin:] /= fl[lmin:]
                 else:
                     cl["CL"][lmin:] /= fl[lmin:]
-            areas.append(a)
-
-        # scale by area**power
-        for a, p in zip(areas, powers):
-            if a is not None and p != 0:
-                if cl.dtype.names is None:
-                    cl[lmin:] /= a**p
-                else:
-                    cl["CL"][lmin:] /= a**p
 
         # store depixelated cl in output set
         out[key] = cl

@@ -40,17 +40,14 @@ _METADATA_COMMENTS = {
     "spin": "spin weight of map",
     "kernel": "mapping kernel of map",
     "nside": "NSIDE parameter of HEALPix map",
-    "power": "area power of map",
     "catalog_1": "catalog of first map",
     "spin_1": "spin weight of first map",
     "kernel_1": "mapping kernel of first map",
     "nside_1": "NSIDE parameter of first HEALPix map",
-    "power_1": "area power of first map",
     "catalog_2": "catalog of second map",
     "spin_2": "spin weight of second map",
     "kernel_2": "mapping kernel of second map",
     "nside_2": "NSIDE parameter of second HEALPix map",
-    "power_2": "area power of second map",
     "noisbias": "noise bias of spectrum",
 }
 

@@ -49,6 +49,23 @@ def toc_filter(obj, include=None, exclude=None):
     raise TypeError(msg)
 
 
+def toc_nearest(obj, key):
+    """return the closest match to *key* in *obj*."""
+    if isinstance(key, Sequence):
+        t = tuple(key)
+    else:
+        t = (key,)
+    while t:
+        if t in obj:
+            return obj[t]
+        if len(t) == 1 and t[0] in obj:
+            return obj[t[0]]
+        t = t[:-1]
+    if t in obj:
+        return obj[t]
+    raise KeyError(key)
+
+
 # subclassing UserDict here since that returns the correct type from methods
 # such as __copy__(), __or__(), etc.
 class TocDict(UserDict):

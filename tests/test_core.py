@@ -38,6 +38,17 @@ def test_toc_filter():
         toc_filter(object())
 
 
+def test_toc_nearest():
+    from heracles.core import toc_nearest
+
+    assert toc_nearest({(1,): "x"}, 1) == "x"
+    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, 2) == "y"
+    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, (2, 0)) == "y"
+    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, (3, 0)) == "z"
+    assert toc_nearest({(0, 1): "x", (0, 2): "y", (0,): "z"}, (0, 2)) == "y"
+    assert toc_nearest({0: "x", 1: "y", (): "z"}, (0, 2)) == "x"
+
+
 def test_tocdict():
     from copy import copy, deepcopy
 
