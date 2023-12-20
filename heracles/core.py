@@ -90,11 +90,13 @@ class TocDict(UserDict):
         return found
 
 
-def update_metadata(array, **metadata):
+def update_metadata(array, *sources, **metadata):
     """update metadata of an array dtype"""
     md = {}
     if array.dtype.metadata is not None:
         md.update(array.dtype.metadata)
+    for source in sources:
+        md.update(source.metadata)
     md.update(metadata)
     # create the new dtype with only the new metadata
     dt = array.dtype

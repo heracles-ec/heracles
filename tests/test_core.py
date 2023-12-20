@@ -84,21 +84,23 @@ def test_tocdict():
 def test_update_metadata():
     from heracles.core import update_metadata
 
+    other = np.dtype(float, metadata={"a": 0})
+
     a = np.empty(0)
 
     assert a.dtype.metadata is None
 
-    update_metadata(a, x=1)
+    update_metadata(a, other, x=1)
 
-    assert a.dtype.metadata == {"x": 1}
+    assert a.dtype.metadata == {"a": 0, "x": 1}
 
     update_metadata(a, y=2)
 
-    assert a.dtype.metadata == {"x": 1, "y": 2}
+    assert a.dtype.metadata == {"a": 0, "x": 1, "y": 2}
 
     update_metadata(a, x=3)
 
-    assert a.dtype.metadata == {"x": 3, "y": 2}
+    assert a.dtype.metadata == {"a": 0, "x": 3, "y": 2}
 
     # check dtype fields are preserved
 
