@@ -22,16 +22,16 @@ Module for creating maps from fields and catalogues.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping, Sequence
 from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 import coroutines
-import numpy as np
 
-from heracles.core import TocDict, toc_match, toc_nearest, update_metadata
+from heracles.core import TocDict, multi_value_getter, toc_match
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, MutableMapping, Sequence
+
     from numpy.typing import NDArray
 
     from heracles.catalog import Catalog
@@ -85,6 +85,9 @@ def map_catalogs(
     if out is None:
         out = TocDict()
 
+    # getter for mapper value or dict
+    mappergetter = multi_value_getter(mapper)
+
     # collect groups of items to go through
     # items are tuples of (key, field, catalog)
     groups = [
@@ -115,11 +118,7 @@ def map_catalogs(
             keys, coros = [], []
             for key, field, catalog in items:
                 if toc_match(key, include, exclude):
-                    # find the mapper for this key
-                    if isinstance(mapper, Mapping):
-                        _mapper = toc_nearest(mapper, key)
-                    else:
-                        _mapper = mapper
+                    _mapper = mappergetter(key)
 
                     coro = _map_progress(key, field, catalog, _mapper, prog)
 
@@ -144,6 +143,7 @@ def map_catalogs(
 
 
 def transform_maps(
+    mapper: Mapper | Mapping[Any, Mapper],
     maps: Mapping[tuple[Any, Any], NDArray],
     *,
     lmax: int | Mapping[Any, int] | None = None,
@@ -153,11 +153,13 @@ def transform_maps(
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
     """transform a set of maps to alms"""
 
-    import healpy as hp
-
     # the output toc dict
     if out is None:
         out = TocDict()
+
+    # getter for values or dicts
+    mappergetter = multi_value_getter(mapper)
+    lmaxgetter = multi_value_getter(lmax)
 
     # display a progress bar if asked to
     progressbar: Progress | nullcontext
@@ -172,14 +174,6 @@ def transform_maps(
     # convert maps to alms, taking care of complex and spin-weighted maps
     with progressbar as prog:
         for (k, i), m in maps.items():
-            if isinstance(lmax, Mapping):
-                _lmax = toc_nearest(lmax, (k, i))
-            else:
-                _lmax = lmax
-
-            md = m.dtype.metadata or {}
-            spin = md.get("spin", 0)
-
             if progress:
                 subtask = prog.task(
                     f"[{k}, {i}]",
@@ -188,29 +182,18 @@ def transform_maps(
                     total=None,
                 )
 
-            tfm: NDArray | list[NDArray]
-            if spin == 0:
-                tfm = m
-                pol = False
-            elif spin == 2:
-                tfm = [np.zeros(np.shape(m)[-1]), m[0], m[1]]
-                pol = True
+            _mapper = mappergetter((k, i))
+            _lmax = lmaxgetter((k, i))
+
+            alms = _mapper.transform(m, _lmax)
+
+            if isinstance(alms, tuple):
+                out[f"{k}_E", i] = alms[0]
+                out[f"{k}_B", i] = alms[1]
             else:
-                msg = f"spin-{spin} maps not yet supported"
-                raise NotImplementedError(msg)
+                out[k, i] = alms
 
-            alms = hp.map2alm(tfm, lmax=_lmax, pol=pol, **kwargs)
-
-            if spin == 0:
-                alms = {(k, i): alms}
-            elif spin == 2:
-                alms = {(f"{k}_E", i): alms[1], (f"{k}_B", i): alms[2]}
-
-            for ki, alm in alms.items():
-                update_metadata(alm, **md)
-                out[ki] = alm
-
-            del m, tfm, alms, alm
+            del m, alms
 
             if progress:
                 subtask.remove()

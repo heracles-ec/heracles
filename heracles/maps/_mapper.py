@@ -105,7 +105,7 @@ class Mapper(metaclass=MapperMeta):
         """
 
     @abstractmethod
-    def __call__(
+    def map_values(
         self,
         lon: ArrayLike,
         lat: ArrayLike,
@@ -115,4 +115,14 @@ class Mapper(metaclass=MapperMeta):
     ) -> None:
         """
         Add values to maps.
+        """
+
+    @abstractmethod
+    def transform(
+        self,
+        maps: ArrayLike,
+        lmax: int | None = None,
+    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
+        """
+        The spherical harmonic transform for this mapper.
         """

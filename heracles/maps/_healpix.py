@@ -29,6 +29,8 @@ import healpy as hp
 import numpy as np
 from numba import njit
 
+from heracles.core import update_metadata
+
 from ._mapper import Mapper
 
 if TYPE_CHECKING:
@@ -118,7 +120,13 @@ class Healpix(Mapper, kernel="healpix"):
     available as the *nside* property.
     """
 
-    def __init__(self, nside: int, dtype: DTypeLike = np.float64) -> None:
+    def __init__(
+        self,
+        nside: int,
+        dtype: DTypeLike = np.float64,
+        *,
+        datapath: str | None = None,
+    ) -> None:
         """
         Mapper for HEALPix maps with the given *nside* parameter.
         """
@@ -126,6 +134,7 @@ class Healpix(Mapper, kernel="healpix"):
         self.__nside = nside
         self.__npix = hp.nside2npix(nside)
         self.__dtype = np.dtype(dtype)
+        self.__datapath = datapath
         self._metadata |= {
             "nside": nside,
         }
@@ -158,7 +167,7 @@ class Healpix(Mapper, kernel="healpix"):
         """
         return hp.nside2pixarea(self.__nside)
 
-    def __call__(
+    def map_values(
         self,
         lon: ArrayLike,
         lat: ArrayLike,
@@ -186,3 +195,41 @@ class Healpix(Mapper, kernel="healpix"):
                 _map(ipix, maps, values)
             else:
                 _mapw(ipix, maps, values, weight)
+
+    def transform(
+        self,
+        maps: ArrayLike,
+        lmax: int | None = None,
+    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
+        """
+        Spherical harmonic transform of HEALPix maps.
+        """
+
+        md = maps.dtype.metadata or {}
+        spin = md.get("spin", 0)
+
+        if spin == 0:
+            pol = False
+        elif spin == 2:
+            maps = [np.zeros(self.__npix), maps[0], maps[1]]
+            pol = True
+        else:
+            msg = f"spin-{spin} maps not yet supported"
+            raise NotImplementedError(msg)
+
+        alms = hp.map2alm(
+            maps,
+            lmax=lmax,
+            pol=pol,
+            use_pixel_weights=True,
+            datapath=self.__datapath,
+        )
+
+        if spin == 0:
+            update_metadata(alms, **md)
+        else:
+            alms = (alms[1], alms[2])
+            update_metadata(alms[0], **md)
+            update_metadata(alms[1], **md)
+
+        return alms
