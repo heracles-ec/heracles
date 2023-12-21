@@ -147,6 +147,7 @@ def transform_maps(
     maps: Mapping[tuple[Any, Any], NDArray],
     *,
     lmax: int | Mapping[Any, int] | None = None,
+    deconvolve: bool = True,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     progress: bool = False,
     **kwargs,
@@ -186,6 +187,13 @@ def transform_maps(
             _lmax = lmaxgetter((k, i))
 
             alms = _mapper.transform(m, _lmax)
+
+            if deconvolve:
+                if isinstance(alms, tuple):
+                    for alm in alms:
+                        _mapper.deconvolve(alm, inplace=True)
+                else:
+                    _mapper.deconvolve(alms, inplace=True)
 
             if isinstance(alms, tuple):
                 out[f"{k}_E", i] = alms[0]

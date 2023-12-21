@@ -233,3 +233,24 @@ class Healpix(Mapper, kernel="healpix"):
             update_metadata(alms[1], **md)
 
         return alms
+
+    def deconvolve(self, alm: ArrayLike, *, inplace: bool = False) -> ArrayLike:
+        """
+        Remove HEALPix pixel window function from *alm*.
+        """
+
+        lmax = hp.Alm.getlmax(alm.size)
+
+        md = alm.dtype.metadata or {}
+        spin = md.get("spin", 0)
+
+        if spin == 0:
+            pw = hp.pixwin(self.__nside, lmax=lmax)
+        elif spin == 2:
+            _, pw = hp.pixwin(self.__nside, lmax=lmax, pol=True)
+            pw[:2] = 1.0
+        else:
+            msg = f"unsupported spin for deconvolve: {spin}"
+            raise ValueError(msg)
+
+        return hp.almxfl(alm, 1 / pw, inplace=inplace)

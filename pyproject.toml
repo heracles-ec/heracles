@@ -93,7 +93,6 @@ select = [
     "ICN",
     "INP",
     "ISC",
-    "PD",
     "PIE",
     "PYI",
     "Q",
