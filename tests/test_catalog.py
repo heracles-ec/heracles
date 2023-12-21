@@ -185,6 +185,8 @@ def test_catalog_base_properties(catalog):
     catalog.label = "label 123"
     assert catalog.label == "label 123"
 
+    assert catalog.metadata == {"catalog": catalog.label}
+
     v = object()
     assert catalog.visibility is None
     catalog.visibility = v
@@ -253,6 +255,7 @@ def test_catalog_view(catalog):
     assert catalog.base is None
     assert catalog.selection is None
     assert view.base is catalog
+    assert view.metadata == {"catalog": view.label}
     assert view.label == "label 123"
     assert view.selection is where
     assert view.visibility is catalog.visibility

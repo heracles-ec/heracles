@@ -211,8 +211,6 @@ def depixelate_cls(cls, *, inplace=False):
 
         spins = [md.get("spin_1", 0), md.get("spin_2", 0)]
         kernels = [md.get("kernel_1"), md.get("kernel_2")]
-        powers = [md.get("power_1", 0), md.get("power_2", 0)]
-        areas = []
 
         # minimum l for corrections
         lmin = max(map(abs, spins))
@@ -222,7 +220,6 @@ def depixelate_cls(cls, *, inplace=False):
             logger.info("- spin-%s %s kernel", spin, kernel)
             if kernel is None:
                 fl = None
-                a = None
             elif kernel == "healpix":
                 nside = md[f"nside_{i}"]
                 if (nside, lmax, spin) not in fls[kernel]:
@@ -237,7 +234,6 @@ def depixelate_cls(cls, *, inplace=False):
                         lmax,
                         spin,
                     )
-                a = hp.nside2pixarea(nside)
             else:
                 msg = f"unknown kernel: {kernel}"
                 raise ValueError(msg)
@@ -246,15 +242,6 @@ def depixelate_cls(cls, *, inplace=False):
                     cl[lmin:] /= fl[lmin:]
                 else:
                     cl["CL"][lmin:] /= fl[lmin:]
-            areas.append(a)
-
-        # scale by area**power
-        for a, p in zip(areas, powers):
-            if a is not None and p != 0:
-                if cl.dtype.names is None:
-                    cl[lmin:] /= a**p
-                else:
-                    cl["CL"][lmin:] /= a**p
 
         # store depixelated cl in output set
         out[key] = cl
@@ -478,83 +465,3 @@ def binned_mms(mms, bins, *, weights=None, out=None):
         out[key] = bin2pt(mm, bins, "MM", weights=weights)
 
     return out
-
-
-def random_bias(
-    maps,
-    catalogs,
-    *,
-    repeat=1,
-    full=False,
-    parallel=False,
-    include=None,
-    exclude=None,
-    progress=False,
-    **kwargs,
-):
-    """bias estimate from randomised maps
-
-    The ``include`` and ``exclude`` selection is applied to the maps.
-
-    """
-
-    from .fields import map_catalogs, transform_maps
-
-    logger.info("estimating two-point bias for %d catalog(s)", len(catalogs))
-    logger.info("randomising %s maps", ", ".join(map(str, maps)))
-    t = time.monotonic()
-
-    # grab lmax parameter if given
-    lmax = kwargs.get("lmax", None)
-
-    # include will be set below after we have the first set of alms
-    include_cls = None
-    if full:
-        logger.info("estimating cross-biases")
-
-    # set all input maps to randomize
-    # store and later reset their initial state
-    randomize = {k: m.randomize for k, m in maps.items()}
-    try:
-        for m in maps.values():
-            m.randomize = True
-
-        nbs = TocDict()
-
-        for n in range(repeat):
-            logger.info(
-                "estimating bias from randomised maps%s",
-                "" if n == 0 else f" (repeat {n+1})",
-            )
-
-            data = map_catalogs(
-                maps,
-                catalogs,
-                parallel=parallel,
-                include=include,
-                exclude=exclude,
-                progress=progress,
-            )
-            alms = transform_maps(data, progress=progress, **kwargs)
-
-            # set the includes cls if full is false now that we know the alms
-            if not full and include_cls is None:
-                include_cls = [(k, k, i, i) for k, i in alms]
-
-            cls = angular_power_spectra(alms, lmax=lmax, include=include_cls)
-
-            for k, cl in cls.items():
-                ell = np.arange(2, cl.shape[-1])
-                nb = np.sum((2 * ell + 1) * cl[2:]) / np.sum(2 * ell + 1)
-                nbs[k] = nbs.get(k, 0.0) + (nb - nbs.get(k, 0.0)) / (n + 1)
-    finally:
-        for k, m in maps.items():
-            m.randomize = randomize[k]
-
-    logger.info(
-        "estimated %d two-point biases in %s",
-        len(nbs),
-        timedelta(seconds=(time.monotonic() - t)),
-    )
-
-    return nbs

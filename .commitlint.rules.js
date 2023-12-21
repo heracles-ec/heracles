@@ -11,6 +11,7 @@ module.exports = {
         "covariance",
         "io",
         "fields",
+        "maps",
         "plot",
         "progress",
         "twopoint",

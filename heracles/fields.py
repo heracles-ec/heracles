@@ -22,72 +22,28 @@ from __future__ import annotations
 
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
-from functools import partial, wraps
+from functools import partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import coroutines
-import healpy as hp
 import numpy as np
-from numba import njit
 
-from .core import TocDict, toc_match, update_metadata
+from .core import update_metadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, MutableMapping, Sequence
+    from collections.abc import AsyncIterable, Mapping
     from typing import Any
 
     from numpy.typing import ArrayLike
 
     from .catalog import Catalog, CatalogPage
-    from .progress import Progress, ProgressTask
+    from .maps import Mapper
+    from .progress import ProgressTask
 
 
-def _nativebyteorder(fn):
-    """utility decorator to convert inputs to native byteorder"""
-
-    @wraps(fn)
-    def wrapper(*inputs):
-        native = []
-        for a in inputs:
-            if a.dtype.byteorder != "=":
-                a = a.byteswap().newbyteorder("=")
-            native.append(a)
-        return fn(*native)
-
-    return wrapper
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map_pos(pos, ipix):
-    for i in ipix:
-        pos[i] += 1
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map_real(wht, val, ipix, w, v):
-    for i, w_i, v_i in zip(ipix, w, v):
-        wht[i] += w_i
-        val[i] += w_i / wht[i] * (v_i - val[i])
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map_complex(wht, val, ipix, w, re, im):
-    for i, w_i, re_i, im_i in zip(ipix, w, re, im):
-        wht[i] += w_i
-        val[0, i] += w_i / wht[i] * (re_i - val[0, i])
-        val[1, i] += w_i / wht[i] * (im_i - val[1, i])
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map_weight(wht, ipix, w):
-    for i, w_i in zip(ipix, w):
-        wht[i] += w_i
+# type alias for column specification
+Columns = tuple["str | None", ...]
 
 
 class Field(metaclass=ABCMeta):
@@ -98,16 +54,46 @@ class Field(metaclass=ABCMeta):
 
     """
 
-    def __init__(self, columns: tuple[str | None], spin: int = 0) -> None:
-        """Initialise the map."""
+    def __init__(
+        self,
+        *columns: str,
+        spin: int = 0,
+    ) -> None:
+        """Initialise the field."""
         super().__init__()
-        self._columns = columns
-        self._metadata = dict(spin=spin)
+        self.__columns: Columns | None
+        if columns:
+            try:
+                self.__columns = self._init_columns(*columns)
+            except TypeError as exc:
+                msg = str(exc).replace("_init_columns", "__init__")
+                raise TypeError(msg) from None
+        else:
+            self.__columns = None
+        self._metadata: dict[str, Any] = {
+            "spin": spin,
+        }
+
+    @staticmethod
+    @abstractmethod
+    def _init_columns(*columns: str) -> Columns:
+        """Initialise the given set of columns for a specific field
+        subclass."""
+        ...
 
     @property
-    def columns(self) -> tuple[str | None]:
+    def columns(self) -> Columns | None:
         """Return the catalogue columns used by this field."""
-        return self._columns
+        return self.__columns
+
+    @property
+    def columns_or_error(self) -> Columns:
+        """Return the catalogue columns used by this field, or raise a
+        :class:`ValueError` if not set."""
+        if self.__columns is None:
+            msg = "no columns for field"
+            raise ValueError(msg)
+        return self.__columns
 
     @property
     def metadata(self) -> Mapping[str, Any]:
@@ -119,108 +105,16 @@ class Field(metaclass=ABCMeta):
         """Spin weight of field."""
         return self._metadata["spin"]
 
-    def metadata_for_result(self, result: ArrayLike, **metadata) -> ArrayLike:
-        """Apply static and dynamic metadata to map data."""
-        update_metadata(result, **{**self._metadata, **metadata})
-
     @abstractmethod
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
         """Implementation for mapping a catalogue."""
         ...
-
-
-class Healpix:
-    """Mixin class for HEALPix map making.
-
-    HEALPix fields have a resolution parameter, available as the
-    ``nside`` property.
-
-    """
-
-    def __init__(self, nside: int, power: int = 0, **kwargs) -> None:
-        """Initialize field with the given nside parameter."""
-        super().__init__(**kwargs)
-        self._metadata["kernel"] = "healpix"
-        self._metadata["nside"] = nside
-        self._metadata["power"] = power
-
-    @property
-    def nside(self) -> int:
-        """The resolution parameter of the HEALPix map."""
-        return self._metadata["nside"]
-
-    @property
-    def area_power(self) -> int:
-        """The spectrum scales with this power of the pixel area."""
-        return self._metadata["power"]
-
-
-class Randomizable:
-    """Mixin for randomisable fields.
-
-    Randomisable fields have a ``randomize`` property that determines
-    whether or not their maps are randomised.
-
-    """
-
-    default_rng: np.random.Generator = np.random.default_rng()
-    """Default random number generator for randomisable fields."""
-
-    def __init__(
-        self,
-        randomize: bool,
-        *,
-        rng: np.random.Generator | None = None,
-        **kwargs,
-    ) -> None:
-        """Initialise field with the given randomize property."""
-        super().__init__(**kwargs)
-        self._randomize = randomize
-        self._rng = rng
-
-    @property
-    def randomize(self) -> bool:
-        return self._randomize
-
-    @randomize.setter
-    def randomize(self, randomize: bool) -> None:
-        """Set the randomize flag."""
-        self._randomize = randomize
-
-    @property
-    def rng(self) -> np.random.Generator:
-        """Random number generator of this field."""
-        return self._rng or self.default_rng
-
-    @rng.setter
-    def rng(self, rng: np.random.Generator) -> None:
-        """Set the random number generator of this field."""
-        self._rng = rng
-
-
-class Normalizable:
-    """Mixin class for normalisable fields.
-
-    A normalised field is a field that is divided by its mean weight.
-
-    Normalisable fields have a ``normalize`` property that determines
-    whether or not their maps are normalised.
-
-    """
-
-    def __init__(self, normalize: bool, **kwargs) -> None:
-        """Initialise field with the given normalize property."""
-        super().__init__(**kwargs, power=0 if normalize else 1)
-        self._normalize = normalize
-
-    @property
-    def normalize(self) -> bool:
-        return self._normalize
 
 
 async def _pages(
@@ -243,8 +137,8 @@ async def _pages(
     await coroutines.sleep()
 
 
-class Positions(Randomizable, Normalizable, Healpix, Field):
-    """Create HEALPix maps from positions in a catalogue.
+class Positions(Field):
+    """Field of positions in a catalogue.
 
     Can produce both overdensity maps and number count maps, depending
     on the ``overdensity`` property.
@@ -253,70 +147,56 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
 
     def __init__(
         self,
-        nside: int,
-        lon: str,
-        lat: str,
-        *,
+        *columns: str,
         overdensity: bool = True,
         nbar: float | None = None,
-        randomize: bool = False,
-        rng: np.random.Generator | None = None,
     ) -> None:
-        """Create a position field with the given properties."""
-        super().__init__(
-            columns=(lon, lat),
-            nside=nside,
-            randomize=randomize,
-            normalize=overdensity,
-            rng=rng,
-        )
-        if nbar is not None:
-            self._metadata["nbar"] = nbar
+        """Create a position field."""
+        super().__init__(*columns, spin=0)
+        self.__overdensity = overdensity
+        self.__nbar = nbar
+
+    @staticmethod
+    def _init_columns(lon: str, lat: str) -> Columns:
+        return lon, lat
 
     @property
     def overdensity(self) -> bool:
         """Flag to create overdensity maps."""
-        return self.normalize
+        return self.__overdensity
 
     @property
     def nbar(self) -> float | None:
         """Mean number count."""
-        return self._metadata.get("nbar")
+        return self.__nbar
 
     @nbar.setter
     def nbar(self, nbar: float | None) -> None:
         """Set the mean number count."""
-        if nbar is not None:
-            self._metadata["nbar"] = nbar
-        else:
-            self._metadata.pop("nbar", None)
+        self.__nbar = nbar
 
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
         """Map the given catalogue."""
 
         # get catalogue column definition
-        col = self.columns
-
-        # number of pixels for nside
-        npix = hp.nside2npix(self.nside)
+        col = self.columns_or_error
 
         # position map
-        pos = np.zeros(npix, dtype=np.float64)
+        pos = np.zeros(mapper.size, mapper.dtype)
 
         # keep track of the total number of galaxies
         ngal = 0
 
         # map catalogue data asynchronously
         async for page in _pages(catalog, progress):
-            if not self._randomize:
-                lon, lat = page.get(*col)
-                ipix = hp.ang2pix(self.nside, lon, lat, lonlat=True)
-                _map_pos(pos, ipix)
+            lon, lat = page.get(*col)
+            mapper(lon, lat, [pos])
 
             ngal += page.size
 
@@ -327,17 +207,12 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
         vmap = catalog.visibility
 
         # match resolution of visibility map if present
-        if vmap is not None and hp.get_nside(vmap) != self.nside:
-            warnings.warn("position and visibility maps have different NSIDE")
-            vmap = hp.ud_grade(vmap, self.nside)
+        # FIXME generic mapper support
+        if vmap is not None and vmap.size != pos.size:
+            import healpy as hp
 
-        # randomise position map if asked to
-        if self.randomize:
-            if vmap is None:
-                p = np.full(npix, 1 / npix)
-            else:
-                p = vmap / np.sum(vmap)
-            pos[:] = self.rng.multinomial(ngal, p)
+            warnings.warn("position and visibility maps have different NSIDE")
+            vmap = hp.ud_grade(vmap, mapper.nside)
 
         # mean visibility (i.e. f_sky)
         if vmap is None:
@@ -345,11 +220,15 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
         else:
             vbar = np.mean(vmap)
 
+        # effective number of pixels
+        npix = 4 * np.pi / mapper.area
+
         # compute average number count from map
         nbar = ngal / vbar / npix
         # override with provided value, but check that it makes sense
         if (nbar_ := self.nbar) is not None:
-            sigma_nbar = (nbar / vbar / npix) ** 0.5
+            # Poisson std dev from expected ngal assuming nbar_ is truth
+            sigma_nbar = (nbar_ / vbar / npix) ** 0.5
             if abs(nbar - nbar_) > 3 * sigma_nbar:
                 warnings.warn(
                     f"The provided mean density ({nbar_:g}) differs from the "
@@ -357,69 +236,56 @@ class Positions(Randomizable, Normalizable, Healpix, Field):
                 )
             nbar = nbar_
 
-        # compute bias of number counts
-        pix_area = 4 * np.pi / npix
-        bias = ngal / (4 * np.pi) * pix_area**2
+        # normalize map
+        pos /= nbar
 
-        # compute overdensity if asked to
-        if self.normalize:
-            pos /= nbar
+        # compute density contrast if asked to
+        if self.__overdensity:
             if vmap is None:
                 pos -= 1
             else:
                 pos -= vmap
-            bias /= nbar**2
+
+        # compute bias of number counts
+        bias = ngal / (4 * np.pi) * mapper.area**2 / nbar**2
 
         # set metadata of array
-        self.metadata_for_result(
-            pos,
-            catalog=catalog.label,
-            nbar=nbar,
-            bias=bias,
-        )
+        update_metadata(pos, self, catalog, mapper, nbar=nbar, bias=bias)
 
         # return the position map
         return pos
 
 
-class ScalarField(Normalizable, Healpix, Field):
-    """Create HEALPix maps from real scalar values in a catalogue."""
+class ScalarField(Field):
+    """Field of real scalar values in a catalogue."""
 
-    def __init__(
-        self,
-        nside: int,
+    def __init__(self, *columns: str) -> None:
+        """Create a scalar field."""
+        super().__init__(*columns, spin=0)
+
+    @staticmethod
+    def _init_columns(
         lon: str,
         lat: str,
         value: str,
         weight: str | None = None,
-        *,
-        normalize: bool = True,
-    ) -> None:
-        """Create a new scalar field."""
-        super().__init__(
-            columns=(lon, lat, value, weight),
-            nside=nside,
-            normalize=normalize,
-        )
+    ) -> Columns:
+        return lon, lat, value, weight
 
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
         """Map real values from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
-        *col, wcol = self.columns
+        *col, wcol = self.columns_or_error
 
-        # number of pixels for nside
-        nside = self.nside
-        npix = hp.nside2npix(nside)
-
-        # create the weight and value map
-        wht = np.zeros(npix)
-        val = np.zeros(npix)
+        # scalar field map
+        val = np.zeros(mapper.size, mapper.dtype)
 
         # total weighted variance from online algorithm
         ngal = 0
@@ -430,24 +296,27 @@ class ScalarField(Normalizable, Healpix, Field):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
-            lon, lat, v = page.get(*col)
-
-            if wcol is None:
-                w = np.ones(page.size)
-            else:
-                w = page.get(wcol)
-
-            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
-
-            _map_real(wht, val, ipix, w, v)
-
             if page.size:
+                lon, lat, v = page.get(*col)
+                w = page.get(wcol) if wcol is not None else None
+
+                mapper(lon, lat, [val], [v], w)
+
                 ngal += page.size
-                wmean += (w - wmean).sum() / ngal
-                var += ((w * v) ** 2 - var).sum() / ngal
+                if w is None:
+                    var += (v**2 - var).sum() / ngal
+                else:
+                    wmean += (w - wmean).sum() / ngal
+                    var += ((w * v) ** 2 - var).sum() / ngal
+
+                del lon, lat, v, w
 
             # clean up and yield control to main loop
-            del page, lon, lat, v, w
+            del page
+
+        # fix mean weight if there was no column for it
+        if wcol is None:
+            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -455,120 +324,89 @@ class ScalarField(Normalizable, Healpix, Field):
         else:
             vbar = np.mean(catalog.visibility)
 
-        # compute mean weight per visible pixel
-        wbar = ngal / npix / vbar * wmean
+        # compute mean weight per effective mapper "pixel"
+        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
 
-        # normalise the weight in each pixel if asked to
-        # compute bias for both cases here, giving more numerical accuracy
-        if self.normalize:
-            wht /= wbar
-            bias = 4 * np.pi * vbar**2 / ngal * (var / wmean**2)
-        else:
-            bias = (4 * np.pi / npix) * (ngal / npix) * var
+        # normalise the map
+        val /= wbar
 
-        # value was averaged in each pixel for numerical stability
-        # now compute the sum
-        val *= wht
+        # compute bias from variance (per object)
+        bias = 4 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        self.metadata_for_result(
-            val,
-            catalog=catalog.label,
-            wbar=wbar,
-            bias=bias,
-        )
+        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
 
         # return the value map
         return val
 
 
-class ComplexField(Normalizable, Randomizable, Healpix, Field):
-    """Create HEALPix maps from complex values in a catalogue.
+class ComplexField(Field):
+    """Field of complex values in a catalogue.
 
     Complex fields can have non-zero spin weight, set using the
     ``spin=`` parameter.
 
     """
 
-    def __init__(
-        self,
-        nside: int,
+    def __init__(self, *columns: str, spin: int = 0) -> None:
+        """Create a complex field."""
+        super().__init__(*columns, spin=spin)
+
+    @staticmethod
+    def _init_columns(
         lon: str,
         lat: str,
         real: str,
         imag: str,
         weight: str | None = None,
-        *,
-        spin: int = 0,
-        normalize: bool = True,
-        randomize: bool = False,
-        rng: np.random.Generator | None = None,
-    ) -> None:
-        """Create a new complex field."""
-        super().__init__(
-            columns=(lon, lat, real, imag, weight),
-            spin=spin,
-            nside=nside,
-            normalize=normalize,
-            randomize=randomize,
-            rng=rng,
-        )
+    ) -> Columns:
+        return lon, lat, real, imag, weight
 
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
         """Map complex values from catalogue to HEALPix map."""
 
         # get the column definition of the catalogue
-        *col, wcol = self.columns
+        *col, wcol = self.columns_or_error
 
-        # get the map properties
-        randomize = self.randomize
-
-        # number of pixels for nside
-        nside = self.nside
-        npix = hp.nside2npix(nside)
-
-        # create the weight and shear map
-        wht = np.zeros(npix)
-        val = np.zeros((2, npix))
+        # complex map with real and imaginary part
+        val = np.zeros((2, mapper.size), mapper.dtype)
 
         # total weighted variance from online algorithm
         ngal = 0
         wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and get the shear values,
-        # randomise if asked to, and do the mapping
         async for page in _pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
-            lon, lat, re, im = page.get(*col)
-
-            if wcol is None:
-                w = np.ones(page.size)
-            else:
-                w = page.get(wcol)
-
-            if randomize:
-                a = self.rng.uniform(0.0, 2 * np.pi, size=page.size)
-                r = np.hypot(re, im)
-                re, im = r * np.cos(a), r * np.sin(a)
-                del a, r
-
-            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
-
-            _map_complex(wht, val, ipix, w, re, im)
-
             if page.size:
-                ngal += page.size
-                wmean += (w - wmean).sum() / ngal
-                var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
+                lon, lat, re, im = page.get(*col)
 
-            del page, lon, lat, re, im, w
+                w = page.get(wcol) if wcol is not None else None
+
+                mapper(lon, lat, [val[0], val[1]], [re, im], w)
+
+                ngal += page.size
+                if w is None:
+                    var += (re**2 + im**2 - var).sum() / ngal
+                else:
+                    wmean += (w - wmean).sum() / ngal
+                    var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
+
+                del lon, lat, re, im, w
+
+            del page
+
+        # set mean weight if there was no column for it
+        if wcol is None:
+            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -576,43 +414,37 @@ class ComplexField(Normalizable, Randomizable, Healpix, Field):
         else:
             vbar = np.mean(catalog.visibility)
 
-        # mean weight per visible pixel
-        wbar = ngal / npix / vbar * wmean
+        # mean weight per effective mapper "pixel"
+        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
 
-        # normalise the weight in each pixel if asked to
-        # compute bias for both cases here, giving more numerical accuracy
-        if self.normalize:
-            wht /= wbar
-            bias = 2 * np.pi * vbar**2 / ngal * (var / wmean**2)
-        else:
-            bias = (2 * np.pi / npix) * (ngal / npix) * var
+        # normalise the map
+        val /= wbar
 
-        # value was averaged in each pixel for numerical stability
-        # now compute the sum
-        val *= wht
+        # bias from measured variance, for E/B decomposition
+        bias = 2 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        self.metadata_for_result(
-            val,
-            catalog=catalog.label,
-            wbar=wbar,
-            bias=bias,
-        )
+        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
 
         # return the shear map
         return val
 
 
-class Visibility(Healpix, Field):
+class Visibility(Field):
     """Copy visibility map from catalogue at given resolution."""
 
-    def __init__(self, nside: int) -> None:
-        """Create visibility map at given NSIDE parameter."""
-        super().__init__(columns=(), nside=nside)
+    def __init__(self) -> None:
+        """Create a visibility field."""
+        super().__init__(spin=0)
+
+    @staticmethod
+    def _init_columns() -> Columns:
+        return ()
 
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
@@ -625,70 +457,59 @@ class Visibility(Healpix, Field):
             raise ValueError(msg)
 
         # warn if visibility is changing resolution
-        vmap_nside = hp.get_nside(vmap)
-        if vmap_nside != self.nside:
+        if vmap.size != mapper.size:
+            import healpy as hp
+
             warnings.warn(
                 f"changing NSIDE of visibility map "
-                f"from {vmap_nside} to {self.nside}",
+                f"from {hp.get_nside(vmap)} to {mapper.nside}",
             )
-            vmap = hp.ud_grade(vmap, self.nside)
+            vmap = hp.ud_grade(vmap, mapper.nside)
         else:
             # make a copy for updates to metadata
             vmap = np.copy(vmap)
 
-        self.metadata_for_result(
-            vmap,
-            catalog=catalog.label,
-        )
+        update_metadata(vmap, self, catalog, mapper)
 
         return vmap
 
 
-class Weights(Normalizable, Healpix, Field):
-    """Create a HEALPix weight map from a catalogue."""
+class Weights(Field):
+    """Field of weight values from a catalogue."""
 
-    def __init__(
-        self,
-        nside: int,
-        lon: str,
-        lat: str,
-        weight: str,
-        *,
-        normalize=True,
-    ) -> None:
-        """Create a new weight map."""
-        super().__init__(columns=(lon, lat, weight), nside=nside, normalize=normalize)
+    def __init__(self, *columns: str) -> None:
+        """Create a weight field."""
+        super().__init__(*columns, spin=0)
+
+    @staticmethod
+    def _init_columns(lon: str, lat: str, weight: str | None = None) -> Columns:
+        return lon, lat, weight
 
     async def __call__(
         self,
         catalog: Catalog,
+        mapper: Mapper,
         *,
         progress: ProgressTask | None = None,
     ) -> ArrayLike:
         """Map catalogue weights."""
 
-        # get the columns for this map
-        *col, wcol = self.columns
+        # get the columns for this field
+        *col, wcol = self.columns_or_error
 
-        # number of pixels for nside
-        nside = self.nside
-        npix = hp.nside2npix(nside)
-
-        # create the weight map
-        wht = np.zeros(npix)
+        # weight map
+        wht = np.zeros(mapper.size, mapper.dtype)
 
         # map catalogue
         async for page in _pages(catalog, progress):
             lon, lat = page.get(*col)
 
             if wcol is None:
-                w = np.ones(page.size)
+                w = None
             else:
                 w = page.get(wcol)
 
-            ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
-
-            _map_weight(wht, ipix, w)
+            mapper(lon, lat, [wht], None, w)
 
             del page, lon, lat, w
 
@@ -697,16 +518,11 @@ class Weights(Normalizable, Healpix, Field):
         if catalog.visibility is not None:
             wbar /= np.mean(catalog.visibility)
 
-        # normalise the weight in each pixel if asked to
-        if self.normalize:
-            wht /= wbar
+        # normalise the map
+        wht /= wbar
 
         # set metadata of arrays
-        self.metadata_for_result(
-            wht,
-            catalog=catalog.label,
-            wbar=wbar,
-        )
+        update_metadata(wht, self, catalog, mapper, wbar=wbar)
 
         # return the weight map
         return wht
@@ -715,163 +531,3 @@ class Weights(Normalizable, Healpix, Field):
 Spin2Field = partial(ComplexField, spin=2)
 Shears = Spin2Field
 Ellipticities = Spin2Field
-
-
-async def _map_task(
-    key: tuple[Any, ...],
-    field: Field,
-    catalog: Catalog,
-    progress: Progress,
-) -> ArrayLike:
-    """
-    Removes the task when coroutine finishes.
-    """
-    name = "[" + ", ".join(map(str, key)) + "]"
-    task = progress.task(name, subtask=True, total=None)
-    try:
-        return await field(catalog, progress=task)
-    finally:
-        task.remove()
-        progress.advance(progress.task_ids[0])
-
-
-def map_catalogs(
-    fields: Mapping[Any, Field],
-    catalogs: Mapping[Any, Catalog],
-    *,
-    parallel: bool = False,
-    out: MutableMapping[Any, Any] = None,
-    include: Sequence[tuple[Any, Any]] | None = None,
-    exclude: Sequence[tuple[Any, Any]] | None = None,
-    progress: bool = False,
-) -> dict[tuple[Any, Any], ArrayLike]:
-    """Make maps for a set of catalogues."""
-
-    # the toc dict of maps
-    if out is None:
-        out = TocDict()
-
-    # collect groups of items to go through
-    # items are tuples of (key, field, catalog)
-    groups = [
-        [((i, j), field, catalog) for i, field in fields.items()]
-        for j, catalog in catalogs.items()
-    ]
-
-    # flatten groups for parallel processing
-    if parallel:
-        groups = [sum(groups, [])]
-
-    # display a progress bar if asked to
-    if progress:
-        from .progress import Progress
-
-        # create the progress bar
-        # add the main task -- this must be the first task
-        _progress = Progress()
-        _progress.add_task("mapping", total=sum(map(len, groups)))
-        _progress.start()
-
-    # process all groups of fields and catalogues
-    for items in groups:
-        # fields return coroutines, which are ran concurrently
-        keys, coros = [], []
-        for key, field, catalog in items:
-            if toc_match(key, include, exclude):
-                if progress:
-                    coro = _map_task(key, field, catalog, _progress)
-                else:
-                    coro = field(catalog)
-                keys.append(key)
-                coros.append(coro)
-
-        # run all coroutines concurrently
-        results = coroutines.run(coroutines.gather(*coros))
-
-        # store results
-        for key, value in zip(keys, results):
-            out[key] = value
-
-        # free up memory for next group
-        del results
-
-    if progress:
-        _progress.refresh()
-        _progress.stop()
-
-    # return the toc dict
-    return out
-
-
-def transform_maps(
-    maps: Mapping[tuple[Any, Any], ArrayLike],
-    *,
-    lmax: int | Mapping[Any, int] | None = None,
-    out: MutableMapping[Any, Any] = None,
-    progress: bool = False,
-    **kwargs,
-) -> dict[tuple[Any, Any], ArrayLike]:
-    """transform a set of maps to alms"""
-
-    # the output toc dict
-    if out is None:
-        out = TocDict()
-
-    # display a progress bar if asked to
-    if progress:
-        from .progress import Progress
-
-        _progress = Progress()
-        _task = _progress.task("transform", total=len(maps))
-        _progress.start()
-
-    # convert maps to alms, taking care of complex and spin-weighted maps
-    for (k, i), m in maps.items():
-        if isinstance(lmax, Mapping):
-            _lmax = lmax.get((k, i)) or lmax.get(k)
-        else:
-            _lmax = lmax
-
-        md = m.dtype.metadata or {}
-        spin = md.get("spin", 0)
-
-        if progress:
-            _subtask = _progress.task(
-                f"[{k}, {i}]",
-                subtask=True,
-                start=False,
-                total=None,
-            )
-
-        if spin == 0:
-            pol = False
-        elif spin == 2:
-            pol = True
-            m = [np.zeros(np.shape(m)[-1]), m[0], m[1]]
-        else:
-            msg = f"spin-{spin} maps not yet supported"
-            raise NotImplementedError(msg)
-
-        alms = hp.map2alm(m, lmax=_lmax, pol=pol, **kwargs)
-
-        if spin == 0:
-            alms = {(k, i): alms}
-        elif spin == 2:
-            alms = {(f"{k}_E", i): alms[1], (f"{k}_B", i): alms[2]}
-
-        for ki, alm in alms.items():
-            update_metadata(alm, **md)
-            out[ki] = alm
-
-        del m, alms, alm
-
-        if progress:
-            _subtask.remove()
-            _task.update(advance=1)
-
-    if progress:
-        _progress.refresh()
-        _progress.stop()
-
-    # return the toc dict of alms
-    return out

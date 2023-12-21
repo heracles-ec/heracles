@@ -127,6 +127,11 @@ class Catalog(Protocol):
         ...
 
     @property
+    def metadata(self):
+        """return a dictionary of metadata for the catalogue"""
+        ...
+
+    @property
     def label(self):
         """return a human-friendly identifier for the source of data"""
         ...
@@ -199,6 +204,11 @@ class CatalogView:
     def base(self):
         """base catalogue of this view"""
         return self._catalog
+
+    @property
+    def metadata(self):
+        """return metadata for this view"""
+        return self._catalog.metadata
 
     @property
     def label(self):
@@ -324,6 +334,15 @@ class CatalogBase(metaclass=ABCMeta):
     def base(self):
         """returns ``None`` since this is not a view of another catalogue"""
         return
+
+    @property
+    def metadata(self):
+        """return the metadata for this catalogue"""
+        return MappingProxyType(
+            {
+                "catalog": self._label,
+            },
+        )
 
     @property
     def label(self):

@@ -1,5 +1,3 @@
-import unittest.mock
-
 import numpy as np
 import pytest
 
@@ -280,60 +278,3 @@ def test_bin2pt(ndim, rng, weights):
     np.testing.assert_array_equal(result["LMIN"], bins[:-1])
     np.testing.assert_array_equal(result["LMAX"], bins[1:])
     np.testing.assert_array_almost_equal(result["W"], binned_w)
-
-
-@pytest.mark.parametrize("full", [False, True])
-def test_random_bias(full, rng):
-    from heracles.twopoint import random_bias
-
-    nside = 64
-    npix = 12 * nside**2
-
-    catalog = unittest.mock.Mock()
-    catalog.visibility = None
-
-    async def _call(_):
-        return rng.random(npix)
-
-    map_a = unittest.mock.Mock(side_effect=_call)
-    map_b = unittest.mock.Mock(side_effect=_call)
-
-    initial_randomize = [map_a.randomize, map_b.randomize]
-
-    maps = {"A": map_a, "B": map_b}
-    catalogs = {0: catalog, 1: catalog}
-
-    nbs = random_bias(maps, catalogs, repeat=5, full=full)
-
-    for m, r in zip(maps.values(), initial_randomize):
-        assert m.randomize is r
-
-    keys = [("A", "A", 0, 0), ("A", "A", 1, 1), ("B", "B", 0, 0), ("B", "B", 1, 1)]
-    if full:
-        keys += [
-            ("A", "A", 0, 1),
-            ("A", "B", 0, 0),
-            ("A", "B", 1, 1),
-            ("A", "B", 0, 1),
-            ("A", "B", 1, 0),
-            ("B", "B", 0, 1),
-        ]
-
-    assert set(nbs.keys()) == set(keys)
-
-    # filter with include and exclude
-
-    nbs = random_bias(
-        maps,
-        catalogs,
-        repeat=5,
-        full=full,
-        include=[("A", 0), ("B", ...)],
-        exclude=[("B", 0)],
-    )
-
-    keys = [("A", "A", 0, 0), ("B", "B", 1, 1)]
-    if full:
-        keys += [("A", "B", 0, 1)]
-
-    assert set(nbs.keys()) == set(keys)
