@@ -84,7 +84,7 @@ def test_field_abc():
 
     class TestField(Field):
         @staticmethod
-        def _init_columns(lon: str, lat: str, weight: str | None = None) -> Columns:
+        def _init_columns(lon, lat, weight=None) -> Columns:
             return lon, lat, weight
 
         async def __call__(self):
