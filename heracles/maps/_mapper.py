@@ -126,3 +126,9 @@ class Mapper(metaclass=MapperMeta):
         """
         The spherical harmonic transform for this mapper.
         """
+
+    @abstractmethod
+    def deconvolve(self, alm: ArrayLike, *, inplace: bool = False) -> ArrayLike:
+        """
+        Remove this mapper's convolution kernel from *alm*.
+        """

@@ -164,35 +164,6 @@ def test_mixing_matrices(rng):
     assert mms["XY", 0, 1].shape == (lmax + 1, lmax + 1)
 
 
-def test_pixelate_mms_healpix():
-    import healpy as hp
-
-    from heracles.twopoint import pixelate_mms_healpix
-
-    nside = 512
-    lmax = 1000
-
-    fl0, fl2 = hp.pixwin(nside, lmax=lmax, pol=True)
-
-    mms = {
-        ("00", 0, 0): np.eye(lmax + 1),
-        ("0+", 0, 0): np.eye(lmax + 1),
-        ("++", 0, 0): np.eye(lmax + 1),
-        ("--", 0, 0): np.eye(lmax + 1),
-        ("+-", 0, 0): np.eye(lmax + 1),
-        ("ab", 0, 0): np.eye(lmax + 1),
-    }
-
-    pixelate_mms_healpix(mms, nside, inplace=True)
-
-    assert np.all(mms["00", 0, 0] == np.diag(fl0 * fl0))
-    assert np.all(mms["0+", 0, 0] == np.diag(fl0 * fl2))
-    assert np.all(mms["++", 0, 0] == np.diag(fl2 * fl2))
-    assert np.all(mms["--", 0, 0] == np.diag(fl2 * fl2))
-    assert np.all(mms["+-", 0, 0] == np.diag(fl2 * fl2))
-    assert np.all(mms["ab", 0, 0] == np.diag(fl0 * fl0))
-
-
 @pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
 def test_binned_cls(rng, weights):
     from heracles.twopoint import binned_cls
