@@ -196,7 +196,7 @@ class Positions(Field):
         # map catalogue data asynchronously
         async for page in _pages(catalog, progress):
             lon, lat = page.get(*col)
-            mapper(lon, lat, [pos])
+            mapper.map_values(lon, lat, [pos])
 
             ngal += page.size
 
@@ -300,7 +300,7 @@ class ScalarField(Field):
                 lon, lat, v = page.get(*col)
                 w = page.get(wcol) if wcol is not None else None
 
-                mapper(lon, lat, [val], [v], w)
+                mapper.map_values(lon, lat, [val], [v], w)
 
                 ngal += page.size
                 if w is None:
@@ -391,7 +391,7 @@ class ComplexField(Field):
 
                 w = page.get(wcol) if wcol is not None else None
 
-                mapper(lon, lat, [val[0], val[1]], [re, im], w)
+                mapper.map_values(lon, lat, [val[0], val[1]], [re, im], w)
 
                 ngal += page.size
                 if w is None:
@@ -509,7 +509,7 @@ class Weights(Field):
             else:
                 w = page.get(wcol)
 
-            mapper(lon, lat, [wht], None, w)
+            mapper.map_values(lon, lat, [wht], None, w)
 
             del page, lon, lat, w
 

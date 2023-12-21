@@ -38,15 +38,31 @@ def test_toc_filter():
         toc_filter(object())
 
 
-def test_toc_nearest():
-    from heracles.core import toc_nearest
+def test_multi_value_getter():
+    from heracles.core import multi_value_getter
 
-    assert toc_nearest({(1,): "x"}, 1) == "x"
-    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, 2) == "y"
-    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, (2, 0)) == "y"
-    assert toc_nearest({(1,): "x", (2,): "y", (): "z"}, (3, 0)) == "z"
-    assert toc_nearest({(0, 1): "x", (0, 2): "y", (0,): "z"}, (0, 2)) == "y"
-    assert toc_nearest({0: "x", 1: "y", (): "z"}, (0, 2)) == "x"
+    getter = multi_value_getter(
+        {
+            (1,): "x",
+            (2,): "y",
+            (): "z",
+            (2, 1): "w",
+            4: "v",
+        },
+    )
+
+    assert getter(1) == "x"
+    assert getter(2) == "y"
+    assert getter((2, 0)) == "y"
+    assert getter((3, 0)) == "z"
+    assert getter((2, 1)) == "w"
+    assert getter((4, 0)) == "v"
+
+    getter = multi_value_getter("x")
+
+    assert getter(1) == "x"
+    assert getter(2) == "x"
+    assert getter((2, 0)) == "x"
 
 
 def test_tocdict():

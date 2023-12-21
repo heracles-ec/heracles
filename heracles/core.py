@@ -18,10 +18,15 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for common core functionality"""
 
+from __future__ import annotations
+
 from collections import UserDict
 from collections.abc import Mapping, Sequence
+from typing import Any, Callable, TypeVar
 
 import numpy as np
+
+T = TypeVar("T")
 
 
 def toc_match(key, include=None, exclude=None):
@@ -49,21 +54,31 @@ def toc_filter(obj, include=None, exclude=None):
     raise TypeError(msg)
 
 
-def toc_nearest(obj, key):
-    """return the closest match to *key* in *obj*."""
-    if isinstance(key, Sequence):
-        t = tuple(key)
+def multi_value_getter(obj: T | Mapping[Any, T]) -> Callable[[Any], T]:
+    """Return a getter for values or mappings."""
+    if isinstance(obj, Mapping):
+
+        def getter(key: Any) -> T:
+            if isinstance(key, Sequence):
+                t = tuple(key)
+            else:
+                t = (key,)
+            while t:
+                if t in obj:
+                    return obj[t]
+                if len(t) == 1 and t[0] in obj:
+                    return obj[t[0]]
+                t = t[:-1]
+            if t in obj:
+                return obj[t]
+            raise KeyError(key)
+
     else:
-        t = (key,)
-    while t:
-        if t in obj:
-            return obj[t]
-        if len(t) == 1 and t[0] in obj:
-            return obj[t[0]]
-        t = t[:-1]
-    if t in obj:
-        return obj[t]
-    raise KeyError(key)
+
+        def getter(key: Any) -> T:
+            return obj
+
+    return getter
 
 
 # subclassing UserDict here since that returns the correct type from methods

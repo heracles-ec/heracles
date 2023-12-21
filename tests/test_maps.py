@@ -47,7 +47,7 @@ def test_healpix_maps(rng):
     # map positions
 
     m = np.zeros(mapper.size, mapper.dtype)
-    mapper(lon, lat, [m])
+    mapper.map_values(lon, lat, [m])
 
     expected = np.zeros(npix)
     np.add.at(expected, ipix, 1)
@@ -57,7 +57,7 @@ def test_healpix_maps(rng):
     # map positions with weights
 
     m = np.zeros(mapper.size, mapper.dtype)
-    mapper(lon, lat, [m], None, w)
+    mapper.map_values(lon, lat, [m], None, w)
 
     expected = np.zeros(npix)
     np.add.at(expected, ipix, w)
@@ -67,7 +67,7 @@ def test_healpix_maps(rng):
     # map one set of values
 
     m = np.zeros(mapper.size, mapper.dtype)
-    mapper(lon, lat, [m], [x])
+    mapper.map_values(lon, lat, [m], [x])
 
     expected = np.zeros(npix)
     np.add.at(expected, ipix, x)
@@ -77,7 +77,7 @@ def test_healpix_maps(rng):
     # map two sets of values
 
     m = np.zeros((2, mapper.size), mapper.dtype)
-    mapper(lon, lat, [m[0], m[1]], [x, y])
+    mapper.map_values(lon, lat, [m[0], m[1]], [x, y])
 
     expected = np.zeros((2, npix))
     np.add.at(expected[0], ipix, x)
@@ -88,7 +88,7 @@ def test_healpix_maps(rng):
     # map one set of values with weights
 
     m = np.zeros(mapper.size, mapper.dtype)
-    mapper(lon, lat, [m], [x], w)
+    mapper.map_values(lon, lat, [m], [x], w)
 
     expected = np.zeros(npix)
     np.add.at(expected, ipix, w * x)
@@ -98,13 +98,59 @@ def test_healpix_maps(rng):
     # map two sets of values with weights
 
     m = np.zeros((2, mapper.size), mapper.dtype)
-    mapper(lon, lat, [m[0], m[1]], [x, y], w)
+    mapper.map_values(lon, lat, [m[0], m[1]], [x, y], w)
 
     expected = np.zeros((2, npix))
     np.add.at(expected[0], ipix, w * x)
     np.add.at(expected[1], ipix, w * y)
 
     npt.assert_array_equal(m, expected)
+
+
+@unittest.mock.patch("healpy.map2alm")
+def test_healpix_transform(mock_map2alm, rng):
+    from heracles.core import update_metadata
+    from heracles.maps import Healpix
+
+    nside = 32
+    npix = 12 * nside**2
+
+    mapper = Healpix(nside)
+
+    # single scalar map
+    m = rng.standard_normal(npix)
+    update_metadata(m, spin=0, nside=nside, a=1)
+
+    mock_map2alm.return_value = np.empty(0, dtype=complex)
+
+    alms = mapper.transform(m)
+
+    assert alms is mock_map2alm.return_value
+    assert alms.dtype.metadata["spin"] == 0
+    assert alms.dtype.metadata["a"] == 1
+    assert alms.dtype.metadata["nside"] == nside
+
+    # polarisation map
+    m = rng.standard_normal((2, npix))
+    update_metadata(m, spin=2, nside=nside, b=2)
+
+    mock_map2alm.return_value = (
+        np.empty(0, dtype=complex),
+        np.empty(0, dtype=complex),
+        np.empty(0, dtype=complex),
+    )
+
+    alms = mapper.transform(m)
+
+    assert len(alms) == 2
+    assert alms[0] is mock_map2alm.return_value[1]
+    assert alms[1] is mock_map2alm.return_value[2]
+    assert alms[0].dtype.metadata["spin"] == 2
+    assert alms[1].dtype.metadata["spin"] == 2
+    assert alms[0].dtype.metadata["b"] == 2
+    assert alms[1].dtype.metadata["b"] == 2
+    assert alms[0].dtype.metadata["nside"] == nside
+    assert alms[1].dtype.metadata["nside"] == nside
 
 
 class MockField:
@@ -166,63 +212,21 @@ def test_map_catalogs_match():
 
 
 def test_transform_maps(rng):
-    from heracles.core import update_metadata
     from heracles.maps import transform_maps
 
-    nside = 32
-    npix = 12 * nside**2
+    alms_x = unittest.mock.Mock()
+    alms_ye = unittest.mock.Mock()
+    alms_yb = unittest.mock.Mock()
 
-    t = rng.standard_normal(npix)
-    update_metadata(t, spin=0, nside=nside, a=1)
-    p = rng.standard_normal((2, npix))
-    update_metadata(p, spin=2, nside=nside, b=2)
+    mapper = unittest.mock.Mock()
+    mapper.transform.side_effect = (alms_x, (alms_ye, alms_yb))
 
-    # single scalar map
-    maps = {("T", 0): t}
-    alms = transform_maps(maps)
+    maps = {("X", 0): unittest.mock.Mock(), ("Y", 1): unittest.mock.Mock()}
 
-    assert len(alms) == 1
-    assert alms.keys() == maps.keys()
-    assert alms["T", 0].dtype.metadata["spin"] == 0
-    assert alms["T", 0].dtype.metadata["a"] == 1
-    assert alms["T", 0].dtype.metadata["nside"] == nside
-
-    # polarisation map
-    maps = {("P", 0): p}
-    alms = transform_maps(maps)
-
-    assert len(alms) == 2
-    assert alms.keys() == {("P_E", 0), ("P_B", 0)}
-    assert alms["P_E", 0].dtype.metadata["spin"] == 2
-    assert alms["P_B", 0].dtype.metadata["spin"] == 2
-    assert alms["P_E", 0].dtype.metadata["b"] == 2
-    assert alms["P_B", 0].dtype.metadata["b"] == 2
-    assert alms["P_E", 0].dtype.metadata["nside"] == nside
-    assert alms["P_B", 0].dtype.metadata["nside"] == nside
-
-    # mixed
-    maps = {("T", 0): t, ("P", 1): p}
-    alms = transform_maps(maps)
+    alms = transform_maps(mapper, maps)
 
     assert len(alms) == 3
-    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
-    assert alms["T", 0].dtype.metadata["spin"] == 0
-    assert alms["P_E", 1].dtype.metadata["spin"] == 2
-    assert alms["P_B", 1].dtype.metadata["spin"] == 2
-    assert alms["T", 0].dtype.metadata["a"] == 1
-    assert alms["P_E", 1].dtype.metadata["b"] == 2
-    assert alms["P_B", 1].dtype.metadata["b"] == 2
-    assert alms["T", 0].dtype.metadata["nside"] == nside
-    assert alms["P_E", 1].dtype.metadata["nside"] == nside
-    assert alms["P_B", 1].dtype.metadata["nside"] == nside
-
-    # explicit lmax per map
-    maps = {("T", 0): t, ("P", 1): p}
-    lmax = {"T": 10, "P": 20}
-    alms = transform_maps(maps, lmax=lmax)
-
-    assert len(alms) == 3
-    assert alms.keys() == {("T", 0), ("P_E", 1), ("P_B", 1)}
-    assert alms["T", 0].size == (lmax["T"] + 1) * (lmax["T"] + 2) // 2
-    assert alms["P_E", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
-    assert alms["P_B", 1].size == (lmax["P"] + 1) * (lmax["P"] + 2) // 2
+    assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}
+    assert alms["X", 0] is alms_x
+    assert alms["Y_E", 1] is alms_ye
+    assert alms["Y_B", 1] is alms_yb
