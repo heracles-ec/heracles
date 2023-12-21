@@ -102,7 +102,7 @@ def test_field_abc():
     with pytest.raises(ValueError):
         f.columns_or_error
 
-    with pytest.raises(TypeError, match=r"TestField\.__init__\(\) missing 1 required"):
+    with pytest.raises(TypeError, match=r"__init__\(\) missing 1 required"):
         TestField("lon")
 
     f = TestField("lon", "lat")
