@@ -57,16 +57,13 @@ class Field(metaclass=ABCMeta):
     # overwritten by the class (or even an individual instance)
     __spin: int | None = None
 
-    def __init_subclass__(cls, spin: int | None = None) -> None:
+    def __init_subclass__(cls, *, spin: int | None = None) -> None:
         """Initialise spin weight of field subclasses."""
         super().__init_subclass__()
         if spin is not None:
             cls.__spin = spin
 
-    def __init__(
-        self,
-        *columns: str,
-    ) -> None:
+    def __init__(self, *columns: str) -> None:
         """Initialise the field."""
         super().__init__()
         self.__columns: Columns | None
@@ -349,11 +346,11 @@ class ScalarField(Field, spin=0):
         return val
 
 
-class ComplexField(Field):
+class ComplexField(Field, spin=0):
     """Field of complex values in a catalogue.
 
-    The :class:`ComplexField` subclasses such as :class:`Spin2Field`
-    have non-zero spin weight.
+    The :class:`ComplexField` class has zero spin weight, while
+    subclasses such as :class:`Spin2Field` have non-zero spin weight.
 
     """
 
