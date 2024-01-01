@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import warnings
 from abc import ABCMeta, abstractmethod
-from functools import partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -54,11 +53,17 @@ class Field(metaclass=ABCMeta):
 
     """
 
-    def __init__(
-        self,
-        *columns: str,
-        spin: int = 0,
-    ) -> None:
+    # every field subclass has a static spin weight attribute, which can be
+    # overwritten by the class (or even an individual instance)
+    __spin: int | None = None
+
+    def __init_subclass__(cls, *, spin: int | None = None) -> None:
+        """Initialise spin weight of field subclasses."""
+        super().__init_subclass__()
+        if spin is not None:
+            cls.__spin = spin
+
+    def __init__(self, *columns: str) -> None:
         """Initialise the field."""
         super().__init__()
         self.__columns: Columns | None
@@ -70,9 +75,9 @@ class Field(metaclass=ABCMeta):
                 raise TypeError(msg) from None
         else:
             self.__columns = None
-        self._metadata: dict[str, Any] = {
-            "spin": spin,
-        }
+        self._metadata: dict[str, Any] = {}
+        if (spin := self.__spin) is not None:
+            self._metadata["spin"] = spin
 
     @staticmethod
     @abstractmethod
@@ -103,7 +108,12 @@ class Field(metaclass=ABCMeta):
     @property
     def spin(self) -> int:
         """Spin weight of field."""
-        return self._metadata["spin"]
+        spin = self.__spin
+        if spin is None:
+            clsname = self.__class__.__name__
+            msg = f"field of type '{clsname}' has undefined spin weight"
+            raise ValueError(msg)
+        return spin
 
     @abstractmethod
     async def __call__(
@@ -137,7 +147,7 @@ async def _pages(
     await coroutines.sleep()
 
 
-class Positions(Field):
+class Positions(Field, spin=0):
     """Field of positions in a catalogue.
 
     Can produce both overdensity maps and number count maps, depending
@@ -152,7 +162,7 @@ class Positions(Field):
         nbar: float | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(*columns, spin=0)
+        super().__init__(*columns)
         self.__overdensity = overdensity
         self.__nbar = nbar
 
@@ -256,12 +266,8 @@ class Positions(Field):
         return pos
 
 
-class ScalarField(Field):
+class ScalarField(Field, spin=0):
     """Field of real scalar values in a catalogue."""
-
-    def __init__(self, *columns: str) -> None:
-        """Create a scalar field."""
-        super().__init__(*columns, spin=0)
 
     @staticmethod
     def _init_columns(
@@ -340,17 +346,13 @@ class ScalarField(Field):
         return val
 
 
-class ComplexField(Field):
+class ComplexField(Field, spin=0):
     """Field of complex values in a catalogue.
 
-    Complex fields can have non-zero spin weight, set using the
-    ``spin=`` parameter.
+    The :class:`ComplexField` class has zero spin weight, while
+    subclasses such as :class:`Spin2Field` have non-zero spin weight.
 
     """
-
-    def __init__(self, *columns: str, spin: int = 0) -> None:
-        """Create a complex field."""
-        super().__init__(*columns, spin=spin)
 
     @staticmethod
     def _init_columns(
@@ -430,12 +432,8 @@ class ComplexField(Field):
         return val
 
 
-class Visibility(Field):
+class Visibility(Field, spin=0):
     """Copy visibility map from catalogue at given resolution."""
-
-    def __init__(self) -> None:
-        """Create a visibility field."""
-        super().__init__(spin=0)
 
     @staticmethod
     def _init_columns() -> Columns:
@@ -474,12 +472,8 @@ class Visibility(Field):
         return vmap
 
 
-class Weights(Field):
+class Weights(Field, spin=0):
     """Field of weight values from a catalogue."""
-
-    def __init__(self, *columns: str) -> None:
-        """Create a weight field."""
-        super().__init__(*columns, spin=0)
 
     @staticmethod
     def _init_columns(lon: str, lat: str, weight: str | None = None) -> Columns:
@@ -528,6 +522,9 @@ class Weights(Field):
         return wht
 
 
-Spin2Field = partial(ComplexField, spin=2)
+class Spin2Field(ComplexField, spin=2):
+    """Spin-2 complex field."""
+
+
 Shears = Spin2Field
 Ellipticities = Spin2Field

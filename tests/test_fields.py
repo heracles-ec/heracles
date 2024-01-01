@@ -82,7 +82,19 @@ def test_field_abc():
     with pytest.raises(TypeError):
         Field()
 
-    class TestField(Field):
+    class SpinLessField(Field):
+        def _init_columns(self, *columns: str) -> Columns:
+            return columns
+
+        async def __call__(self):
+            pass
+
+    f = SpinLessField()
+
+    with pytest.raises(ValueError, match="undefined spin weight"):
+        f.spin
+
+    class TestField(Field, spin=0):
         @staticmethod
         def _init_columns(lon, lat, weight=None) -> Columns:
             return lon, lat, weight
@@ -269,11 +281,11 @@ def test_scalar_field(mapper, catalog):
 
 
 def test_complex_field(mapper, catalog):
-    from heracles.fields import ComplexField
+    from heracles.fields import Spin2Field
 
     npix = 12 * mapper.nside**2
 
-    f = ComplexField("ra", "dec", "g1", "g2", "w", spin=2)
+    f = Spin2Field("ra", "dec", "g1", "g2", "w")
     m = coroutines.run(f(catalog, mapper))
 
     w = next(iter(catalog))["w"]
