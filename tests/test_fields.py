@@ -95,9 +95,7 @@ def test_field_abc():
         f.spin
 
     class TestField(Field, spin=0):
-        @staticmethod
-        def _init_columns(lon, lat, weight=None) -> Columns:
-            return lon, lat, weight
+        uses = "lon", "lat", "[weight]"
 
         async def __call__(self):
             pass
@@ -114,7 +112,7 @@ def test_field_abc():
     with pytest.raises(ValueError):
         f.columns_or_error
 
-    with pytest.raises(TypeError, match=r"__init__\(\) missing 1 required"):
+    with pytest.raises(ValueError, match="accepts 2 to 3 columns"):
         TestField("lon")
 
     f = TestField("lon", "lat")
