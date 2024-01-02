@@ -202,7 +202,7 @@ def mixing_matrices(fields, cls, *, l1max=None, l2max=None, l3max=None, out=None
     done = set()
 
     # go through the toc dict of cls and compute mixing matrices
-    # which mixing matrix is computed depends on the whts mapping
+    # which mixing matrix is computed depends on the `weights` mapping
     for (k1, k2, i1, i2), cl in cls.items():
         # if the weights are not named then skip this cl
         try:

@@ -139,11 +139,7 @@ def test_mixing_matrices(mock, mock_eb, rng):
     # field definition, requires weight function and spin weight
 
     # mixmat_eb returns three values
-    mock_eb.return_value = (
-        Mock(),
-        Mock(),
-        Mock(),
-    )
+    mock_eb.return_value = (Mock(), Mock(), Mock())
 
     lmax = 20
     cl = rng.standard_normal(lmax + 1)
