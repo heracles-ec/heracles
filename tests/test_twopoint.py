@@ -1,3 +1,5 @@
+from unittest.mock import Mock, call, patch
+
 import numpy as np
 import pytest
 
@@ -126,42 +128,90 @@ def test_debias_cls():
     assert np.all(cls["PP", 0, 0] == -1.23)
 
 
-def test_mixing_matrices(rng):
+@patch("convolvecl.mixmat_eb")
+@patch("convolvecl.mixmat")
+def test_mixing_matrices(mock, mock_eb, rng):
     from heracles.twopoint import mixing_matrices
 
     # this only tests the function logic
     # the mixing matrix computation itself is tested elsewhere
 
+    # field definition, requires weight function and spin weight
+
+    # mixmat_eb returns three values
+    mock_eb.return_value = (Mock(), Mock(), Mock())
+
     lmax = 20
     cl = rng.standard_normal(lmax + 1)
 
+    # create the mock field information
+    fields = {
+        "P": Mock(weight="V", spin=0),
+        "G": Mock(weight="W", spin=2),
+    }
+
     # compute pos-pos
     cls = {("V", "V", 0, 1): cl}
-    mms = mixing_matrices(cls)
+    mms = mixing_matrices(fields, cls)
     assert len(mms) == 1
-    assert mms["00", 0, 1].shape == (lmax + 1, lmax + 1)
+    assert mock.call_count == 1
+    assert mock_eb.call_count == 0
+    mock.assert_called_with(cl, l1max=None, l2max=None, l3max=None, spin=(0, 0))
+    assert mms["P", "P", 0, 1] is mock.return_value
+
+    mock.reset_mock()
+    mock_eb.reset_mock()
 
     # compute pos-she
     cls = {("V", "W", 0, 1): cl, ("W", "V", 0, 1): cl}
-    mms = mixing_matrices(cls)
+    mms = mixing_matrices(fields, cls)
     assert len(mms) == 2
-    assert mms["0+", 0, 1].shape == (lmax + 1, lmax + 1)
-    assert mms["0+", 1, 0].shape == (lmax + 1, lmax + 1)
+    assert mock.call_count == 2
+    assert mock_eb.call_count == 0
+    assert mock.call_args_list == [
+        call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 2)),
+        call(cl, l1max=None, l2max=None, l3max=None, spin=(2, 0)),
+    ]
+    assert mms["P", "G_E", 0, 1] is mock.return_value
+    assert mms["G_E", "P", 0, 1] is mock.return_value
+
+    mock.reset_mock()
+    mock_eb.reset_mock()
 
     # compute she-she
     cls = {("W", "W", 0, 1): cl}
-    mms = mixing_matrices(cls)
+    mms = mixing_matrices(fields, cls)
     assert len(mms) == 3
-    assert mms["++", 0, 1].shape == (lmax + 1, lmax + 1)
-    assert mms["--", 0, 1].shape == (lmax + 1, lmax + 1)
-    assert mms["+-", 0, 1].shape == (lmax + 1, lmax + 1)
-    np.testing.assert_allclose(mms["+-", 0, 1], mms["++", 0, 1] + mms["--", 0, 1])
+    assert mock.call_count == 0
+    assert mock_eb.call_count == 1
+    mock_eb.assert_called_with(cl, l1max=None, l2max=None, l3max=None, spin=(2, 2))
+    assert mms["G_E", "G_E", 0, 1] is mock_eb.return_value[0]
+    assert mms["G_B", "G_B", 0, 1] is mock_eb.return_value[1]
+    assert mms["G_E", "G_B", 0, 1] is mock_eb.return_value[2]
+
+    mock.reset_mock()
+    mock_eb.reset_mock()
 
     # compute unknown
     cls = {("X", "Y", 0, 1): cl}
-    mms = mixing_matrices(cls)
-    assert len(mms) == 1
-    assert mms["XY", 0, 1].shape == (lmax + 1, lmax + 1)
+    mms = mixing_matrices(fields, cls)
+    assert len(mms) == 0
+
+    mock.reset_mock()
+    mock_eb.reset_mock()
+
+    # compute multiple combinations
+    cls = {("V", "V", 0, 0): cl, ("V", "V", 0, 1): cl, ("V", "V", 1, 1): cl}
+    mms = mixing_matrices(fields, cls)
+    assert len(mms) == 3
+    assert mock.call_count == 3
+    assert mock_eb.call_count == 0
+    assert mock.call_args_list == [
+        call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 0)),
+        call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 0)),
+        call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 0)),
+    ]
+    assert mms.keys() == {("P", "P", 0, 0), ("P", "P", 0, 1), ("P", "P", 1, 1)}
 
 
 @pytest.mark.parametrize("weights", [None, "l(l+1)", "2l+1", "<rand>"])
