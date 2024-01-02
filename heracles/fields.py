@@ -31,7 +31,7 @@ import numpy as np
 from .core import update_metadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Mapping
+    from collections.abc import AsyncIterable, Mapping, Sequence
     from typing import Any
 
     from numpy.typing import ArrayLike
@@ -53,38 +53,63 @@ class Field(metaclass=ABCMeta):
 
     """
 
+    # column names: "col1", "col2", "[optional]"
+    uses: Sequence[str] | str | None = None
+
     # every field subclass has a static spin weight attribute, which can be
     # overwritten by the class (or even an individual instance)
     __spin: int | None = None
+
+    # definition of required and optional columns
+    __ncol: tuple[int, int]
 
     def __init_subclass__(cls, *, spin: int | None = None) -> None:
         """Initialise spin weight of field subclasses."""
         super().__init_subclass__()
         if spin is not None:
             cls.__spin = spin
+        uses = cls.uses
+        if cls.uses is None:
+            uses = ()
+        elif isinstance(cls.uses, str):
+            uses = (uses,)
+        ncol = len(uses)
+        nopt = 0
+        for u in uses[::-1]:
+            if u.startswith("[") and u.endswith("]"):
+                nopt += 1
+            else:
+                break
+        cls.__ncol = (ncol - nopt, ncol)
 
     def __init__(self, *columns: str) -> None:
         """Initialise the field."""
         super().__init__()
-        self.__columns: Columns | None
-        if columns:
-            try:
-                self.__columns = self._init_columns(*columns)
-            except TypeError as exc:
-                msg = str(exc).replace("_init_columns", "__init__")
-                raise TypeError(msg) from None
-        else:
-            self.__columns = None
+        self.__columns = self._init_columns(*columns) if columns else None
         self._metadata: dict[str, Any] = {}
         if (spin := self.__spin) is not None:
             self._metadata["spin"] = spin
 
-    @staticmethod
-    @abstractmethod
-    def _init_columns(*columns: str) -> Columns:
+    @classmethod
+    def _init_columns(cls, *columns: str) -> Columns:
         """Initialise the given set of columns for a specific field
         subclass."""
-        ...
+        nmin, nmax = cls.__ncol
+        if not nmin <= len(columns) <= nmax:
+            uses = cls.uses
+            if uses is None:
+                uses = ()
+            if isinstance(uses, str):
+                uses = (uses,)
+            count = f"{nmin}"
+            if nmax != nmin:
+                count += f" to {nmax}"
+            msg = f"field of type '{cls.__name__}' accepts {count} columns"
+            if uses:
+                msg += " (" + ", ".join(uses) + ")"
+            msg += f", received {len(columns)}"
+            raise ValueError(msg)
+        return columns + (None,) * (nmax - len(columns))
 
     @property
     def columns(self) -> Columns | None:
@@ -155,6 +180,8 @@ class Positions(Field, spin=0):
 
     """
 
+    uses = "longitude", "latitude"
+
     def __init__(
         self,
         *columns: str,
@@ -165,10 +192,6 @@ class Positions(Field, spin=0):
         super().__init__(*columns)
         self.__overdensity = overdensity
         self.__nbar = nbar
-
-    @staticmethod
-    def _init_columns(lon: str, lat: str) -> Columns:
-        return lon, lat
 
     @property
     def overdensity(self) -> bool:
@@ -269,14 +292,7 @@ class Positions(Field, spin=0):
 class ScalarField(Field, spin=0):
     """Field of real scalar values in a catalogue."""
 
-    @staticmethod
-    def _init_columns(
-        lon: str,
-        lat: str,
-        value: str,
-        weight: str | None = None,
-    ) -> Columns:
-        return lon, lat, value, weight
+    uses = "longitude", "latitude", "value", "[weight]"
 
     async def __call__(
         self,
@@ -354,15 +370,7 @@ class ComplexField(Field, spin=0):
 
     """
 
-    @staticmethod
-    def _init_columns(
-        lon: str,
-        lat: str,
-        real: str,
-        imag: str,
-        weight: str | None = None,
-    ) -> Columns:
-        return lon, lat, real, imag, weight
+    uses = "longitude", "latitude", "real", "imag", "[weight]"
 
     async def __call__(
         self,
@@ -435,10 +443,6 @@ class ComplexField(Field, spin=0):
 class Visibility(Field, spin=0):
     """Copy visibility map from catalogue at given resolution."""
 
-    @staticmethod
-    def _init_columns() -> Columns:
-        return ()
-
     async def __call__(
         self,
         catalog: Catalog,
@@ -475,9 +479,7 @@ class Visibility(Field, spin=0):
 class Weights(Field, spin=0):
     """Field of weight values from a catalogue."""
 
-    @staticmethod
-    def _init_columns(lon: str, lat: str, weight: str | None = None) -> Columns:
-        return lon, lat, weight
+    uses = "longitude", "latitude", "[weight]"
 
     async def __call__(
         self,
