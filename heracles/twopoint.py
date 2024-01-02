@@ -25,7 +25,12 @@ import time
 from contextlib import nullcontext
 from datetime import timedelta
 from itertools import combinations_with_replacement, product
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import healpy as hp
+import numpy as np
+
+from .core import TocDict, toc_match, update_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
@@ -34,13 +39,6 @@ if TYPE_CHECKING:
 
     from .fields import Field
     from .progress import Progress
-
-from typing import Any
-
-import healpy as hp
-import numpy as np
-
-from .core import TocDict, toc_match, update_metadata
 
 # type alias for the keys of two-point data
 TwoPointKey = tuple[Any, Any, Any, Any]
