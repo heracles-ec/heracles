@@ -82,10 +82,11 @@ class Field(metaclass=ABCMeta):
                 break
         cls.__ncol = (ncol - nopt, ncol)
 
-    def __init__(self, *columns: str) -> None:
+    def __init__(self, *columns: str, weight: str | None = None) -> None:
         """Initialise the field."""
         super().__init__()
         self.__columns = self._init_columns(*columns) if columns else None
+        self.__weight = weight
         self._metadata: dict[str, Any] = {}
         if (spin := self.__spin) is not None:
             self._metadata["spin"] = spin
@@ -140,6 +141,11 @@ class Field(metaclass=ABCMeta):
             raise ValueError(msg)
         return spin
 
+    @property
+    def weight(self) -> str | None:
+        """Name of the weight function for this field."""
+        return self.__weight
+
     @abstractmethod
     async def __call__(
         self,
@@ -187,9 +193,10 @@ class Positions(Field, spin=0):
         *columns: str,
         overdensity: bool = True,
         nbar: float | None = None,
+        weight: str | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(*columns)
+        super().__init__(*columns, weight=weight)
         self.__overdensity = overdensity
         self.__nbar = nbar
 

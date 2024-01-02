@@ -115,9 +115,10 @@ def test_field_abc():
     with pytest.raises(ValueError, match="accepts 2 to 3 columns"):
         TestField("lon")
 
-    f = TestField("lon", "lat")
+    f = TestField("lon", "lat", weight="W")
 
     assert f.columns == ("lon", "lat", None)
+    assert f.weight == "W"
 
 
 def test_visibility(mapper, vmap):
