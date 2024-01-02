@@ -69,9 +69,9 @@ class Field(metaclass=ABCMeta):
         if spin is not None:
             cls.__spin = spin
         uses = cls.uses
-        if cls.uses is None:
+        if uses is None:
             uses = ()
-        elif isinstance(cls.uses, str):
+        elif isinstance(uses, str):
             uses = (uses,)
         ncol = len(uses)
         nopt = 0
