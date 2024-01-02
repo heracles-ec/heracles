@@ -18,15 +18,32 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for angular power spectrum estimation"""
 
+from __future__ import annotations
+
 import logging
 import time
+from contextlib import nullcontext
 from datetime import timedelta
 from itertools import combinations_with_replacement, product
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, MutableMapping
+
+    from numpy.typing import ArrayLike, NDArray
+
+    from .fields import Field
+    from .progress import Progress
+
+from typing import Any
 
 import healpy as hp
 import numpy as np
 
 from .core import TocDict, toc_match, update_metadata
+
+# type alias for the keys of two-point data
+TwoPointKey = tuple[Any, Any, Any, Any]
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +198,16 @@ def debias_cls(cls, bias=None, *, inplace=False):
     return out
 
 
-def mixing_matrices(fields, cls, *, l1max=None, l2max=None, l3max=None, out=None):
+def mixing_matrices(
+    fields: Mapping[Any, Field],
+    cls: Mapping[TwoPointKey, NDArray[Any]],
+    *,
+    l1max: int | None = None,
+    l2max: int | None = None,
+    l3max: int | None = None,
+    out: MutableMapping[TwoPointKey, ArrayLike] | None = None,
+    progress: bool = False,
+) -> MutableMapping[TwoPointKey, ArrayLike]:
     """compute mixing matrices for fields from a set of cls"""
 
     from convolvecl import mixmat, mixmat_eb
@@ -191,7 +217,7 @@ def mixing_matrices(fields, cls, *, l1max=None, l2max=None, l3max=None, out=None
         out = TocDict()
 
     # inverse mapping of weights to fields
-    weights = {}
+    weights: dict[str, dict[Any, Field]] = {}
     for key, field in fields.items():
         if field.weight is not None:
             if field.weight not in weights:
@@ -201,57 +227,82 @@ def mixing_matrices(fields, cls, *, l1max=None, l2max=None, l3max=None, out=None
     # keep track of combinations that have been done already
     done = set()
 
+    # display a progress bar if asked to
+    progressbar: Progress | nullcontext[None]
+    if progress:
+        from heracles.progress import Progress
+
+        progressbar = Progress()
+        progressbar.task("mixing matrices", total=None)
+    else:
+        progressbar = nullcontext()
+
     # go through the toc dict of cls and compute mixing matrices
     # which mixing matrix is computed depends on the `weights` mapping
-    for (k1, k2, i1, i2), cl in cls.items():
-        # if the weights are not named then skip this cl
-        try:
-            fields1 = weights[k1]
-            fields2 = weights[k2]
-        except KeyError:
-            continue
-
-        # deal with structured cl arrays
-        if cl.dtype.names is not None:
-            cl = cl["CL"]
-
-        # compute mixing matrices for all fields of this weight combination
-        for f1, f2 in product(fields1, fields2):
-            # check if this combination has been done already
-            if (f1, f2, i1, i2) in done or (f2, f1, i2, i1) in done:
+    with progressbar as prog:
+        for (k1, k2, i1, i2), cl in cls.items():
+            # if the weights are not named then skip this cl
+            try:
+                fields1 = weights[k1]
+                fields2 = weights[k2]
+            except KeyError:
                 continue
-            # otherwise, mark it as done
-            done.add((f1, f2, i1, i2))
 
-            # get spins of fields
-            spin1, spin2 = fields1[f1].spin, fields2[f2].spin
+            # deal with structured cl arrays
+            if cl.dtype.names is not None:
+                cl = cl["CL"]
 
-            # if any spin is zero, then there is no need for E/B decomposition
-            if spin1 == 0 or spin2 == 0:
-                mm = mixmat(
-                    cl,
-                    l1max=l1max,
-                    l2max=l2max,
-                    l3max=l3max,
-                    spin=(spin1, spin2),
-                )
-                name1 = f1 if spin1 == 0 else f"{f1}_E"
-                name2 = f2 if spin2 == 0 else f"{f2}_E"
-                out[name1, name2, i1, i2] = mm
-                del mm
-            else:
-                # E/B decomposition for mixing matrix
-                mm_ee, mm_bb, mm_eb = mixmat_eb(
-                    cl,
-                    l1max=l1max,
-                    l2max=l2max,
-                    l3max=l3max,
-                    spin=(spin1, spin2),
-                )
-                out[f"{f1}_E", f"{f2}_E", i1, i2] = mm_ee
-                out[f"{f1}_B", f"{f2}_B", i1, i2] = mm_bb
-                out[f"{f1}_E", f"{f2}_B", i1, i2] = mm_eb
-                del mm_ee, mm_bb, mm_eb
+            # compute mixing matrices for all fields of this weight combination
+            for f1, f2 in product(fields1, fields2):
+                # check if this combination has been done already
+                if (f1, f2, i1, i2) in done or (f2, f1, i2, i1) in done:
+                    continue
+                # otherwise, mark it as done
+                done.add((f1, f2, i1, i2))
+
+                if prog is not None:
+                    subtask = prog.task(
+                        f"[{f1}, {f2}, {i1}, {i2}]",
+                        subtask=True,
+                        start=False,
+                        total=None,
+                    )
+
+                # get spins of fields
+                spin1, spin2 = fields1[f1].spin, fields2[f2].spin
+
+                # if any spin is zero, then there is no E/B decomposition
+                if spin1 == 0 or spin2 == 0:
+                    mm = mixmat(
+                        cl,
+                        l1max=l1max,
+                        l2max=l2max,
+                        l3max=l3max,
+                        spin=(spin1, spin2),
+                    )
+                    name1 = f1 if spin1 == 0 else f"{f1}_E"
+                    name2 = f2 if spin2 == 0 else f"{f2}_E"
+                    out[name1, name2, i1, i2] = mm
+                    del mm
+                else:
+                    # E/B decomposition for mixing matrix
+                    mm_ee, mm_bb, mm_eb = mixmat_eb(
+                        cl,
+                        l1max=l1max,
+                        l2max=l2max,
+                        l3max=l3max,
+                        spin=(spin1, spin2),
+                    )
+                    out[f"{f1}_E", f"{f2}_E", i1, i2] = mm_ee
+                    out[f"{f1}_B", f"{f2}_B", i1, i2] = mm_bb
+                    out[f"{f1}_E", f"{f2}_B", i1, i2] = mm_eb
+                    del mm_ee, mm_bb, mm_eb
+
+                if prog is not None:
+                    subtask.remove()
+
+        if prog is not None:
+            prog.refresh()
 
     # return the toc dict of mixing matrices
     return out
