@@ -214,13 +214,13 @@ def mixing_matrices(
     if out is None:
         out = TocDict()
 
-    # inverse mapping of weights to fields
-    weights: dict[str, dict[Any, Field]] = {}
+    # inverse mapping of masks to fields
+    masks: dict[str, dict[Any, Field]] = {}
     for key, field in fields.items():
-        if field.weight is not None:
-            if field.weight not in weights:
-                weights[field.weight] = {}
-            weights[field.weight][key] = field
+        if field.mask is not None:
+            if field.mask not in masks:
+                masks[field.mask] = {}
+            masks[field.mask][key] = field
 
     # keep track of combinations that have been done already
     done = set()
@@ -236,13 +236,13 @@ def mixing_matrices(
         progressbar = nullcontext()
 
     # go through the toc dict of cls and compute mixing matrices
-    # which mixing matrix is computed depends on the `weights` mapping
+    # which mixing matrix is computed depends on the `masks` mapping
     with progressbar as prog:
         for (k1, k2, i1, i2), cl in cls.items():
-            # if the weights are not named then skip this cl
+            # if the masks are not named then skip this cl
             try:
-                fields1 = weights[k1]
-                fields2 = weights[k2]
+                fields1 = masks[k1]
+                fields2 = masks[k2]
             except KeyError:
                 continue
 
@@ -250,7 +250,7 @@ def mixing_matrices(
             if cl.dtype.names is not None:
                 cl = cl["CL"]
 
-            # compute mixing matrices for all fields of this weight combination
+            # compute mixing matrices for all fields of this mask combination
             for f1, f2 in product(fields1, fields2):
                 # check if this combination has been done already
                 if (f1, f2, i1, i2) in done or (f2, f1, i2, i1) in done:

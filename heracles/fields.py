@@ -84,11 +84,11 @@ class Field(metaclass=ABCMeta):
                 break
         cls.__ncol = (ncol - nopt, ncol)
 
-    def __init__(self, *columns: str, weight: str | None = None) -> None:
+    def __init__(self, *columns: str, mask: str | None = None) -> None:
         """Initialise the field."""
         super().__init__()
         self.__columns = self._init_columns(*columns) if columns else None
-        self.__weight = weight
+        self.__mask = mask
         self._metadata: dict[str, Any] = {}
         if (spin := self.__spin) is not None:
             self._metadata["spin"] = spin
@@ -144,9 +144,9 @@ class Field(metaclass=ABCMeta):
         return spin
 
     @property
-    def weight(self) -> str | None:
-        """Name of the weight function for this field."""
-        return self.__weight
+    def mask(self) -> str | None:
+        """Name of the mask for this field."""
+        return self.__mask
 
     @abstractmethod
     async def __call__(
@@ -195,10 +195,10 @@ class Positions(Field, spin=0):
         *columns: str,
         overdensity: bool = True,
         nbar: float | None = None,
-        weight: str | None = None,
+        mask: str | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(*columns, weight=weight)
+        super().__init__(*columns, mask=mask)
         self.__overdensity = overdensity
         self.__nbar = nbar
 
@@ -541,7 +541,7 @@ Shears = Spin2Field
 Ellipticities = Spin2Field
 
 
-def weights_for_fields(
+def get_masks(
     fields: Mapping[str, Field],
     *,
     comb: int | None = None,
@@ -550,12 +550,12 @@ def weights_for_fields(
     append_eb: bool = False,
 ) -> Sequence[str] | Sequence[tuple[str, ...]]:
     """
-    Return the weights for a given set of fields.
+    Return the masks for a given set of fields.
 
-    If *comb* is given, produce combinations of weights for combinations
+    If *comb* is given, produce combinations of masks for combinations
     of a number *comb* of fields.
 
-    The fields (not weights) can be filtered using the *include* and
+    The fields (not masks) can be filtered using the *include* and
     *exclude* parameters.  If *append_eb* is true, the filter is applied
     to field names including the E/B-mode suffix when the spin weight is
     non-zero.
@@ -575,21 +575,21 @@ def weights_for_fields(
         return not any(item is None for item in seq)
 
     if comb is None:
-        weights_no_comb: list[str] = []
+        masks_no_comb: list[str] = []
         for key, field in fields.items():
-            if field.weight is None:
+            if field.mask is None:
                 continue
             if not any(map(isgood, _key_eb(key))):
                 continue
-            weights_no_comb.append(field.weight)
-        return weights_no_comb
+            masks_no_comb.append(field.mask)
+        return masks_no_comb
 
-    weights_comb: list[tuple[str, ...]] = []
+    masks_comb: list[tuple[str, ...]] = []
     for keys in combinations_with_replacement(fields, comb):
-        item = tuple(fields[key].weight for key in keys)
+        item = tuple(fields[key].mask for key in keys)
         if not _all_str(item):
             continue
         if not any(map(isgood, product(*map(_key_eb, keys)))):
             continue
-        weights_comb.append(item)
-    return weights_comb
+        masks_comb.append(item)
+    return masks_comb
