@@ -115,10 +115,10 @@ def test_field_abc():
     with pytest.raises(ValueError, match="accepts 2 to 3 columns"):
         TestField("lon")
 
-    f = TestField("lon", "lat", weight="W")
+    f = TestField("lon", "lat", mask="W")
 
     assert f.columns == ("lon", "lat", None)
-    assert f.weight == "W"
+    assert f.mask == "W"
 
 
 def test_visibility(mapper, vmap):
@@ -328,41 +328,41 @@ def test_weights(mapper, catalog):
     np.testing.assert_array_almost_equal(m, w / wbar)
 
 
-def test_weights_for_fields():
+def test_get_masks():
     from unittest.mock import Mock
 
-    from heracles.fields import weights_for_fields
+    from heracles.fields import get_masks
 
     fields = {
-        "A": Mock(weight="X", spin=0),
-        "B": Mock(weight="Y", spin=2),
-        "C": Mock(weight=None),
+        "A": Mock(mask="X", spin=0),
+        "B": Mock(mask="Y", spin=2),
+        "C": Mock(mask=None),
     }
 
-    weights = weights_for_fields(fields)
+    masks = get_masks(fields)
 
-    assert weights == ["X", "Y"]
+    assert masks == ["X", "Y"]
 
-    weights = weights_for_fields(fields, comb=1)
+    masks = get_masks(fields, comb=1)
 
-    assert weights == [("X",), ("Y",)]
+    assert masks == [("X",), ("Y",)]
 
-    weights = weights_for_fields(fields, comb=2)
+    masks = get_masks(fields, comb=2)
 
-    assert weights == [("X", "X"), ("X", "Y"), ("Y", "Y")]
+    assert masks == [("X", "X"), ("X", "Y"), ("Y", "Y")]
 
-    weights = weights_for_fields(fields, comb=2, include=[("A",)])
+    masks = get_masks(fields, comb=2, include=[("A",)])
 
-    assert weights == [("X", "X"), ("X", "Y")]
+    assert masks == [("X", "X"), ("X", "Y")]
 
-    weights = weights_for_fields(fields, comb=2, exclude=[("A", "B")])
+    masks = get_masks(fields, comb=2, exclude=[("A", "B")])
 
-    assert weights == [("X", "X"), ("Y", "Y")]
+    assert masks == [("X", "X"), ("Y", "Y")]
 
-    weights = weights_for_fields(fields, comb=2, include=[("A", "B")], append_eb=True)
+    masks = get_masks(fields, comb=2, include=[("A", "B")], append_eb=True)
 
-    assert weights == []
+    assert masks == []
 
-    weights = weights_for_fields(fields, comb=2, include=[("A", "B_E")], append_eb=True)
+    masks = get_masks(fields, comb=2, include=[("A", "B_E")], append_eb=True)
 
-    assert weights == [("X", "Y")]
+    assert masks == [("X", "Y")]

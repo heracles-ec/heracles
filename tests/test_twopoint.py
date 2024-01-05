@@ -136,7 +136,7 @@ def test_mixing_matrices(mock, mock_eb, rng):
     # this only tests the function logic
     # the mixing matrix computation itself is tested elsewhere
 
-    # field definition, requires weight function and spin weight
+    # field definition, requires mask and spin weight
 
     # mixmat_eb returns three values
     mock_eb.return_value = (Mock(), Mock(), Mock())
@@ -146,8 +146,8 @@ def test_mixing_matrices(mock, mock_eb, rng):
 
     # create the mock field information
     fields = {
-        "P": Mock(weight="V", spin=0),
-        "G": Mock(weight="W", spin=2),
+        "P": Mock(mask="V", spin=0),
+        "G": Mock(mask="W", spin=2),
     }
 
     # compute pos-pos
