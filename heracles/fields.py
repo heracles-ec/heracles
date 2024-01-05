@@ -22,17 +22,19 @@ from __future__ import annotations
 
 import warnings
 from abc import ABCMeta, abstractmethod
+from functools import partial
+from itertools import combinations_with_replacement, product
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import coroutines
 import numpy as np
 
-from .core import update_metadata
+from .core import toc_match, update_metadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, Mapping, Sequence
-    from typing import Any
+    from typing import Any, TypeGuard
 
     from numpy.typing import ArrayLike
 
@@ -537,3 +539,57 @@ class Spin2Field(ComplexField, spin=2):
 
 Shears = Spin2Field
 Ellipticities = Spin2Field
+
+
+def weights_for_fields(
+    fields: Mapping[str, Field],
+    *,
+    comb: int | None = None,
+    include: Sequence[Sequence[str]] | None = None,
+    exclude: Sequence[Sequence[str]] | None = None,
+    append_eb: bool = False,
+) -> Sequence[str] | Sequence[tuple[str, ...]]:
+    """
+    Return the weights for a given set of fields.
+
+    If *comb* is given, produce combinations of weights for combinations
+    of a number *comb* of fields.
+
+    The fields (not weights) can be filtered using the *include* and
+    *exclude* parameters.  If *append_eb* is true, the filter is applied
+    to field names including the E/B-mode suffix when the spin weight is
+    non-zero.
+
+    """
+
+    isgood = partial(toc_match, include=include, exclude=exclude)
+
+    def _key_eb(key: str) -> tuple[str, ...]:
+        """Return the key of the given field with _E/_B appended (or not)."""
+        if append_eb and fields[key].spin != 0:
+            return (f"{key}_E", f"{key}_B")
+        return (key,)
+
+    def _all_str(seq: tuple[str | None, ...]) -> TypeGuard[tuple[str, ...]]:
+        """Return true if all items in *seq* are strings."""
+        return not any(item is None for item in seq)
+
+    if comb is None:
+        weights_no_comb: list[str] = []
+        for key, field in fields.items():
+            if field.weight is None:
+                continue
+            if not any(map(isgood, _key_eb(key))):
+                continue
+            weights_no_comb.append(field.weight)
+        return weights_no_comb
+
+    weights_comb: list[tuple[str, ...]] = []
+    for keys in combinations_with_replacement(fields, comb):
+        item = tuple(fields[key].weight for key in keys)
+        if not _all_str(item):
+            continue
+        if not any(map(isgood, product(*map(_key_eb, keys)))):
+            continue
+        weights_comb.append(item)
+    return weights_comb

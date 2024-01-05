@@ -326,3 +326,43 @@ def test_weights(mapper, catalog):
         "nside": mapper.nside,
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
+
+
+def test_weights_for_fields():
+    from unittest.mock import Mock
+
+    from heracles.fields import weights_for_fields
+
+    fields = {
+        "A": Mock(weight="X", spin=0),
+        "B": Mock(weight="Y", spin=2),
+        "C": Mock(weight=None),
+    }
+
+    weights = weights_for_fields(fields)
+
+    assert weights == ["X", "Y"]
+
+    weights = weights_for_fields(fields, comb=1)
+
+    assert weights == [("X",), ("Y",)]
+
+    weights = weights_for_fields(fields, comb=2)
+
+    assert weights == [("X", "X"), ("X", "Y"), ("Y", "Y")]
+
+    weights = weights_for_fields(fields, comb=2, include=[("A",)])
+
+    assert weights == [("X", "X"), ("X", "Y")]
+
+    weights = weights_for_fields(fields, comb=2, exclude=[("A", "B")])
+
+    assert weights == [("X", "X"), ("Y", "Y")]
+
+    weights = weights_for_fields(fields, comb=2, include=[("A", "B")], append_eb=True)
+
+    assert weights == []
+
+    weights = weights_for_fields(fields, comb=2, include=[("A", "B_E")], append_eb=True)
+
+    assert weights == [("X", "Y")]
