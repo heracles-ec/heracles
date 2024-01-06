@@ -51,6 +51,7 @@ def angular_power_spectra(
     alms2=None,
     *,
     lmax=None,
+    debias=True,
     bins=None,
     weights=None,
     include=None,
@@ -130,6 +131,12 @@ def angular_power_spectra(
                 else:
                     md[f"{key}_2"] = value
         update_metadata(cl, **md)
+
+        # debias cl if asked to
+        if debias:
+            # minimum l for correction
+            _lmin = max(abs(md.get("spin_1", 0)), abs(md.get("spin_2", 0)))
+            cl[_lmin:] -= md.get("bias", 0.0)
 
         # if bins are given, apply the binning
         if bins is not None:
