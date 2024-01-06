@@ -51,6 +51,8 @@ def angular_power_spectra(
     alms2=None,
     *,
     lmax=None,
+    bins=None,
+    weights=None,
     include=None,
     exclude=None,
     out=None,
@@ -129,6 +131,10 @@ def angular_power_spectra(
                     md[f"{key}_2"] = value
         update_metadata(cl, **md)
 
+        # if bins are given, apply the binning
+        if bins is not None:
+            cl = bin2pt(cl, bins, "CL", weights=weights)
+
         # add cl to the set
         cls[k1, k2, i1, i2] = cl
 
@@ -203,6 +209,8 @@ def mixing_matrices(
     l1max: int | None = None,
     l2max: int | None = None,
     l3max: int | None = None,
+    bins: ArrayLike | None = None,
+    weights: str | ArrayLike | None = None,
     out: MutableMapping[TwoPointKey, ArrayLike] | None = None,
     progress: bool = False,
 ) -> MutableMapping[TwoPointKey, ArrayLike]:
@@ -278,6 +286,8 @@ def mixing_matrices(
                         l3max=l3max,
                         spin=(spin1, spin2),
                     )
+                    if bins is not None:
+                        mm = bin2pt(mm, bins, "MM", weights=weights)
                     name1 = f1 if spin1 == 0 else f"{f1}_E"
                     name2 = f2 if spin2 == 0 else f"{f2}_E"
                     out[name1, name2, i1, i2] = mm
@@ -291,6 +301,10 @@ def mixing_matrices(
                         l3max=l3max,
                         spin=(spin1, spin2),
                     )
+                    if bins is not None:
+                        mm_ee = bin2pt(mm_ee, bins, "MM", weights=weights)
+                        mm_bb = bin2pt(mm_bb, bins, "MM", weights=weights)
+                        mm_eb = bin2pt(mm_eb, bins, "MM", weights=weights)
                     out[f"{f1}_E", f"{f2}_E", i1, i2] = mm_ee
                     out[f"{f1}_B", f"{f2}_B", i1, i2] = mm_bb
                     out[f"{f1}_E", f"{f2}_B", i1, i2] = mm_eb
