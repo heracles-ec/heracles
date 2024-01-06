@@ -358,6 +358,7 @@ def test_tocfits(tmp_path):
 
     data12 = np.zeros(5, dtype=[("X", float), ("Y", int)])
     data22 = np.ones(5, dtype=[("X", float), ("Y", int)])
+    data21 = np.full(5, 2, dtype=[("X", float), ("Y", int)])
 
     tocfits[1, 2] = data12
 
@@ -399,6 +400,16 @@ def test_tocfits(tmp_path):
     assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
     np.testing.assert_array_equal(tocfits2[1, 2], data12)
     np.testing.assert_array_equal(tocfits2[2, 2], data22)
+
+    tocfits2[2, 1] = data21
+
+    with fitsio.FITS(path) as fits:
+        assert len(fits) == 5
+        toc = fits["TESTTOC"].read()
+        assert len(toc) == 3
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
+        np.testing.assert_array_equal(fits["TEST2"].read(), data21)
 
 
 def test_tocfits_is_lazy(tmp_path):

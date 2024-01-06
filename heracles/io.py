@@ -788,7 +788,7 @@ class TocFits(MutableMapping):
                 toc = fits[self.ext].read()
 
                 # store the dtype for ToC entries
-                toc.dtype = toc.dtype
+                self.dtype = toc.dtype
 
                 # store the ToC as a mapping
                 self._toc = TocDict({tuple(key): str(ext) for ext, *key in toc})
