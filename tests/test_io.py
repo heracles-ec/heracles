@@ -233,9 +233,9 @@ def test_write_read_mms(rng, tmp_path):
     workdir = str(tmp_path)
 
     mms = {
-        ("00", 0, 1): rng.standard_normal((10, 10)),
-        ("0+", 1, 2): rng.standard_normal((20, 5)),
-        ("++", 2, 3): rng.standard_normal((10, 5, 2)),
+        ("P", "P", 0, 1): rng.standard_normal((10, 10)),
+        ("P", "G_E", 1, 2): rng.standard_normal((20, 5)),
+        ("G_E", "G_E", 2, 3): rng.standard_normal((10, 5, 2)),
     }
 
     write_mms(filename, mms, workdir=workdir)

@@ -56,7 +56,8 @@ def _write_metadata(hdu, metadata):
     """write array metadata to FITS HDU"""
     md = metadata or {}
     for key, value in md.items():
-        hdu.write_key("META " + key.upper(), value, _METADATA_COMMENTS.get(key))
+        comment = _METADATA_COMMENTS.get(key, "")
+        hdu.write_key("META " + key.upper(), value, comment)
 
 
 def _read_metadata(hdu):
@@ -531,8 +532,8 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
         # write a new TOC extension if FITS doesn't already contain one
         if "MMTOC" not in fits:
             fits.create_table_hdu(
-                names=["EXT", "NAME", "BIN1", "BIN2"],
-                formats=["10A", "10A", "I", "I"],
+                names=["EXT", "NAME1", "NAME2", "BIN1", "BIN2"],
+                formats=["10A", "10A", "10A", "I", "I"],
                 extname="MMTOC",
             )
 
@@ -545,12 +546,12 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
             mmn += 1
 
         # write every mixing matrix
-        for (n, i1, i2), mm in mms.items():
+        for (k1, k2, i1, i2), mm in mms.items():
             # skip if not selected
-            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+            if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("writing mixing matrix %s for bins %s, %s", n, i1, i2)
+            logger.info("writing %s x %s mm for bins %s, %s", k1, k2, i1, i2)
 
             # the mm extension name
             ext = f"MM{mmn}"
@@ -560,7 +561,7 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
             _write_twopoint(fits, ext, mm, "MM")
 
             # write the TOC entry
-            tocentry[0] = (ext, n, i1, i2)
+            tocentry[0] = (ext, k1, k2, i1, i2)
             fits["MMTOC"].append(tocentry)
 
     logger.info("done with %d mm(s)", len(mms))
@@ -584,16 +585,16 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
 
         # read every entry in the TOC, add it to the list, then read the mms
         for entry in fits_toc:
-            ext, n, i1, i2 = entry[["EXT", "NAME", "BIN1", "BIN2"]]
+            ext, k1, k2, i1, i2 = entry[["EXT", "NAME1", "NAME2", "BIN1", "BIN2"]]
 
             # skip if not selected
-            if not toc_match((n, i1, i2), include=include, exclude=exclude):
+            if not toc_match((k1, k2, i1, i2), include=include, exclude=exclude):
                 continue
 
-            logger.info("reading mixing matrix %s for bins %s, %s", n, i1, i2)
+            logger.info("writing %s x %s mm for bins %s, %s", k1, k2, i1, i2)
 
             # read the mixing matrix from the extension and store in set of mms
-            mms[n, i1, i2] = _read_twopoint(fits, ext)
+            mms[k1, k2, i1, i2] = _read_twopoint(fits, ext)
 
     logger.info("done with %d mm(s)", len(mms))
 
@@ -889,6 +890,6 @@ class MmsFits(TocFits):
     """FITS-backed mapping for mixing matrices."""
 
     tag = "MM"
-    columns = {"NAME": "10A", "BIN1": "I", "BIN2": "I"}
+    columns = {"NAME1": "10A", "NAME2": "10A", "BIN1": "I", "BIN2": "I"}
     reader = staticmethod(_read_twopoint)
     writer = partial(_write_twopoint, name=tag)
