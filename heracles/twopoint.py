@@ -118,18 +118,27 @@ def angular_power_spectra(
 
         # collect metadata
         md = {}
+        bias, bcor = None, None
         if alm1.dtype.metadata:
             for key, value in alm1.dtype.metadata.items():
                 if key == "bias":
-                    md[key] = value if k1 == k2 and i1 == i2 else 0.0
+                    if k1 == k2 and i1 == i2:
+                        bias = value
+                elif key == "bcor":
+                    if k1 == k2 and i1 == i2:
+                        bcor = value
                 else:
                     md[f"{key}_1"] = value
         if alm2.dtype.metadata:
             for key, value in alm2.dtype.metadata.items():
-                if key == "bias":
+                if key == "bias" or key == "bcor":
                     pass
                 else:
                     md[f"{key}_2"] = value
+        if bias is not None:
+            md["bias"] = bias
+        if bcor is not None:
+            md["bcor"] = bcor
         update_metadata(cl, **md)
 
         # debias cl if asked to
