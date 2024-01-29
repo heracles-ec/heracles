@@ -47,9 +47,14 @@ optional-dependencies = {all = [
 ]}
 readme = "README.md"
 requires-python = ">=3.9"
-urls.Documentation = "https://heracles.readthedocs.io/"
-urls.Homepage = "https://github.com/heracles-ec/heracles"
-urls.Issues = "https://github.com/heracles-ec/heracles/issues"
+
+[project.scripts]
+heracles = "heracles.cli:main"
+
+[project.urls]
+Documentation = "https://heracles.readthedocs.io/"
+Homepage = "https://github.com/heracles-ec/heracles"
+Issues = "https://github.com/heracles-ec/heracles/issues"
 
 [tool.black]
 force-exclude = """
