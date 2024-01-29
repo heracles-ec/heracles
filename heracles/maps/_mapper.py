@@ -28,8 +28,9 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import Self
 
-    from numpy.typing import ArrayLike, DTypeLike
+    from numpy.typing import ArrayLike, DTypeLike, NDArray
 
 # dictionary of kernel names and their corresponding Mapper classes
 _KERNELS: dict[str, type[Mapper]] = {}
@@ -43,38 +44,62 @@ def get_kernels() -> Mapping[str, type[Mapper]]:
     return MappingProxyType(_KERNELS)
 
 
-class MapperMeta(ABCMeta):
+def mapper_from_dict(d: Mapping[str, Any]) -> Mapper:
     """
-    Metaclass for mappers.
+    Return a mapper that matches the given metadata.
     """
 
-    _kernel: str | None = None
+    try:
+        kernel = d["kernel"]
+    except KeyError:
+        msg = "no 'kernel' in mapping"
+        raise ValueError(msg) from None
 
-    @property
-    def kernel(cls) -> str | None:
-        return cls._kernel
+    try:
+        cls = _KERNELS[kernel]
+    except KeyError:
+        msg = f"unknown kernel: {kernel}"
+        raise ValueError(msg) from None
+
+    return cls.from_dict(d)
 
 
-class Mapper(metaclass=MapperMeta):
+class Mapper(metaclass=ABCMeta):
     """
     Abstract base class for mappers.
     """
 
-    def __init_subclass__(cls, /, kernel: str, **kwargs):
+    __kernel: str
+
+    def __init_subclass__(cls, /, kernel: str, **kwargs) -> None:
         """
         Initialise mapper subclasses with a *kernel* parameter.
         """
         super().__init_subclass__(**kwargs)
-        cls._kernel = kernel
+        cls.__kernel = kernel
         _KERNELS[kernel] = cls
+
+    @classmethod
+    @abstractmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> Self:
+        """
+        Create a new mapper instance from a dictionary of parameters.
+        """
 
     def __init__(self) -> None:
         """
         Initialise a new mapper instance.
         """
         self._metadata: dict[str, Any] = {
-            "kernel": self.__class__.kernel,
+            "kernel": self.__kernel,
         }
+
+    @property
+    def kernel(self) -> str:
+        """
+        Return the name of the kernel for this mapper.
+        """
+        return self.__kernel
 
     @property
     def metadata(self) -> Mapping[str, Any]:
@@ -128,7 +153,13 @@ class Mapper(metaclass=MapperMeta):
         """
 
     @abstractmethod
-    def deconvolve(self, alm: ArrayLike, *, inplace: bool = False) -> ArrayLike:
+    def kl(self, lmax: int, spin: int = 0) -> NDArray[Any]:
         """
-        Remove this mapper's convolution kernel from *alm*.
+        Return the convolution kernel in harmonic space.
         """
+
+    def bl(self, lmax: int, spin: int = 0) -> None | NDArray[Any]:
+        """
+        Return the biasing kernel in harmonic space.
+        """
+        return None

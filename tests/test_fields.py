@@ -263,7 +263,6 @@ def test_scalar_field(mapper, catalog):
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
     v2 = ((w * v) ** 2).sum()
-    neff = w.sum() ** 2 / (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
     bias = (4 * np.pi / npix / npix) * v2
@@ -276,7 +275,6 @@ def test_scalar_field(mapper, catalog):
         "kernel": "healpix",
         "nside": mapper.nside,
         "bias": pytest.approx(bias / wbar**2),
-        "bcor": pytest.approx(4 * np.pi / neff),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -293,7 +291,6 @@ def test_complex_field(mapper, catalog):
     re = next(iter(catalog))["g1"]
     im = next(iter(catalog))["g2"]
     v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
-    neff = w.sum() ** 2 / (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
     bias = (4 * np.pi / npix / npix) * v2 / 2
@@ -306,7 +303,6 @@ def test_complex_field(mapper, catalog):
         "kernel": "healpix",
         "nside": mapper.nside,
         "bias": pytest.approx(bias / wbar**2),
-        "bcor": pytest.approx(2 * np.pi / neff),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -314,20 +310,25 @@ def test_complex_field(mapper, catalog):
 def test_weights(mapper, catalog):
     from heracles.fields import Weights
 
+    npix = 12 * mapper.nside**2
+
     f = Weights("ra", "dec", "w")
     m = coroutines.run(f(catalog, mapper))
 
     w = next(iter(catalog))["w"]
+    v2 = (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    bias = (4 * np.pi / npix / npix) * v2
 
     assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 0,
-        "wbar": wbar,
+        "wbar": pytest.approx(wbar),
         "kernel": "healpix",
         "nside": mapper.nside,
+        "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
 

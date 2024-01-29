@@ -34,9 +34,10 @@ from heracles.core import update_metadata
 from ._mapper import Mapper
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+    from typing import Any, Self
 
-    from numpy.typing import ArrayLike, DTypeLike
+    from numpy.typing import ArrayLike, DTypeLike, NDArray
 
 
 def _asnative(arr):
@@ -120,12 +121,25 @@ class Healpix(Mapper, kernel="healpix"):
     available as the *nside* property.
     """
 
+    DATAPATH: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> Self:
+        """
+        Create a HEALPix mapper from a dictionary.
+        """
+        nside = d["nside"]
+        if isinstance(nside, str) and nside.isdigit():
+            nside = int(nside)
+        elif not isinstance(nside, int):
+            msg = f"value for key 'nside' is {type(nside).__name__}, expected int"
+            raise ValueError(msg)
+        return cls(nside)
+
     def __init__(
         self,
         nside: int,
         dtype: DTypeLike = np.float64,
-        *,
-        datapath: str | None = None,
     ) -> None:
         """
         Mapper for HEALPix maps with the given *nside* parameter.
@@ -134,7 +148,6 @@ class Healpix(Mapper, kernel="healpix"):
         self.__nside = nside
         self.__npix = hp.nside2npix(nside)
         self.__dtype = np.dtype(dtype)
-        self.__datapath = datapath
         self._metadata |= {
             "nside": nside,
         }
@@ -222,7 +235,7 @@ class Healpix(Mapper, kernel="healpix"):
             lmax=lmax,
             pol=pol,
             use_pixel_weights=True,
-            datapath=self.__datapath,
+            datapath=self.DATAPATH,
         )
 
         if spin == 0:
@@ -234,23 +247,26 @@ class Healpix(Mapper, kernel="healpix"):
 
         return alms
 
-    def deconvolve(self, alm: ArrayLike, *, inplace: bool = False) -> ArrayLike:
+    def kl(self, lmax: int, spin: int = 0) -> NDArray[Any]:
         """
-        Remove HEALPix pixel window function from *alm*.
+        Return the HEALPix pixel window function.
         """
 
-        lmax = hp.Alm.getlmax(alm.size)
-
-        md = alm.dtype.metadata or {}
-        spin = md.get("spin", 0)
-
+        pw: NDArray[Any]
         if spin == 0:
             pw = hp.pixwin(self.__nside, lmax=lmax)
         elif spin == 2:
             _, pw = hp.pixwin(self.__nside, lmax=lmax, pol=True)
-            pw[:2] = 1.0
         else:
-            msg = f"unsupported spin for deconvolve: {spin}"
+            msg = f"unsupported spin: {spin}"
             raise ValueError(msg)
 
-        return hp.almxfl(alm, 1 / pw, inplace=inplace)
+        return pw
+
+    def bl(self, lmax: int, spin: int = 0) -> NDArray[Any]:
+        """
+        Return the biasing kernel for HEALPix.
+        """
+        kl = self.kl(lmax, spin)
+        where = np.arange(lmax + 1) >= abs(spin)
+        return np.divide(1.0, kl, where=where, out=np.zeros(lmax + 1))

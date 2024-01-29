@@ -30,7 +30,8 @@ from typing import TYPE_CHECKING, Any
 import healpy as hp
 import numpy as np
 
-from .core import TocDict, toc_match, update_metadata
+from .core import TocDict, items_with_suffix, toc_match, update_metadata
+from .maps import mapper_from_dict
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
@@ -44,6 +45,61 @@ if TYPE_CHECKING:
 TwoPointKey = tuple[Any, Any, Any, Any]
 
 logger = logging.getLogger(__name__)
+
+
+def _debias_cl(
+    cl: NDArray[Any],
+    bias: float | None = None,
+    md: Mapping[str, Any] | None = None,
+    *,
+    inplace: bool = False,
+) -> NDArray[Any]:
+    """
+    Remove additive bias from angular power spectrum.
+    """
+
+    if md is None:
+        md = cl.dtype.metadata or {}
+
+    if not inplace:
+        cl = cl.copy()
+        update_metadata(cl, **md)
+
+    lmax = len(cl) - 1
+
+    # spins of the spectrum
+    spin1, spin2 = md.get("spin_1", 0), md.get("spin_2", 0)
+
+    # minimum angular mode for bias correction
+    lmin = max(abs(spin1), abs(spin2))
+
+    # use explicit bias, if given, or bias value from metadata
+    b = np.zeros(lmax + 1)
+    b[lmin:] = md.get("bias", 0.0) if bias is None else bias
+
+    # apply biasing kernel from mappers
+    try:
+        mapper = mapper_from_dict(items_with_suffix(md, "_1"))
+    except ValueError:
+        pass
+    else:
+        if (bl := mapper.bl(lmax=lmax, spin=spin1)) is not None:
+            b *= bl
+    try:
+        mapper = mapper_from_dict(items_with_suffix(md, "_2"))
+    except ValueError:
+        pass
+    else:
+        if (bl := mapper.bl(lmax=lmax, spin=spin2)) is not None:
+            b *= bl
+
+    # remove bias
+    if cl.dtype.names is None:
+        cl -= b
+    else:
+        cl["CL"] -= b
+
+    return cl
 
 
 def angular_power_spectra(
@@ -118,38 +174,33 @@ def angular_power_spectra(
 
         # collect metadata
         md = {}
-        bias, bcor = None, None
+        bias = None
         if alm1.dtype.metadata:
             for key, value in alm1.dtype.metadata.items():
                 if key == "bias":
                     if k1 == k2 and i1 == i2:
                         bias = value
-                elif key == "bcor":
-                    if k1 == k2 and i1 == i2:
-                        bcor = value
                 else:
                     md[f"{key}_1"] = value
         if alm2.dtype.metadata:
             for key, value in alm2.dtype.metadata.items():
-                if key == "bias" or key == "bcor":
+                if key == "bias":
                     pass
                 else:
                     md[f"{key}_2"] = value
         if bias is not None:
             md["bias"] = bias
-        if bcor is not None:
-            md["bcor"] = bcor
-        update_metadata(cl, **md)
 
         # debias cl if asked to
-        if debias:
-            # minimum l for correction
-            _lmin = max(abs(md.get("spin_1", 0)), abs(md.get("spin_2", 0)))
-            cl[_lmin:] -= md.get("bias", 0.0)
+        if debias and bias is not None:
+            _debias_cl(cl, bias, md, inplace=True)
 
         # if bins are given, apply the binning
         if bins is not None:
             cl = bin2pt(cl, bins, "CL", weights=weights)
+
+        # write metadata for this spectrum
+        update_metadata(cl, **md)
 
         # add cl to the set
         cls[k1, k2, i1, i2] = cl
@@ -179,34 +230,7 @@ def debias_cls(cls, bias=None, *, inplace=False):
     # subtract bias of each cl in turn
     for key in cls:
         logger.info("debiasing %s x %s cl for bins %s, %s", *key)
-
-        cl = cls[key]
-        md = cl.dtype.metadata or {}
-
-        if not inplace:
-            cl = cl.copy()
-            update_metadata(cl, **md)
-
-        # minimum l for correction
-        lmin = max(abs(md.get("spin_1", 0)), abs(md.get("spin_2", 0)))
-
-        # get bias from explicit dict, if given, or metadata
-        if bias is None:
-            b = md.get("bias", 0.0)
-        else:
-            b = bias.get(key, 0.0)
-
-        # remove bias
-        if cl.dtype.names is None:
-            cl[lmin:] -= b
-        else:
-            cl["CL"][lmin:] -= b
-
-        # write noise bias to corrected cl
-        update_metadata(cl, bias=b)
-
-        # store debiased cl in output set
-        out[key] = cl
+        out[key] = _debias_cl(cls[key], bias and bias.get(key), inplace=inplace)
 
     logger.info(
         "debiased %d cl(s) in %s",

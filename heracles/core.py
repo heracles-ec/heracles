@@ -143,3 +143,11 @@ def update_metadata(array, *sources, **metadata):
         raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
+
+
+def items_with_suffix(d: Mapping[str, Any], suffix: str) -> Mapping[str, Any]:
+    """
+    Return items from *d* where keys end in *suffix*.  Returns a mapping
+    where *suffix* is removed from keys.
+    """
+    return {k.removesuffix(suffix): v for k, v in d.items() if k.endswith(suffix)}
