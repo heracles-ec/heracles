@@ -26,8 +26,11 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 import coroutines
+import numpy as np
 
 from heracles.core import TocDict, multi_value_getter, toc_match
+
+from ._mapper import mapper_from_dict
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping, Sequence
@@ -142,8 +145,30 @@ def map_catalogs(
     return out
 
 
+def deconvolved(
+    mapper: Mapper,
+    alm: NDArray[Any] | tuple[NDArray[Any], ...],
+    *,
+    inplace: bool = False,
+) -> NDArray[Any] | tuple[NDArray[Any], ...]:
+    """
+    Divide *alm* by the spherical convolution kernel of *mapper*.
+    """
+    from healpy import Alm, almxfl
+
+    if isinstance(alm, tuple):
+        result = tuple(deconvolved(mapper, a, inplace=inplace) for a in alm)
+        return result if not inplace else alm
+
+    lmax = Alm.getlmax(alm.shape[-1])
+    spin = (alm.dtype.metadata or {}).get("spin", 0)
+    kl = mapper.kl(lmax=lmax, spin=spin)
+    where = np.arange(lmax + 1) >= abs(spin)
+    fl = np.divide(1, kl, where=where, out=np.ones(lmax + 1))
+    return almxfl(alm, fl, inplace=inplace)
+
+
 def transform_maps(
-    mapper: Mapper | Mapping[Any, Mapper],
     maps: Mapping[tuple[Any, Any], NDArray],
     *,
     lmax: int | Mapping[Any, int] | None = None,
@@ -159,7 +184,6 @@ def transform_maps(
         out = TocDict()
 
     # getter for values or dicts
-    mappergetter = multi_value_getter(mapper)
     lmaxgetter = multi_value_getter(lmax)
 
     # display a progress bar if asked to
@@ -183,17 +207,18 @@ def transform_maps(
                     total=None,
                 )
 
-            _mapper = mappergetter((k, i))
             _lmax = lmaxgetter((k, i))
 
-            alms = _mapper.transform(m, _lmax)
+            try:
+                mapper = mapper_from_dict(m.dtype.metadata or {})
+            except ValueError as exc:
+                msg = f"could not construct mapper from metadata for map {k}, {i}: {exc!s}"
+                raise ValueError(msg)
+
+            alms = mapper.transform(m, _lmax)
 
             if deconvolve:
-                if isinstance(alms, tuple):
-                    for alm in alms:
-                        _mapper.deconvolve(alm, inplace=True)
-                else:
-                    _mapper.deconvolve(alms, inplace=True)
+                deconvolved(mapper, alms, inplace=True)
 
             if isinstance(alms, tuple):
                 out[f"{k}_E", i] = alms[0]

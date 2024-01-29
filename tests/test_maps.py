@@ -13,8 +13,22 @@ def test_kernel_registry():
         pass
 
     assert get_kernels() == {"test": TestMapper}
-    assert Mapper.kernel is None
-    assert TestMapper.kernel == "test"
+
+
+@unittest.mock.patch.dict("heracles.maps._mapper._KERNELS", clear=True)
+def test_mapper_from_dict():
+    from heracles.maps import mapper_from_dict
+    from heracles.maps._mapper import _KERNELS
+
+    mock = unittest.mock.Mock()
+
+    assert _KERNELS == {}
+    _KERNELS["test"] = mock
+
+    d = {"kernel": "test", "a": 1}
+
+    mapper_from_dict(d)
+    mock.from_dict.assert_called_once_with(d)
 
 
 def test_healpix_maps(rng):
@@ -105,6 +119,11 @@ def test_healpix_maps(rng):
     np.add.at(expected[1], ipix, w * y)
 
     npt.assert_array_equal(m, expected)
+
+    # test from_dict
+    mapper = Healpix.from_dict({"nside": 12})
+    assert isinstance(mapper, Healpix)
+    assert mapper.nside == 12
 
 
 @unittest.mock.patch("healpy.map2alm")
@@ -211,19 +230,30 @@ def test_map_catalogs_match():
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
-def test_transform_maps(rng):
+@unittest.mock.patch.dict("heracles.maps._mapper._KERNELS", clear=True)
+@unittest.mock.patch("heracles.maps._mapping.deconvolved")
+def test_transform_maps(mock_deconvolved, rng):
+    import numpy as np
+
     from heracles.maps import transform_maps
+    from heracles.maps._mapper import _KERNELS
 
     alms_x = unittest.mock.Mock()
     alms_ye = unittest.mock.Mock()
     alms_yb = unittest.mock.Mock()
 
-    mapper = unittest.mock.Mock()
-    mapper.transform.side_effect = (alms_x, (alms_ye, alms_yb))
+    mock = unittest.mock.Mock()
+    mock.from_dict().transform.side_effect = (alms_x, (alms_ye, alms_yb))
+    _KERNELS["test"] = mock
 
-    maps = {("X", 0): unittest.mock.Mock(), ("Y", 1): unittest.mock.Mock()}
+    dtype = np.dtype(float, metadata={"kernel": "test"})
 
-    alms = transform_maps(mapper, maps)
+    maps = {
+        ("X", 0): unittest.mock.Mock(dtype=dtype),
+        ("Y", 1): unittest.mock.Mock(dtype=dtype),
+    }
+
+    alms = transform_maps(maps)
 
     assert len(alms) == 3
     assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}

@@ -320,7 +320,7 @@ class ScalarField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, w2mean, var = 0.0, 0.0, 0.0
+        wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and map values
         async for page in _pages(catalog, progress):
@@ -338,7 +338,6 @@ class ScalarField(Field, spin=0):
                     var += (v**2 - var).sum() / ngal
                 else:
                     wmean += (w - wmean).sum() / ngal
-                    w2mean += (w**2 - w2mean).sum() / ngal
                     var += ((w * v) ** 2 - var).sum() / ngal
 
                 del lon, lat, v, w
@@ -348,7 +347,7 @@ class ScalarField(Field, spin=0):
 
         # fix mean weight if there was no column for it
         if wcol is None:
-            wmean = w2mean = 1.0
+            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -365,11 +364,8 @@ class ScalarField(Field, spin=0):
         # compute bias from variance (per object)
         bias = 4 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
-        # bias correction factor for intrinsic variance
-        bcor = 4 * np.pi * vbar**2 * (w2mean / wmean**2) / ngal
-
         # set metadata of array
-        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias, bcor=bcor)
+        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
 
         # return the value map
         return val
@@ -402,7 +398,7 @@ class ComplexField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, w2mean, var = 0.0, 0.0, 0.0
+        wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and get the shear values,
         async for page in _pages(catalog, progress):
@@ -421,7 +417,6 @@ class ComplexField(Field, spin=0):
                     var += (re**2 + im**2 - var).sum() / ngal
                 else:
                     wmean += (w - wmean).sum() / ngal
-                    w2mean += (w**2 - w2mean).sum() / ngal
                     var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
 
                 del lon, lat, re, im, w
@@ -430,7 +425,7 @@ class ComplexField(Field, spin=0):
 
         # set mean weight if there was no column for it
         if wcol is None:
-            wmean = w2mean = 1.0
+            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -447,11 +442,8 @@ class ComplexField(Field, spin=0):
         # bias from measured variance, for E/B decomposition
         bias = 2 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
-        # bias correction factor for intrinsic field variance
-        bcor = 2 * np.pi * vbar**2 * (w2mean / wmean**2) / ngal
-
         # set metadata of array
-        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias, bcor=bcor)
+        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
 
         # return the shear map
         return val
@@ -513,29 +505,52 @@ class Weights(Field, spin=0):
         # weight map
         wht = np.zeros(mapper.size, mapper.dtype)
 
+        # total weighted variance from online algorithm
+        ngal = 0
+        wmean, w2mean = 0.0, 0.0
+
         # map catalogue
         async for page in _pages(catalog, progress):
-            lon, lat = page.get(*col)
+            if wcol is not None:
+                page.delete(page[wcol] == 0)
 
-            if wcol is None:
-                w = None
-            else:
-                w = page.get(wcol)
+            if page.size:
+                lon, lat = page.get(*col)
 
-            mapper.map_values(lon, lat, [wht], None, w)
+                w = page.get(wcol) if wcol is not None else None
 
-            del page, lon, lat, w
+                mapper.map_values(lon, lat, [wht], None, w)
 
-        # compute average weight in nonzero pixels
-        wbar = wht.mean()
-        if catalog.visibility is not None:
-            wbar /= np.mean(catalog.visibility)
+                ngal += page.size
+                if w is not None:
+                    wmean += (w - wmean).sum() / ngal
+                    w2mean += (w**2 - w2mean).sum() / ngal
+
+                del lon, lat, w
+
+            del page
+
+        # set mean weight if there was no column for it
+        if wcol is None:
+            wmean = w2mean = 1.0
+
+        # compute mean visibility
+        if catalog.visibility is None:
+            vbar = 1
+        else:
+            vbar = np.mean(catalog.visibility)
+
+        # mean weight per effective mapper "pixel"
+        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
 
         # normalise the map
         wht /= wbar
 
-        # set metadata of arrays
-        update_metadata(wht, self, catalog, mapper, wbar=wbar)
+        # bias from weights
+        bias = 4 * np.pi * vbar**2 * (w2mean / wmean**2) / ngal
+
+        # set metadata of array
+        update_metadata(wht, self, catalog, mapper, wbar=wbar, bias=bias)
 
         # return the weight map
         return wht

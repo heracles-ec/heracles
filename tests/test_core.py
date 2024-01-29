@@ -147,3 +147,9 @@ def test_update_metadata():
 
     assert a.dtype.fields == a_fields_original
     assert a.dtype.metadata == {"x": 1, "y": 2}
+
+
+def test_items_with_suffix():
+    from heracles.core import items_with_suffix
+
+    assert items_with_suffix({"a_1": 1, "b_2": 2, "c_1": 3}, "_1") == {"a": 1, "c": 3}

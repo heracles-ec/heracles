@@ -25,9 +25,10 @@ __all__ = (
     "Mapper",
     "get_kernels",
     "map_catalogs",
+    "mapper_from_dict",
     "transform_maps",
 )
 
 from ._healpix import Healpix
-from ._mapper import Mapper, get_kernels
+from ._mapper import Mapper, get_kernels, mapper_from_dict
 from ._mapping import map_catalogs, transform_maps
