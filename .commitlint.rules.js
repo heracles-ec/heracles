@@ -7,6 +7,7 @@ module.exports = {
       "always",
       [
         "catalog",
+        "cli",
         "core",
         "covariance",
         "io",

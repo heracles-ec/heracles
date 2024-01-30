@@ -129,7 +129,12 @@ def map_catalogs(
                     coros.append(coro)
 
             # run all coroutines concurrently
-            results = coroutines.run(coroutines.gather(*coros))
+            try:
+                results = coroutines.run(coroutines.gather(*coros))
+            finally:
+                # force-close coroutines to prevent "never awaited" warnings
+                for coro in coros:
+                    coro.close()
 
             # store results
             for key, value in zip(keys, results):
