@@ -734,7 +734,6 @@ def main():
     cmd_parser.add_argument(
         "-c",
         "--config",
-        default="heracles.cfg",
         help="configuration file (can be repeated)",
         metavar="<config>",
         action="append",
@@ -860,6 +859,10 @@ def main():
     if args.cmd is None:
         main_parser.print_help()
         return 1
+
+    # fix default config
+    if not args.files:
+        args.files = ["heracles.cfg"]
 
     # get keyword args
     kwargs = vars(args)
