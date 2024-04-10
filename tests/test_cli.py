@@ -110,6 +110,7 @@ def test_field_from_config():
     }
 
     config = ConfigParser()
+    config[config.default_section]["mapper"] = "none"
     config.read_dict(
         {
             "a": {
@@ -135,9 +136,9 @@ def test_field_from_config():
         with pytest.raises(RuntimeError, match="Internal error"):
             field_from_config(config, "c")
 
-    mock.assert_called_once_with("COL1", "-COL2", mask="x")
+    mock.assert_called_once_with(None, "COL1", "-COL2", mask="x")
     assert mock.return_value is a
-    other_mock.assert_called_once_with(mask=None)
+    other_mock.assert_called_once_with(None, mask=None)
     assert other_mock.return_value is b
 
 
@@ -165,33 +166,6 @@ def test_fields_from_config(mock):
         ((config, "fields:a"),),
         ((config, "fields:b"),),
         ((config, "fields:c"),),
-    ]
-
-
-@patch("heracles.maps.mapper_from_dict")
-def test_mappers_from_config(mock):
-    from heracles.cli import ConfigParser, mappers_from_config
-
-    config = ConfigParser()
-    config.read_dict(
-        {
-            "fields:a": {},
-            "fields:b": {},
-            "fields:c": {},
-        },
-    )
-
-    m = mappers_from_config(config)
-
-    assert m == {
-        "a": mock.return_value,
-        "b": mock.return_value,
-        "c": mock.return_value,
-    }
-    assert mock.call_args_list == [
-        ((config["fields:a"],),),
-        ((config["fields:b"],),),
-        ((config["fields:c"],),),
     ]
 
 
@@ -297,22 +271,6 @@ def test_catalogs_from_config(mock):
         ((config, "catalogs:b", "b"), {"out": c}),
         ((config, "catalogs:c", "c"), {"out": c}),
     ]
-
-
-def test_lmax_from_config():
-    from heracles.cli import ConfigParser, lmax_from_config
-
-    config = ConfigParser()
-    config.read_dict(
-        {
-            "defaults": {"lmax": 30},
-            "fields:a": {"lmax": 10},
-            "fields:b": {"lmax": 20},
-            "fields:c": {},  # should use defaults
-        },
-    )
-
-    assert lmax_from_config(config) == {"a": 10, "b": 20, "c": 30}
 
 
 def test_bins_from_config():

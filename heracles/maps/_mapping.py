@@ -26,11 +26,8 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 import coroutines
-import numpy as np
 
-from heracles.core import TocDict, multi_value_getter, toc_match
-
-from ._mapper import mapper_from_dict
+from heracles.core import TocDict, toc_match
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping, Sequence
@@ -41,14 +38,11 @@ if TYPE_CHECKING:
     from heracles.fields import Field
     from heracles.progress import Progress, ProgressTask
 
-    from ._mapper import Mapper
-
 
 async def _map_progress(
     key: tuple[Any, ...],
     field: Field,
     catalog: Catalog,
-    mapper: Mapper,
     progress: Progress | None,
 ) -> NDArray:
     """
@@ -62,7 +56,7 @@ async def _map_progress(
     else:
         task = None
 
-    result = await field(catalog, mapper, progress=task)
+    result = await field(catalog, progress=task)
 
     if progress is not None:
         task.remove()
@@ -72,7 +66,6 @@ async def _map_progress(
 
 
 def map_catalogs(
-    mapper: Mapper | Mapping[Any, Mapper],
     fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
@@ -87,9 +80,6 @@ def map_catalogs(
     # the toc dict of maps
     if out is None:
         out = TocDict()
-
-    # getter for mapper value or dict
-    mappergetter = multi_value_getter(mapper)
 
     # collect groups of items to go through
     # items are tuples of (key, field, catalog)
@@ -121,12 +111,8 @@ def map_catalogs(
             keys, coros = [], []
             for key, field, catalog in items:
                 if toc_match(key, include, exclude):
-                    _mapper = mappergetter(key)
-
-                    coro = _map_progress(key, field, catalog, _mapper, prog)
-
                     keys.append(key)
-                    coros.append(coro)
+                    coros.append(_map_progress(key, field, catalog, prog))
 
             # run all coroutines concurrently
             try:
@@ -150,34 +136,10 @@ def map_catalogs(
     return out
 
 
-def deconvolved(
-    mapper: Mapper,
-    alm: NDArray[Any] | tuple[NDArray[Any], ...],
-    *,
-    inplace: bool = False,
-) -> NDArray[Any] | tuple[NDArray[Any], ...]:
-    """
-    Divide *alm* by the spherical convolution kernel of *mapper*.
-    """
-    from healpy import Alm, almxfl
-
-    if isinstance(alm, tuple):
-        result = tuple(deconvolved(mapper, a, inplace=inplace) for a in alm)
-        return result if not inplace else alm
-
-    lmax = Alm.getlmax(alm.shape[-1])
-    spin = (alm.dtype.metadata or {}).get("spin", 0)
-    kl = mapper.kl(lmax=lmax, spin=spin)
-    where = np.arange(lmax + 1) >= abs(spin)
-    fl = np.divide(1, kl, where=where, out=np.ones(lmax + 1))
-    return almxfl(alm, fl, inplace=inplace)
-
-
 def transform_maps(
+    fields: Mapping[Any, Field],
     maps: Mapping[tuple[Any, Any], NDArray],
     *,
-    lmax: int | Mapping[Any, int] | None = None,
-    deconvolve: bool = True,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     progress: bool = False,
     **kwargs,
@@ -187,9 +149,6 @@ def transform_maps(
     # the output toc dict
     if out is None:
         out = TocDict()
-
-    # getter for values or dicts
-    lmaxgetter = multi_value_getter(lmax)
 
     # display a progress bar if asked to
     progressbar: Progress | nullcontext
@@ -212,18 +171,13 @@ def transform_maps(
                     total=None,
                 )
 
-            _lmax = lmaxgetter((k, i))
-
             try:
-                mapper = mapper_from_dict(m.dtype.metadata or {})
-            except ValueError as exc:
-                msg = f"could not construct mapper from metadata for map {k}, {i}: {exc!s}"
+                field = fields[k]
+            except KeyError:
+                msg = f"unknown field name: {k}"
                 raise ValueError(msg)
 
-            alms = mapper.transform(m, _lmax)
-
-            if deconvolve:
-                deconvolved(mapper, alms, inplace=True)
+            alms = field.mapper_or_error.transform(m)
 
             if isinstance(alms, tuple):
                 out[f"{k}_E", i] = alms[0]

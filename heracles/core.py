@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections import UserDict
 from collections.abc import Mapping, Sequence
-from typing import Any, Callable, TypeVar
+from typing import TypeVar
 
 import numpy as np
 
@@ -52,33 +52,6 @@ def toc_filter(obj, include=None, exclude=None):
         return {k: v for k, v in obj.items() if toc_match(k, include, exclude)}
     msg = "invalid input type"
     raise TypeError(msg)
-
-
-def multi_value_getter(obj: T | Mapping[Any, T]) -> Callable[[Any], T]:
-    """Return a getter for values or mappings."""
-    if isinstance(obj, Mapping):
-
-        def getter(key: Any) -> T:
-            if isinstance(key, Sequence):
-                t = tuple(key)
-            else:
-                t = (key,)
-            while t:
-                if t in obj:
-                    return obj[t]
-                if len(t) == 1 and t[0] in obj:
-                    return obj[t[0]]
-                t = t[:-1]
-            if t in obj:
-                return obj[t]
-            raise KeyError(key)
-
-    else:
-
-        def getter(key: Any) -> T:
-            return obj
-
-    return getter
 
 
 # subclassing UserDict here since that returns the correct type from methods
@@ -143,11 +116,3 @@ def update_metadata(array, *sources, **metadata):
         raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
-
-
-def items_with_suffix(d: Mapping[str, Any], suffix: str) -> Mapping[str, Any]:
-    """
-    Return items from *d* where keys end in *suffix*.  Returns a mapping
-    where *suffix* is removed from keys.
-    """
-    return {k.removesuffix(suffix): v for k, v in d.items() if k.endswith(suffix)}

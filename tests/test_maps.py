@@ -5,47 +5,38 @@ import numpy.testing as npt
 import pytest
 
 
-@unittest.mock.patch.dict("heracles.maps._mapper._KERNELS", clear=True)
-def test_kernel_registry():
-    from heracles.maps import Mapper, get_kernels
-
-    class TestMapper(Mapper, kernel="test"):
-        pass
-
-    assert get_kernels() == {"test": TestMapper}
-
-
-@unittest.mock.patch.dict("heracles.maps._mapper._KERNELS", clear=True)
-def test_mapper_from_dict():
-    from heracles.maps import mapper_from_dict
-    from heracles.maps._mapper import _KERNELS
-
-    mock = unittest.mock.Mock()
-
-    assert _KERNELS == {}
-    _KERNELS["test"] = mock
-
-    d = {"kernel": "test", "a": 1}
-
-    mapper_from_dict(d)
-    mock.from_dict.assert_called_once_with(d)
-
-
 def test_healpix_maps(rng):
     import healpy as hp
 
-    from heracles.maps import Healpix
+    from heracles.maps import Healpix, Mapper
 
     nside = 1 << rng.integers(1, 10)
     npix = hp.nside2npix(nside)
+    lmax = 1 << rng.integers(1, 10)
+    deconv = rng.choice([True, False])
 
-    mapper = Healpix(nside)
+    mapper = Healpix(nside, lmax, deconvolve=deconv)
 
-    assert mapper.metadata == {"kernel": "healpix", "nside": nside}
+    assert isinstance(mapper, Mapper)
+
     assert mapper.nside == nside
+    assert mapper.lmax == lmax
+    assert mapper.deconvolve == deconv
     assert mapper.area == hp.nside2pixarea(nside)
-    assert mapper.dtype == np.float64
-    assert mapper.size == npix
+
+    # create a map
+    m = mapper.create(1, 2, 3, dtype=np.uint16, spin=-3)
+
+    assert m.shape == (1, 2, 3, npix)
+    assert m.dtype == np.uint16
+    assert m.dtype.metadata == {
+        "geometry": "healpix",
+        "kernel": "healpix",
+        "nside": nside,
+        "lmax": lmax,
+        "deconv": deconv,
+        "spin": -3,
+    }
 
     # random values for mapping
     size = 1000
@@ -60,7 +51,7 @@ def test_healpix_maps(rng):
 
     # map positions
 
-    m = np.zeros(mapper.size, mapper.dtype)
+    m = mapper.create()
     mapper.map_values(lon, lat, [m])
 
     expected = np.zeros(npix)
@@ -70,7 +61,7 @@ def test_healpix_maps(rng):
 
     # map positions with weights
 
-    m = np.zeros(mapper.size, mapper.dtype)
+    m = mapper.create()
     mapper.map_values(lon, lat, [m], None, w)
 
     expected = np.zeros(npix)
@@ -80,7 +71,7 @@ def test_healpix_maps(rng):
 
     # map one set of values
 
-    m = np.zeros(mapper.size, mapper.dtype)
+    m = mapper.create()
     mapper.map_values(lon, lat, [m], [x])
 
     expected = np.zeros(npix)
@@ -90,7 +81,7 @@ def test_healpix_maps(rng):
 
     # map two sets of values
 
-    m = np.zeros((2, mapper.size), mapper.dtype)
+    m = mapper.create(2)
     mapper.map_values(lon, lat, [m[0], m[1]], [x, y])
 
     expected = np.zeros((2, npix))
@@ -101,7 +92,7 @@ def test_healpix_maps(rng):
 
     # map one set of values with weights
 
-    m = np.zeros(mapper.size, mapper.dtype)
+    m = mapper.create()
     mapper.map_values(lon, lat, [m], [x], w)
 
     expected = np.zeros(npix)
@@ -111,7 +102,7 @@ def test_healpix_maps(rng):
 
     # map two sets of values with weights
 
-    m = np.zeros((2, mapper.size), mapper.dtype)
+    m = mapper.create(2)
     mapper.map_values(lon, lat, [m[0], m[1]], [x, y], w)
 
     expected = np.zeros((2, npix))
@@ -119,11 +110,6 @@ def test_healpix_maps(rng):
     np.add.at(expected[1], ipix, w * y)
 
     npt.assert_array_equal(m, expected)
-
-    # test from_dict
-    mapper = Healpix.from_dict({"nside": 12})
-    assert isinstance(mapper, Healpix)
-    assert mapper.nside == 12
 
 
 @unittest.mock.patch("healpy.map2alm")
@@ -172,22 +158,6 @@ def test_healpix_transform(mock_map2alm, rng):
     assert alms[1].dtype.metadata["nside"] == nside
 
 
-class MockField:
-    def __init__(self):
-        self.args = []
-        self.return_value = object()
-
-    async def __call__(self, catalog, mapper, *, progress=None):
-        self.args.append((catalog, mapper))
-        return self.return_value
-
-    def assert_called_with(self, *args):
-        assert self.args[-1] == args
-
-    def assert_any_call(self, *args):
-        assert args in self.args
-
-
 class MockCatalog:
     size = 10
     page_size = 1
@@ -199,64 +169,55 @@ class MockCatalog:
 
 @pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(parallel):
+    from unittest.mock import AsyncMock
+
     from heracles.maps import map_catalogs
 
-    mapper = unittest.mock.Mock()
-
-    fields = {"a": MockField(), "b": MockField(), "z": MockField()}
+    fields = {"a": AsyncMock(), "b": AsyncMock(), "z": AsyncMock()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    maps = map_catalogs(mapper, fields, catalogs, parallel=parallel)
+    maps = map_catalogs(fields, catalogs, parallel=parallel)
 
     for k in fields:
         for i in catalogs:
-            fields[k].assert_any_call(catalogs[i], mapper)
+            fields[k].assert_any_call(catalogs[i], progress=None)
             assert maps[k, i] is fields[k].return_value
 
 
 def test_map_catalogs_match():
+    from unittest.mock import AsyncMock
+
     from heracles.maps import map_catalogs
 
-    mapper = unittest.mock.Mock()
-    fields = {"a": MockField(), "b": MockField(), "c": MockField()}
+    fields = {"a": AsyncMock(), "b": AsyncMock(), "c": AsyncMock()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    maps = map_catalogs(mapper, fields, catalogs, include=[(..., "y")])
+    maps = map_catalogs(fields, catalogs, include=[(..., "y")])
 
     assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
 
-    maps = map_catalogs(mapper, fields, catalogs, exclude=[("a", ...)])
+    maps = map_catalogs(fields, catalogs, exclude=[("a", ...)])
 
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
-@unittest.mock.patch.dict("heracles.maps._mapper._KERNELS", clear=True)
-@unittest.mock.patch("heracles.maps._mapping.deconvolved")
-def test_transform_maps(mock_deconvolved, rng):
-    import numpy as np
+def test_transform_maps(rng):
+    from unittest.mock import Mock
 
     from heracles.maps import transform_maps
-    from heracles.maps._mapper import _KERNELS
 
-    alms_x = unittest.mock.Mock()
-    alms_ye = unittest.mock.Mock()
-    alms_yb = unittest.mock.Mock()
+    x = Mock()
+    y = Mock()
+    x.mapper_or_error.transform.return_value = Mock()
+    y.mapper_or_error.transform.return_value = (Mock(), Mock())
 
-    mock = unittest.mock.Mock()
-    mock.from_dict().transform.side_effect = (alms_x, (alms_ye, alms_yb))
-    _KERNELS["test"] = mock
+    fields = {"X": x, "Y": y}
+    maps = {("X", 0): Mock(), ("Y", 1): Mock()}
 
-    dtype = np.dtype(float, metadata={"kernel": "test"})
-
-    maps = {
-        ("X", 0): unittest.mock.Mock(dtype=dtype),
-        ("Y", 1): unittest.mock.Mock(dtype=dtype),
-    }
-
-    alms = transform_maps(maps)
+    alms = transform_maps(fields, maps)
 
     assert len(alms) == 3
     assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}
-    assert alms["X", 0] is alms_x
-    assert alms["Y_E", 1] is alms_ye
-    assert alms["Y_B", 1] is alms_yb
+    assert alms["X", 0] is x.mapper_or_error.transform.return_value
+    assert alms["Y_E", 1] is y.mapper_or_error.transform.return_value[0]
+    assert alms["Y_B", 1] is y.mapper_or_error.transform.return_value[1]
