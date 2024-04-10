@@ -158,22 +158,6 @@ def test_healpix_transform(mock_map2alm, rng):
     assert alms[1].dtype.metadata["nside"] == nside
 
 
-class MockField:
-    def __init__(self):
-        self.args = []
-        self.return_value = object()
-
-    async def __call__(self, catalog, mapper, *, progress=None):
-        self.args.append((catalog, mapper))
-        return self.return_value
-
-    def assert_called_with(self, *args):
-        assert self.args[-1] == args
-
-    def assert_any_call(self, *args):
-        assert args in self.args
-
-
 class MockCatalog:
     size = 10
     page_size = 1
@@ -185,56 +169,55 @@ class MockCatalog:
 
 @pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(parallel):
+    from unittest.mock import AsyncMock
+
     from heracles.maps import map_catalogs
 
-    mapper = unittest.mock.Mock()
-
-    fields = {"a": MockField(), "b": MockField(), "z": MockField()}
+    fields = {"a": AsyncMock(), "b": AsyncMock(), "z": AsyncMock()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    maps = map_catalogs(mapper, fields, catalogs, parallel=parallel)
+    maps = map_catalogs(fields, catalogs, parallel=parallel)
 
     for k in fields:
         for i in catalogs:
-            fields[k].assert_any_call(catalogs[i], mapper)
+            fields[k].assert_any_call(catalogs[i], progress=None)
             assert maps[k, i] is fields[k].return_value
 
 
 def test_map_catalogs_match():
+    from unittest.mock import AsyncMock
+
     from heracles.maps import map_catalogs
 
-    mapper = unittest.mock.Mock()
-    fields = {"a": MockField(), "b": MockField(), "c": MockField()}
+    fields = {"a": AsyncMock(), "b": AsyncMock(), "c": AsyncMock()}
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
 
-    maps = map_catalogs(mapper, fields, catalogs, include=[(..., "y")])
+    maps = map_catalogs(fields, catalogs, include=[(..., "y")])
 
     assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
 
-    maps = map_catalogs(mapper, fields, catalogs, exclude=[("a", ...)])
+    maps = map_catalogs(fields, catalogs, exclude=[("a", ...)])
 
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
 def test_transform_maps(rng):
+    from unittest.mock import Mock
+
     from heracles.maps import transform_maps
 
-    alms_x = unittest.mock.Mock()
-    alms_ye = unittest.mock.Mock()
-    alms_yb = unittest.mock.Mock()
+    x = Mock()
+    y = Mock()
+    x.mapper_or_error.transform.return_value = Mock()
+    y.mapper_or_error.transform.return_value = (Mock(), Mock())
 
-    mapper = unittest.mock.Mock()
-    mapper.transform.side_effect = (alms_x, (alms_ye, alms_yb))
+    fields = {"X": x, "Y": y}
+    maps = {("X", 0): Mock(), ("Y", 1): Mock()}
 
-    maps = {
-        ("X", 0): unittest.mock.Mock(),
-        ("Y", 1): unittest.mock.Mock(),
-    }
-
-    alms = transform_maps(mapper, maps)
+    alms = transform_maps(fields, maps)
 
     assert len(alms) == 3
     assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}
-    assert alms["X", 0] is alms_x
-    assert alms["Y_E", 1] is alms_ye
-    assert alms["Y_B", 1] is alms_yb
+    assert alms["X", 0] is x.mapper_or_error.transform.return_value
+    assert alms["Y_E", 1] is y.mapper_or_error.transform.return_value[0]
+    assert alms["Y_B", 1] is y.mapper_or_error.transform.return_value[1]

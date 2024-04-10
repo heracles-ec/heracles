@@ -38,14 +38,11 @@ if TYPE_CHECKING:
     from heracles.fields import Field
     from heracles.progress import Progress, ProgressTask
 
-    from ._mapper import Mapper
-
 
 async def _map_progress(
     key: tuple[Any, ...],
     field: Field,
     catalog: Catalog,
-    mapper: Mapper,
     progress: Progress | None,
 ) -> NDArray:
     """
@@ -59,7 +56,7 @@ async def _map_progress(
     else:
         task = None
 
-    result = await field(catalog, mapper, progress=task)
+    result = await field(catalog, progress=task)
 
     if progress is not None:
         task.remove()
@@ -69,7 +66,6 @@ async def _map_progress(
 
 
 def map_catalogs(
-    mapper: Mapper,
     fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
@@ -116,7 +112,7 @@ def map_catalogs(
             for key, field, catalog in items:
                 if toc_match(key, include, exclude):
                     keys.append(key)
-                    coros.append(_map_progress(key, field, catalog, mapper, prog))
+                    coros.append(_map_progress(key, field, catalog, prog))
 
             # run all coroutines concurrently
             try:
@@ -141,7 +137,7 @@ def map_catalogs(
 
 
 def transform_maps(
-    mapper: Mapper,
+    fields: Mapping[Any, Field],
     maps: Mapping[tuple[Any, Any], NDArray],
     *,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
@@ -175,7 +171,13 @@ def transform_maps(
                     total=None,
                 )
 
-            alms = mapper.transform(m)
+            try:
+                field = fields[k]
+            except KeyError:
+                msg = f"unknown field name: {k}"
+                raise ValueError(msg)
+
+            alms = field.mapper_or_error.transform(m)
 
             if isinstance(alms, tuple):
                 out[f"{k}_E", i] = alms[0]
