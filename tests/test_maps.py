@@ -34,6 +34,7 @@ def test_healpix_maps(rng):
         "kernel": "healpix",
         "nside": nside,
         "lmax": lmax,
+        "deconv": deconv,
         "spin": -3,
     }
 

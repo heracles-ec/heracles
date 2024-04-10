@@ -30,8 +30,7 @@ from typing import TYPE_CHECKING, Any
 import healpy as hp
 import numpy as np
 
-from .core import TocDict, items_with_suffix, toc_match, update_metadata
-from .maps import mapper_from_dict
+from .core import TocDict, toc_match, update_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
@@ -56,6 +55,9 @@ def _debias_cl(
 ) -> NDArray[Any]:
     """
     Remove additive bias from angular power spectrum.
+
+    This function special-cases the bias from HEALPix maps.
+
     """
 
     if md is None:
@@ -65,39 +67,46 @@ def _debias_cl(
         cl = cl.copy()
         update_metadata(cl, **md)
 
-    lmax = len(cl) - 1
+    # use explicit bias, if given, or bias value from metadata
+    if bias is None:
+        bias = md.get("bias")
+        # return early if there is no bias to be subtracted
+        if bias is None:
+            return cl
 
     # spins of the spectrum
     spin1, spin2 = md.get("spin_1", 0), md.get("spin_2", 0)
 
-    # minimum angular mode for bias correction
+    # minimum and maximum angular mode for bias correction
     lmin = max(abs(spin1), abs(spin2))
+    lmax = len(cl) - 1
 
-    # use explicit bias, if given, or bias value from metadata
-    b = np.zeros(lmax + 1)
-    b[lmin:] = md.get("bias", 0.0) if bias is None else bias
+    # this will be subtracted from the cl
+    # modes up to lmin are ignored
+    bl = np.full(lmax + 1, bias)
+    bl[:lmin] = 0.0
 
-    # apply biasing kernel from mappers
-    try:
-        mapper = mapper_from_dict(items_with_suffix(md, "_1"))
-    except ValueError:
-        pass
-    else:
-        if (bl := mapper.bl(lmax=lmax, spin=spin1)) is not None:
-            b *= bl
-    try:
-        mapper = mapper_from_dict(items_with_suffix(md, "_2"))
-    except ValueError:
-        pass
-    else:
-        if (bl := mapper.bl(lmax=lmax, spin=spin2)) is not None:
-            b *= bl
+    # handle HEALPix pseudo-convolution
+    for i, s in (1, spin1), (2, spin2):
+        if md.get(f"kernel_{i}") == "healpix":
+            nside: int | None = md.get(f"nside_{i}")
+            deconv: bool = md.get(f"deconv_{i}", True)
+            if nside is not None and deconv:
+                pw: NDArray[Any] | None
+                if s == 0:
+                    pw = hp.pixwin(nside, lmax=lmax, pol=False)
+                elif s == 2:
+                    pw = hp.pixwin(nside, lmax=lmax, pol=True)[1]
+                else:
+                    pw = None
+                if pw is not None:
+                    bl[lmin:] /= pw[lmin:]
 
     # remove bias
     if cl.dtype.names is None:
-        cl -= b
+        cl -= bl
     else:
-        cl["CL"] -= b
+        cl["CL"] -= bl
 
     return cl
 
@@ -221,22 +230,12 @@ def angular_power_spectra(
 def debias_cls(cls, bias=None, *, inplace=False):
     """remove bias from cls"""
 
-    logger.info("debiasing %d cl(s)%s", len(cls), " in place" if inplace else "")
-    t = time.monotonic()
-
     # the output toc dict
     out = cls if inplace else TocDict()
 
     # subtract bias of each cl in turn
     for key in cls:
-        logger.info("debiasing %s x %s cl for bins %s, %s", *key)
         out[key] = _debias_cl(cls[key], bias and bias.get(key), inplace=inplace)
-
-    logger.info(
-        "debiased %d cl(s) in %s",
-        len(out),
-        timedelta(seconds=(time.monotonic() - t)),
-    )
 
     # return the toc dict of debiased cls
     return out

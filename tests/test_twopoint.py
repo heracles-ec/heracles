@@ -116,16 +116,72 @@ def test_debias_cls():
     from heracles.twopoint import debias_cls
 
     cls = {
-        ("PP", 0, 0): np.zeros(100),
+        0: np.zeros(100),
+        2: np.zeros(100, dtype=np.dtype(float, metadata={"bias": 4.56, "spin_2": 2})),
     }
 
     nbs = {
-        ("PP", 0, 0): 1.23,
+        0: 1.23,
     }
 
     debias_cls(cls, nbs, inplace=True)
 
-    assert np.all(cls["PP", 0, 0] == -1.23)
+    assert np.all(cls[0] == -1.23)
+
+    assert np.all(cls[2][:2] == 0.0)
+    assert np.all(cls[2][2:] == -4.56)
+
+
+def test_debias_cls_healpix():
+    import healpy as hp
+
+    from heracles.twopoint import debias_cls
+
+    pw0, pw2 = hp.pixwin(64, lmax=99, pol=True)
+
+    md1 = {
+        "kernel_1": "healpix",
+        "nside_1": 64,
+        "kernel_2": "healpix",
+        "nside_2": 64,
+        "spin_2": 2,
+    }
+    md2 = {
+        "kernel_1": "healpix",
+        "nside_1": 64,
+        "spin_2": 2,
+    }
+    md3 = {
+        "kernel_1": "healpix",
+        "nside_1": 64,
+        "kernel_2": "healpix",
+        "nside_2": 64,
+        "spin_2": 2,
+        "deconv_2": False,
+    }
+
+    cls = {
+        1: np.zeros(100, dtype=np.dtype(float, metadata=md1)),
+        2: np.zeros(100, dtype=np.dtype(float, metadata=md2)),
+        3: np.zeros(100, dtype=np.dtype(float, metadata=md3)),
+    }
+
+    nbs = {
+        1: 1.23,
+        2: 4.56,
+        3: 7.89,
+    }
+
+    debias_cls(cls, nbs, inplace=True)
+
+    assert np.all(cls[1][:2] == 0.0)
+    assert np.all(cls[1][2:] == -1.23 / pw0[2:] / pw2[2:])
+
+    assert np.all(cls[2][:2] == 0.0)
+    assert np.all(cls[2][2:] == -4.56 / pw0[2:])
+
+    assert np.all(cls[3][:2] == 0.0)
+    assert np.all(cls[3][2:] == -7.89 / pw0[2:])
 
 
 @patch("convolvecl.mixmat_eb")

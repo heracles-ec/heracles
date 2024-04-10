@@ -186,6 +186,7 @@ class Healpix:
             kernel="healpix",
             nside=self.__nside,
             lmax=self.__lmax,
+            deconv=self.__deconv,
             spin=spin,
         )
         return m
@@ -229,7 +230,7 @@ class Healpix:
         maps = np.asanyarray(maps)
         md: Mapping[str, Any] = maps.dtype.metadata or {}
         spin = md.get("spin", 0)
-        pw: NDArray[np.floating] | None = None
+        pw: NDArray[Any] | None = None
 
         if spin == 0:
             pol = False
