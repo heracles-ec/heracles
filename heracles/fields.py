@@ -24,7 +24,6 @@ import warnings
 from abc import ABCMeta, abstractmethod
 from functools import partial
 from itertools import combinations_with_replacement, product
-from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import coroutines
@@ -34,7 +33,7 @@ from .core import toc_match, update_metadata
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, Mapping, Sequence
-    from typing import Any, TypeGuard
+    from typing import TypeGuard
 
     from numpy.typing import ArrayLike
 
@@ -89,9 +88,6 @@ class Field(metaclass=ABCMeta):
         super().__init__()
         self.__columns = self._init_columns(*columns) if columns else None
         self.__mask = mask
-        self._metadata: dict[str, Any] = {}
-        if (spin := self.__spin) is not None:
-            self._metadata["spin"] = spin
 
     @classmethod
     def _init_columns(cls, *columns: str) -> Columns:
@@ -127,11 +123,6 @@ class Field(metaclass=ABCMeta):
             msg = "no columns for field"
             raise ValueError(msg)
         return self.__columns
-
-    @property
-    def metadata(self) -> Mapping[str, Any]:
-        """Return the static metadata for this field."""
-        return MappingProxyType(self._metadata)
 
     @property
     def spin(self) -> int:
@@ -230,7 +221,7 @@ class Positions(Field, spin=0):
         col = self.columns_or_error
 
         # position map
-        pos = np.zeros(mapper.size, mapper.dtype)
+        pos = mapper.create(spin=self.spin)
 
         # keep track of the total number of galaxies
         ngal = 0
@@ -292,7 +283,7 @@ class Positions(Field, spin=0):
         bias = ngal / (4 * np.pi) * mapper.area**2 / nbar**2
 
         # set metadata of array
-        update_metadata(pos, self, catalog, mapper, nbar=nbar, bias=bias)
+        update_metadata(pos, catalog, nbar=nbar, bias=bias)
 
         # return the position map
         return pos
@@ -316,7 +307,7 @@ class ScalarField(Field, spin=0):
         *col, wcol = self.columns_or_error
 
         # scalar field map
-        val = np.zeros(mapper.size, mapper.dtype)
+        val = mapper.create(spin=self.spin)
 
         # total weighted variance from online algorithm
         ngal = 0
@@ -365,7 +356,7 @@ class ScalarField(Field, spin=0):
         bias = 4 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
+        update_metadata(val, catalog, wbar=wbar, bias=bias)
 
         # return the value map
         return val
@@ -394,7 +385,7 @@ class ComplexField(Field, spin=0):
         *col, wcol = self.columns_or_error
 
         # complex map with real and imaginary part
-        val = np.zeros((2, mapper.size), mapper.dtype)
+        val = mapper.create(2, spin=self.spin)
 
         # total weighted variance from online algorithm
         ngal = 0
@@ -443,7 +434,7 @@ class ComplexField(Field, spin=0):
         bias = 2 * np.pi * vbar**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(val, self, catalog, mapper, wbar=wbar, bias=bias)
+        update_metadata(val, catalog, wbar=wbar, bias=bias)
 
         # return the shear map
         return val
@@ -467,22 +458,25 @@ class Visibility(Field, spin=0):
             msg = "no visibility map in catalog"
             raise ValueError(msg)
 
+        # create new visibility map
+        out = mapper.create(spin=self.spin)
+
         # warn if visibility is changing resolution
-        if vmap.size != mapper.size:
+        if vmap.size != out.size:
             import healpy as hp
 
             warnings.warn(
                 f"changing NSIDE of visibility map "
                 f"from {hp.get_nside(vmap)} to {mapper.nside}",
             )
-            vmap = hp.ud_grade(vmap, mapper.nside)
+            out[:] = hp.ud_grade(vmap, mapper.nside)
         else:
-            # make a copy for updates to metadata
-            vmap = np.copy(vmap)
+            # copy pixel values
+            out[:] = vmap
 
-        update_metadata(vmap, self, catalog, mapper)
+        update_metadata(out, catalog)
 
-        return vmap
+        return out
 
 
 class Weights(Field, spin=0):
@@ -503,7 +497,7 @@ class Weights(Field, spin=0):
         *col, wcol = self.columns_or_error
 
         # weight map
-        wht = np.zeros(mapper.size, mapper.dtype)
+        wht = mapper.create(spin=self.spin)
 
         # total weighted variance from online algorithm
         ngal = 0
@@ -550,7 +544,7 @@ class Weights(Field, spin=0):
         bias = 4 * np.pi * vbar**2 * (w2mean / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(wht, self, catalog, mapper, wbar=wbar, bias=bias)
+        update_metadata(wht, catalog, wbar=wbar, bias=bias)
 
         # return the weight map
         return wht

@@ -38,33 +38,6 @@ def test_toc_filter():
         toc_filter(object())
 
 
-def test_multi_value_getter():
-    from heracles.core import multi_value_getter
-
-    getter = multi_value_getter(
-        {
-            (1,): "x",
-            (2,): "y",
-            (): "z",
-            (2, 1): "w",
-            4: "v",
-        },
-    )
-
-    assert getter(1) == "x"
-    assert getter(2) == "y"
-    assert getter((2, 0)) == "y"
-    assert getter((3, 0)) == "z"
-    assert getter((2, 1)) == "w"
-    assert getter((4, 0)) == "v"
-
-    getter = multi_value_getter("x")
-
-    assert getter(1) == "x"
-    assert getter(2) == "x"
-    assert getter((2, 0)) == "x"
-
-
 def test_tocdict():
     from copy import copy, deepcopy
 
@@ -147,9 +120,3 @@ def test_update_metadata():
 
     assert a.dtype.fields == a_fields_original
     assert a.dtype.metadata == {"x": 1, "y": 2}
-
-
-def test_items_with_suffix():
-    from heracles.core import items_with_suffix
-
-    assert items_with_suffix({"a_1": 1, "b_2": 2, "c_1": 3}, "_1") == {"a": 1, "c": 3}

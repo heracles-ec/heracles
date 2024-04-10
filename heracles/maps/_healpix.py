@@ -31,11 +31,9 @@ from numba import njit
 
 from heracles.core import update_metadata
 
-from ._mapper import Mapper
-
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-    from typing import Any, Self
+    from typing import Any
 
     from numpy.typing import ArrayLike, DTypeLike, NDArray
 
@@ -57,6 +55,7 @@ def _nativebyteorder(fn):
         native = []
         for arg in args:
             if isinstance(arg, (list, tuple)):
+                # turn sequences into tuples for numba interoperability
                 native.append(tuple(map(_asnative, arg)))
             else:
                 native.append(_asnative(arg))
@@ -115,42 +114,33 @@ def _mapw(ipix, maps, values, weight):
             maps[k][i] += w * values[k][j]
 
 
-class Healpix(Mapper, kernel="healpix"):
+class Healpix:
     """
-    Mapper for HEALPix maps.  HEALPix maps have a resolution parameter,
-    available as the *nside* property.
+    Mapper for HEALPix maps.
     """
 
     DATAPATH: str | None = None
 
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> Self:
-        """
-        Create a HEALPix mapper from a dictionary.
-        """
-        nside = d["nside"]
-        if isinstance(nside, str) and nside.isdigit():
-            nside = int(nside)
-        elif not isinstance(nside, int):
-            msg = f"value for key 'nside' is {type(nside).__name__}, expected int"
-            raise ValueError(msg)
-        return cls(nside)
-
     def __init__(
         self,
         nside: int,
+        lmax: int | None = None,
+        *,
+        deconvolve: bool | None = None,
         dtype: DTypeLike = np.float64,
     ) -> None:
         """
-        Mapper for HEALPix maps with the given *nside* parameter.
+        Mapper for HEALPix maps.
         """
+        if lmax is None:
+            lmax = 3 * nside // 2
+        if deconvolve is None:
+            deconvolve = True
         super().__init__()
         self.__nside = nside
-        self.__npix = hp.nside2npix(nside)
+        self.__lmax = lmax
+        self.__deconv = deconvolve
         self.__dtype = np.dtype(dtype)
-        self._metadata |= {
-            "nside": nside,
-        }
 
     @property
     def nside(self) -> int:
@@ -160,18 +150,18 @@ class Healpix(Mapper, kernel="healpix"):
         return self.__nside
 
     @property
-    def dtype(self) -> DTypeLike:
+    def lmax(self) -> int:
         """
-        Data type for HEALPix maps.
+        The lmax parameter of the HEALPix map.
         """
-        return self.__dtype
+        return self.__lmax
 
     @property
-    def size(self) -> int:
+    def deconvolve(self) -> bool:
         """
-        Size of HEALPix maps for this *nside* parameter.
+        Whether or not the HEALPix pixel window function is deconvolved.
         """
-        return self.__npix
+        return self.__deconv
 
     @cached_property
     def area(self) -> float:
@@ -179,6 +169,26 @@ class Healpix(Mapper, kernel="healpix"):
         The HEALPix pixel area for this mapper.
         """
         return hp.nside2pixarea(self.__nside)
+
+    def create(
+        self,
+        *dims: int,
+        dtype: DTypeLike | None = None,
+        spin: int = 0,
+    ) -> NDArray[Any]:
+        """
+        Create a new HEALPix map.
+        """
+        m = np.zeros((*dims, hp.nside2npix(self.__nside)), dtype=dtype)
+        update_metadata(
+            m,
+            geometry="healpix",
+            kernel="healpix",
+            nside=self.__nside,
+            lmax=self.__lmax,
+            spin=spin,
+        )
+        return m
 
     def map_values(
         self,
@@ -197,7 +207,6 @@ class Healpix(Mapper, kernel="healpix"):
 
         # sum weighted values in each pixel
         # only use what is available, to minimise number of array operations
-        # turn sequences into tuples for numba interoperability
         if values is None:
             if weight is None:
                 _map0(ipix, maps)
@@ -212,31 +221,43 @@ class Healpix(Mapper, kernel="healpix"):
     def transform(
         self,
         maps: ArrayLike,
-        lmax: int | None = None,
     ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
         """
         Spherical harmonic transform of HEALPix maps.
         """
 
-        md = maps.dtype.metadata or {}
+        maps = np.asanyarray(maps)
+        md: Mapping[str, Any] = maps.dtype.metadata or {}
         spin = md.get("spin", 0)
+        pw: NDArray[np.floating] | None = None
 
         if spin == 0:
             pol = False
+            if self.__deconv:
+                pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=False)
         elif spin == 2:
-            maps = [np.zeros(self.__npix), maps[0], maps[1]]
+            maps = [self.create(), maps[0], maps[1]]
             pol = True
+            if self.__deconv:
+                pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=True)[1]
         else:
             msg = f"spin-{spin} maps not yet supported"
             raise NotImplementedError(msg)
 
         alms = hp.map2alm(
             maps,
-            lmax=lmax,
+            lmax=self.__lmax,
             pol=pol,
             use_pixel_weights=True,
             datapath=self.DATAPATH,
         )
+
+        if pw is not None:
+            fl = np.ones(self.__lmax + 1)
+            fl[abs(spin) :] /= pw[abs(spin) :]
+            for alm in alms:
+                hp.almxfl(alm, fl, inplace=True)
+            del fl
 
         if spin == 0:
             update_metadata(alms, **md)
@@ -246,27 +267,3 @@ class Healpix(Mapper, kernel="healpix"):
             update_metadata(alms[1], **md)
 
         return alms
-
-    def kl(self, lmax: int, spin: int = 0) -> NDArray[Any]:
-        """
-        Return the HEALPix pixel window function.
-        """
-
-        pw: NDArray[Any]
-        if spin == 0:
-            pw = hp.pixwin(self.__nside, lmax=lmax)
-        elif spin == 2:
-            _, pw = hp.pixwin(self.__nside, lmax=lmax, pol=True)
-        else:
-            msg = f"unsupported spin: {spin}"
-            raise ValueError(msg)
-
-        return pw
-
-    def bl(self, lmax: int, spin: int = 0) -> NDArray[Any]:
-        """
-        Return the biasing kernel for HEALPix.
-        """
-        kl = self.kl(lmax, spin)
-        where = np.arange(lmax + 1) >= abs(spin)
-        return np.divide(1.0, kl, where=where, out=np.zeros(lmax + 1))

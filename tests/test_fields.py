@@ -105,10 +105,6 @@ def test_field_abc():
     assert f.columns is None
     assert f.spin == 0
 
-    assert f.metadata == {
-        "spin": 0,
-    }
-
     with pytest.raises(ValueError):
         f.columns_or_error
 
@@ -149,8 +145,10 @@ def test_visibility(mapper, vmap):
         assert result.dtype.metadata == {
             "catalog": catalog.label,
             "spin": 0,
+            "geometry": "healpix",
             "kernel": "healpix",
-            "nside": nside_out,
+            "nside": mapper_out.nside,
+            "lmax": mapper_out.lmax,
         }
         assert np.isclose(result.mean(), fsky)
 
@@ -187,8 +185,10 @@ def test_positions(mapper, catalog, vmap):
         "catalog": catalog.label,
         "spin": 0,
         "nbar": nbar,
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 0)
@@ -203,8 +203,10 @@ def test_positions(mapper, catalog, vmap):
         "catalog": catalog.label,
         "spin": 0,
         "nbar": 4.0,
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 1.0)
@@ -222,8 +224,10 @@ def test_positions(mapper, catalog, vmap):
         "catalog": catalog.label,
         "spin": 0,
         "nbar": pytest.approx(nbar),
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -237,8 +241,10 @@ def test_positions(mapper, catalog, vmap):
         "catalog": catalog.label,
         "spin": 0,
         "nbar": pytest.approx(nbar),
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -272,8 +278,10 @@ def test_scalar_field(mapper, catalog):
         "catalog": catalog.label,
         "spin": 0,
         "wbar": pytest.approx(wbar),
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
@@ -300,8 +308,10 @@ def test_complex_field(mapper, catalog):
         "catalog": catalog.label,
         "spin": 2,
         "wbar": pytest.approx(wbar),
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
@@ -326,8 +336,10 @@ def test_weights(mapper, catalog):
         "catalog": catalog.label,
         "spin": 0,
         "wbar": pytest.approx(wbar),
+        "geometry": "healpix",
         "kernel": "healpix",
         "nside": mapper.nside,
+        "lmax": mapper.lmax,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
