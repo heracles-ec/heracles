@@ -32,6 +32,8 @@ import numpy as np
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from .fields import Field
+
 # valid option keys
 FIELD_TYPES = {
     "positions": "heracles.fields:Positions",
@@ -100,7 +102,7 @@ class ConfigParser(configparser.ConfigParser):
         # fully specify parent class
         super().__init__(
             defaults={
-                "kernel": "healpix",
+                "mapper": "healpix",
             },
             dict_type=dict,
             allow_no_value=False,
@@ -157,6 +159,27 @@ class ConfigParser(configparser.ConfigParser):
         return {s.rpartition(":")[-1].strip(): s for s in sections}
 
 
+def mapper_from_config(config, section):
+    """Construct a mapper instance from config."""
+
+    choices = {
+        "none": "none",
+        "healpix": "healpix",
+    }
+
+    mapper = config.getchoice(section, "mapper", choices)
+    if mapper == "none":
+        return None
+    if mapper == "healpix":
+        from .maps import Healpix
+
+        nside = config.getint(section, "nside")
+        lmax = config.getint(section, "lmax", fallback=None)
+        deconvolve = config.getint(section, "deconvolve", fallback=None)
+        return Healpix(nside, lmax, deconvolve=deconvolve)
+    return None
+
+
 def field_from_config(config, section):
     """Construct a field instance from config."""
 
@@ -175,9 +198,10 @@ def field_from_config(config, section):
             raise RuntimeError(msg) from None
     else:
         cls = _type
+    mapper = mapper_from_config(config, section)
     columns = config.getlist(section, "columns", fallback=())
     mask = config.get(section, "mask", fallback=None)
-    return cls(*columns, mask=mask)
+    return cls(mapper, *columns, mask=mask)
 
 
 def fields_from_config(config):
@@ -185,16 +209,6 @@ def fields_from_config(config):
     sections = config.subsections("fields")
     return {
         name: field_from_config(config, section) for name, section in sections.items()
-    }
-
-
-def mappers_from_config(config):
-    """Construct all mapper instances from config."""
-    from .maps import mapper_from_dict
-
-    sections = config.subsections("fields")
-    return {
-        name: mapper_from_dict(config[section]) for name, section in sections.items()
     }
 
 
@@ -267,12 +281,6 @@ def catalogs_from_config(config):
     for label, section in sections.items():
         catalog_from_config(config, section, label, out=catalogs)
     return catalogs
-
-
-def lmax_from_config(config):
-    """Construct a dictionary with LMAX values for all fields."""
-    sections = config.subsections("fields")
-    return {name: config.getint(section, "lmax") for name, section in sections.items()}
 
 
 def bins_from_config(config, section):
@@ -392,6 +400,7 @@ DEFAULT_LOADER = configloader
 
 
 def map_all_selections(
+    fields: Mapping[str, Field],
     config: ConfigParser,
     logger: logging.Logger,
     progress: bool,
@@ -400,10 +409,8 @@ def map_all_selections(
 
     from .maps import map_catalogs
 
-    # load catalogues, mappers, and fields to process
+    # load catalogues to process
     catalogs = catalogs_from_config(config)
-    mappers = mappers_from_config(config)
-    fields = fields_from_config(config)
 
     logger.info("fields %s", ", ".join(map(repr, fields)))
 
@@ -417,7 +424,6 @@ def map_all_selections(
 
         # maps for single catalogue
         yield map_catalogs(
-            mappers,
             fields,
             {key: catalog},
             parallel=True,  # process everything at this level in one go
@@ -455,9 +461,12 @@ def maps(
     logger.info("reading configuration from %s", files)
     config = loader(files)
 
+    # construct fields for mapping
+    fields = fields_from_config(config)
+
     # iterator over the individual maps
     # this generates maps on the fly
-    itermaps = map_all_selections(config, logger, progress)
+    itermaps = map_all_selections(fields, config, logger, progress)
 
     # output goes into a FITS-backed tocdict so we don't fill memory up
     out = MapFits(path, clobber=True)
@@ -500,8 +509,8 @@ def alms(
     if healpix_datapath is not None:
         Healpix.DATAPATH = healpix_datapath
 
-    # load the individual lmax values for each field into a dictionary
-    lmax = lmax_from_config(config)
+    # construct fields to get mappers for transform
+    fields = fields_from_config(config)
 
     # process either catalogues or maps
     # everything is loaded via iterators to keep memory use low
@@ -509,7 +518,7 @@ def alms(
     if maps:
         itermaps = load_all_maps(maps, logger)
     else:
-        itermaps = map_all_selections(config, logger, progress)
+        itermaps = map_all_selections(fields, config, logger, progress)
 
     # output goes into a FITS-backed tocdict so we don't fill up memory
     logger.info("writing alms to %s", path)
@@ -519,8 +528,8 @@ def alms(
     for maps in itermaps:
         logger.info("transforming %d maps", len(maps))
         transform_maps(
+            fields,
             maps,
-            lmax=lmax,
             progress=progress,
             out=out,
         )
