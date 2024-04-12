@@ -34,6 +34,51 @@ def mock_alms(rng, zbins):
     return alms
 
 
+def test_alm2lmax(rng):
+    import healpy as hp
+
+    from heracles.twopoint import alm2lmax
+
+    for lmax in rng.choice(1000, size=100):
+        alm = np.zeros(hp.Alm.getsize(lmax), dtype=complex)
+        assert alm2lmax(alm) == lmax
+
+
+def test_alm2cl(mock_alms):
+    from itertools import combinations_with_replacement
+
+    import healpy as hp
+
+    from heracles.twopoint import alm2cl
+
+    for alm, alm2 in combinations_with_replacement(mock_alms.values(), 2):
+        cl = alm2cl(alm, alm2)
+        np.testing.assert_allclose(cl, hp.alm2cl(alm, alm2))
+
+
+def test_alm2cl_unequal_size(rng):
+    import healpy as hp
+
+    from heracles.twopoint import alm2cl
+
+    lmax1 = 10
+    lmax2 = 20
+
+    alm = rng.standard_normal(((lmax1 + 1) * (lmax1 + 2) // 2, 2)) @ [1, 1j]
+    alm2 = rng.standard_normal(((lmax2 + 1) * (lmax2 + 2) // 2, 2)) @ [1, 1j]
+
+    alm21 = np.zeros_like(alm)
+    for ell in range(lmax1 + 1):
+        for m in range(ell + 1):
+            alm21[hp.Alm.getidx(lmax1, ell, m)] = alm2[hp.Alm.getidx(lmax2, ell, m)]
+
+    cl = alm2cl(alm, alm2)
+    np.testing.assert_allclose(cl, hp.alm2cl(alm, alm21))
+
+    cl = alm2cl(alm, alm2, lmax=lmax2)
+    np.testing.assert_allclose(cl, hp.alm2cl(alm, alm21, lmax_out=lmax2))
+
+
 def test_angular_power_spectra(mock_alms):
     from itertools import combinations_with_replacement
 
