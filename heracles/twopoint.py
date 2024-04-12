@@ -27,7 +27,6 @@ from datetime import timedelta
 from itertools import combinations_with_replacement, product
 from typing import TYPE_CHECKING, Any
 
-import healpy as hp
 import numpy as np
 
 from .core import TocDict, toc_match, update_metadata
@@ -44,6 +43,52 @@ if TYPE_CHECKING:
 TwoPointKey = tuple[Any, Any, Any, Any]
 
 logger = logging.getLogger(__name__)
+
+
+def alm2lmax(alm, mmax=None):
+    """
+    Returns the *lmax* value of the given *alm* array.
+    """
+
+    return (int((8 * np.shape(alm)[-1] + 1) ** 0.5 + 0.01) - 3) // 2
+
+
+def alm2cl(alm, alm2=None, *, lmax=None):
+    """
+    Compute the angular power spectrum of spherical harmonic
+    coefficients *alm*.  If *alm2* is given, return the angular
+    cross-power spectrum of *alm* and *alm2*.  The spectrum is computed
+    for all modes up to *lmax*, if given, or as many modes as provided
+    in *alm* and *alm2* otherwise.
+    """
+
+    if alm2 is None:
+        alm2 = alm
+
+    alm = np.asanyarray(alm)
+    alm2 = np.asanyarray(alm2)
+
+    lmax1, lmax2 = alm2lmax(alm), alm2lmax(alm2)
+
+    if lmax is None:
+        lmax = step = min(lmax1, lmax2)
+    else:
+        step = min(lmax, lmax1, lmax2)
+
+    cl = alm.real[..., : step + 1] * alm2.real[..., : step + 1]
+
+    start1 = lmax1 + 1
+    start2 = lmax2 + 1
+    for m in range(1, lmax + 1):
+        stop1 = start1 + step - m + 1
+        stop2 = start2 + step - m + 1
+        a = alm.real[..., start1:stop1] * alm2.real[..., start2:stop2]
+        b = alm.imag[..., start1:stop1] * alm2.imag[..., start2:stop2]
+        cl[m:] += 2 * (a + b - cl[m:]) / (2 * m + 1)
+        start1 += lmax1 - m + 1
+        start2 += lmax2 - m + 1
+
+    return cl
 
 
 def _debias_cl(
@@ -89,6 +134,8 @@ def _debias_cl(
     # handle HEALPix pseudo-convolution
     for i, s in (1, spin1), (2, spin2):
         if md.get(f"kernel_{i}") == "healpix":
+            import healpy as hp
+
             nside: int | None = md.get(f"nside_{i}")
             deconv: bool = md.get(f"deconv_{i}", True)
             if nside is not None and deconv:
@@ -179,7 +226,7 @@ def angular_power_spectra(
             alm1, alm2 = alms[k1, i1], alms2[k2, i2]
 
         # compute the raw cl from the alms
-        cl = hp.alm2cl(alm1, alm2, lmax_out=lmax)
+        cl = alm2cl(alm1, alm2, lmax=lmax)
 
         # collect metadata
         md = {}
