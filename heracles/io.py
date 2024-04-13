@@ -20,10 +20,12 @@
 
 import logging
 import os
+import re
 from collections.abc import MutableMapping
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 from warnings import warn
 from weakref import WeakValueDictionary
 
@@ -31,6 +33,9 @@ import fitsio
 import numpy as np
 
 from .core import TocDict, toc_match
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -63,21 +68,33 @@ _METADATA_COMMENTS = {
     "bias": "additive bias of spectrum",
 }
 
+# type for valid keys
+_KeyType: "TypeAlias" = "str | int | tuple[_KeyType, ...]"
 
-def _extname_from_key(key):
+
+def _extname_from_key(key: _KeyType) -> str:
     """
     Return FITS extension name for a given key.
     """
-    if not isinstance(key, tuple):
-        key = (key,)
-    return ",".join(map(str, key))
+    if isinstance(key, tuple):
+        names = list(map(_extname_from_key, key))
+        c = ";" if any("," in name for name in names) else ","
+        return c.join(names)
+    return re.sub(r"\W+", "_", str(key))
 
 
-def _key_from_extname(ext):
+def _key_from_extname(extname: str) -> _KeyType:
     """
     Return key for a given FITS extension name.
     """
-    return tuple(int(s) if s.isdigit() else s for s in ext.split(","))
+    keys = extname.split(";")
+    if len(keys) > 1:
+        return tuple(map(_key_from_extname, keys))
+    keys = keys[0].split(",")
+    if len(keys) > 1:
+        return tuple(map(_key_from_extname, keys))
+    key = keys[0]
+    return int(key) if key.isdigit() else key
 
 
 def _iterfits(path, include=None, exclude=None):
@@ -525,15 +542,15 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
 
     # reopen FITS for writing data
     with fitsio.FITS(path, mode="rw", clobber=False) as fits:
-        for (k1, k2), mat in cov.items():
+        for key, mat in cov.items():
             # skip if not selected
-            if not toc_match((k1, k2), include=include, exclude=exclude):
+            if not toc_match(key, include=include, exclude=exclude):
                 continue
 
-            # the cl extension name
-            ext = _extname_from_key(k1 + k2)
+            logger.info("writing covariance matrix %s", key)
 
-            logger.info("writing %s x %s covariance matrix", k1, k2)
+            # the cov extension name
+            ext = _extname_from_key(key)
 
             # write the covariance matrix as an image
             fits.write_image(mat, extname=ext)
@@ -566,9 +583,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
 
     # iterate over valid HDUs in the file
     for key, hdu in _iterfits(path, include=include, exclude=exclude):
-        k1, k2 = key[: len(key) // 2], key[len(key) // 2 :]
-
-        logger.info("reading %s x %s covariance matrix", k1, k2)
+        logger.info("reading covariance matrix %s", key)
 
         # read the covariance matrix from the extension
         mat = hdu.read()
@@ -577,7 +592,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
         mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(hdu))
 
         # store in set
-        cov[k1, k2] = mat
+        cov[key] = mat
 
     logger.info("done with %d covariance(s)", len(cov))
 

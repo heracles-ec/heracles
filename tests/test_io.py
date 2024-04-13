@@ -148,6 +148,34 @@ def mock_vmap(mock_vmap_fields, nside, datadir):
     return filename
 
 
+def test_extname_from_key():
+    from heracles.io import _extname_from_key
+
+    assert _extname_from_key("a") == "a"
+    assert _extname_from_key(1) == "1"
+    assert _extname_from_key(("a",)) == "a"
+    assert _extname_from_key((1,)) == "1"
+    assert _extname_from_key(("a", 1)) == "a,1"
+    assert _extname_from_key(("a", "b", 1, 2)) == "a,b,1,2"
+    assert _extname_from_key((("a", 1), "b")) == "a,1;b"
+    assert _extname_from_key((("a", 1), ("b", 2))) == "a,1;b,2"
+
+    # test special chars
+    assert _extname_from_key("a,b,c") == "a_b_c"
+    assert _extname_from_key("!@#$%^&*()[]{};,.") == "_"
+
+
+def test_key_from_extname():
+    from heracles.io import _key_from_extname
+
+    assert _key_from_extname("a") == "a"
+    assert _key_from_extname("1") == 1
+    assert _key_from_extname("a,1") == ("a", 1)
+    assert _key_from_extname("a,b,1,2") == ("a", "b", 1, 2)
+    assert _key_from_extname("a,1;b") == (("a", 1), "b")
+    assert _key_from_extname("a,1;b,2") == (("a", 1), ("b", 2))
+
+
 def test_write_read_maps(rng, tmp_path):
     import healpy as hp
     import numpy as np
@@ -214,7 +242,7 @@ def test_write_read_cls(mock_cls, tmp_path):
 
     cls = read_cls(filename, workdir=workdir)
 
-    assert cls.keys() == mock_cls.keys()
+    assert list(cls.keys()) == list(mock_cls.keys())
     for key in mock_cls:
         assert key in cls
         cl = cls[key]
