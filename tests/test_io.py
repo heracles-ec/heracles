@@ -148,32 +148,32 @@ def mock_vmap(mock_vmap_fields, nside, datadir):
     return filename
 
 
-def test_extname_from_key():
-    from heracles.io import _extname_from_key
+def test_string_from_key():
+    from heracles.io import _string_from_key
 
-    assert _extname_from_key("a") == "a"
-    assert _extname_from_key(1) == "1"
-    assert _extname_from_key(("a",)) == "a"
-    assert _extname_from_key((1,)) == "1"
-    assert _extname_from_key(("a", 1)) == "a,1"
-    assert _extname_from_key(("a", "b", 1, 2)) == "a,b,1,2"
-    assert _extname_from_key((("a", 1), "b")) == "a,1;b"
-    assert _extname_from_key((("a", 1), ("b", 2))) == "a,1;b,2"
+    assert _string_from_key("a") == "a"
+    assert _string_from_key(1) == "1"
+    assert _string_from_key(("a",)) == "a"
+    assert _string_from_key((1,)) == "1"
+    assert _string_from_key(("a", 1)) == "a,1"
+    assert _string_from_key(("a", "b", 1, 2)) == "a,b,1,2"
+    assert _string_from_key((("a", 1), "b")) == "a,1;b"
+    assert _string_from_key((("a", 1), ("b", 2))) == "a,1;b,2"
 
     # test special chars
-    assert _extname_from_key("a,b,c") == "a_b_c"
-    assert _extname_from_key("!@#$%^&*()[]{};,.") == "_"
+    assert _string_from_key("a,b,c") == "a_b_c"
+    assert _string_from_key("!@#$%^&*()[]{};,.") == "_"
 
 
-def test_key_from_extname():
-    from heracles.io import _key_from_extname
+def test_key_from_string():
+    from heracles.io import _key_from_string
 
-    assert _key_from_extname("a") == "a"
-    assert _key_from_extname("1") == 1
-    assert _key_from_extname("a,1") == ("a", 1)
-    assert _key_from_extname("a,b,1,2") == ("a", "b", 1, 2)
-    assert _key_from_extname("a,1;b") == (("a", 1), "b")
-    assert _key_from_extname("a,1;b,2") == (("a", 1), ("b", 2))
+    assert _key_from_string("a") == "a"
+    assert _key_from_string("1") == 1
+    assert _key_from_string("a,1") == ("a", 1)
+    assert _key_from_string("a,b,1,2") == ("a", "b", 1, 2)
+    assert _key_from_string("a,1;b") == (("a", 1), "b")
+    assert _key_from_string("a,1;b,2") == (("a", 1), ("b", 2))
 
 
 def test_write_read_maps(rng, tmp_path):
@@ -209,7 +209,7 @@ def test_write_read_maps(rng, tmp_path):
         assert maps[key].dtype.metadata == maps_r[key].dtype.metadata
 
     # make sure map can be read by healpy
-    m = hp.read_map(tmp_path / "maps.fits", hdu="P,1")
+    m = hp.read_map(tmp_path / "maps.fits", hdu="MAP0")
     np.testing.assert_array_equal(maps["P", 1], m)
 
 
@@ -363,8 +363,7 @@ def test_tocfits(tmp_path):
     from heracles.io import TocFits
 
     class TestFits(TocFits):
-        tag = "test"
-        columns = {"col1": "I", "col2": "J"}
+        tag = "TEST"
 
     path = tmp_path / "test.fits"
 
@@ -389,23 +388,23 @@ def test_tocfits(tmp_path):
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 2
-        np.testing.assert_array_equal(fits["1,2"].read(), data12)
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
 
     assert len(tocfits) == 1
     assert list(tocfits) == [(1, 2)]
-    assert tocfits.toc == {(1, 2): "1,2"}
+    assert tocfits.toc == {(1, 2): "TEST0"}
     np.testing.assert_array_equal(tocfits[1, 2], data12)
 
     tocfits[2, 2] = data22
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 3
-        np.testing.assert_array_equal(fits["1,2"].read(), data12)
-        np.testing.assert_array_equal(fits["2,2"].read(), data22)
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
 
     assert len(tocfits) == 2
     assert list(tocfits) == [(1, 2), (2, 2)]
-    assert tocfits.toc == {(1, 2): "1,2", (2, 2): "2,2"}
+    assert tocfits.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
     np.testing.assert_array_equal(tocfits[1, 2], data12)
     np.testing.assert_array_equal(tocfits[2, 2], data22)
 
@@ -418,7 +417,7 @@ def test_tocfits(tmp_path):
 
     assert len(tocfits2) == 2
     assert list(tocfits2) == [(1, 2), (2, 2)]
-    assert tocfits2.toc == {(1, 2): "1,2", (2, 2): "2,2"}
+    assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
     np.testing.assert_array_equal(tocfits2[1, 2], data12)
     np.testing.assert_array_equal(tocfits2[2, 2], data22)
 
@@ -426,9 +425,9 @@ def test_tocfits(tmp_path):
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 4
-        np.testing.assert_array_equal(fits["1,2"].read(), data12)
-        np.testing.assert_array_equal(fits["2,2"].read(), data22)
-        np.testing.assert_array_equal(fits["2,1"].read(), data21)
+        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
+        np.testing.assert_array_equal(fits["TEST2"].read(), data21)
 
 
 def test_tocfits_is_lazy(tmp_path):
