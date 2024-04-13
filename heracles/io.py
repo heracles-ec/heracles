@@ -589,9 +589,9 @@ class TocFits(MutableMapping):
     """A FITS-backed TocDict."""
 
     @staticmethod
-    def reader(fits, ext):
+    def reader(hdu):
         """Read data from FITS extension."""
-        return fits[ext].read()
+        return hdu.read()
 
     @staticmethod
     def writer(fits, ext, data):
@@ -658,7 +658,7 @@ class TocFits(MutableMapping):
         data = self._cache.get(ext)
         if data is None:
             with self.fits as fits:
-                data = self.reader(fits, ext)
+                data = self.reader(fits[ext])
             self._cache[ext] = data
         return data
 
