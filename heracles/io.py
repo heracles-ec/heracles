@@ -20,10 +20,12 @@
 
 import logging
 import os
+import re
 from collections.abc import MutableMapping
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 from warnings import warn
 from weakref import WeakValueDictionary
 
@@ -31,6 +33,9 @@ import fitsio
 import numpy as np
 
 from .core import TocDict, toc_match
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +68,11 @@ _METADATA_COMMENTS = {
     "bias": "additive bias of spectrum",
 }
 
+# type for valid keys
+_KeyType: "TypeAlias" = "str | int | tuple[_KeyType, ...]"
 
-def _extname_from_key(key):
+
+def _extname_from_key(key: _KeyType) -> str:
     """
     Return FITS extension name for a given key.
     """
@@ -72,14 +80,14 @@ def _extname_from_key(key):
         names = list(map(_extname_from_key, key))
         c = ";" if any("," in name for name in names) else ","
         return c.join(names)
-    return "".join(filter(str.isalnum, str(key)))
+    return re.sub(r"\W+", "_", str(key))
 
 
-def _key_from_extname(ext):
+def _key_from_extname(extname: str) -> _KeyType:
     """
     Return key for a given FITS extension name.
     """
-    keys = ext.split(";")
+    keys = extname.split(";")
     if len(keys) > 1:
         return tuple(map(_key_from_extname, keys))
     keys = keys[0].split(",")
