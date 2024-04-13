@@ -181,7 +181,7 @@ def test_write_read_maps(rng, tmp_path):
         assert maps[key].dtype.metadata == maps_r[key].dtype.metadata
 
     # make sure map can be read by healpy
-    m = hp.read_map(tmp_path / "maps.fits", hdu="MAP0")
+    m = hp.read_map(tmp_path / "maps.fits", hdu="P,1")
     np.testing.assert_array_equal(maps["P", 1], m)
 
 
@@ -347,10 +347,7 @@ def test_tocfits(tmp_path):
     assert path.exists()
 
     with fitsio.FITS(path) as fits:
-        assert len(fits) == 2
-        toc = fits["TESTTOC"].read()
-    assert toc.dtype.names == ("EXT", "col1", "col2")
-    assert len(toc) == 0
+        assert len(fits) == 1
 
     assert len(tocfits) == 0
     assert list(tocfits) == []
@@ -363,28 +360,24 @@ def test_tocfits(tmp_path):
     tocfits[1, 2] = data12
 
     with fitsio.FITS(path) as fits:
-        assert len(fits) == 3
-        toc = fits["TESTTOC"].read()
-        assert len(toc) == 1
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        assert len(fits) == 2
+        np.testing.assert_array_equal(fits["1,2"].read(), data12)
 
     assert len(tocfits) == 1
     assert list(tocfits) == [(1, 2)]
-    assert tocfits.toc == {(1, 2): "TEST0"}
+    assert tocfits.toc == {(1, 2): "1,2"}
     np.testing.assert_array_equal(tocfits[1, 2], data12)
 
     tocfits[2, 2] = data22
 
     with fitsio.FITS(path) as fits:
-        assert len(fits) == 4
-        toc = fits["TESTTOC"].read()
-        assert len(toc) == 2
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
-        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
+        assert len(fits) == 3
+        np.testing.assert_array_equal(fits["1,2"].read(), data12)
+        np.testing.assert_array_equal(fits["2,2"].read(), data22)
 
     assert len(tocfits) == 2
     assert list(tocfits) == [(1, 2), (2, 2)]
-    assert tocfits.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
+    assert tocfits.toc == {(1, 2): "1,2", (2, 2): "2,2"}
     np.testing.assert_array_equal(tocfits[1, 2], data12)
     np.testing.assert_array_equal(tocfits[2, 2], data22)
 
@@ -397,19 +390,17 @@ def test_tocfits(tmp_path):
 
     assert len(tocfits2) == 2
     assert list(tocfits2) == [(1, 2), (2, 2)]
-    assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
+    assert tocfits2.toc == {(1, 2): "1,2", (2, 2): "2,2"}
     np.testing.assert_array_equal(tocfits2[1, 2], data12)
     np.testing.assert_array_equal(tocfits2[2, 2], data22)
 
     tocfits2[2, 1] = data21
 
     with fitsio.FITS(path) as fits:
-        assert len(fits) == 5
-        toc = fits["TESTTOC"].read()
-        assert len(toc) == 3
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
-        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
-        np.testing.assert_array_equal(fits["TEST2"].read(), data21)
+        assert len(fits) == 4
+        np.testing.assert_array_equal(fits["1,2"].read(), data12)
+        np.testing.assert_array_equal(fits["2,2"].read(), data22)
+        np.testing.assert_array_equal(fits["2,1"].read(), data21)
 
 
 def test_tocfits_is_lazy(tmp_path):
@@ -444,7 +435,7 @@ def test_tocfits_is_lazy(tmp_path):
 
     # make sure nothing is in the FITS
     with fitsio.FITS(path, "r") as fits:
-        assert len(fits) == 2
+        assert len(fits) == 1
 
     # make sure there are errors when acualising the generators
     with pytest.raises(OSError):
