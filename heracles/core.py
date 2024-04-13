@@ -31,6 +31,8 @@ T = TypeVar("T")
 
 def toc_match(key, include=None, exclude=None):
     """return whether a tocdict entry matches include/exclude criteria"""
+    if not isinstance(key, tuple):
+        key = (key,)
     if include is not None:
         for pattern in include:
             if all(p is Ellipsis or p == k for p, k in zip(pattern, key)):

@@ -25,7 +25,7 @@ from collections.abc import MutableMapping
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 from warnings import warn
 from weakref import WeakValueDictionary
 
@@ -45,8 +45,8 @@ _METADATA_COMMENTS = {
     "catalog_1": "catalog of first field",
     "catalog_2": "catalog of second field",
     "spin": "spin weight of field",
-    "spin1_": "spin weight of first field",
-    "spin2_": "spin weight of second field",
+    "spin_1": "spin weight of first field",
+    "spin_2": "spin weight of second field",
     "geometry": "mapper geometry of field",
     "geometry_1": "mapper geometry of first field",
     "geometry_2": "mapper geometry of second field",
@@ -69,44 +69,55 @@ _METADATA_COMMENTS = {
 }
 
 # type for valid keys
-_KeyType: "TypeAlias" = "str | int | tuple[_KeyType, ...]"
+_DictKey: "TypeAlias" = Union[str, int, tuple["_DictKey", ...]]
 
 
-def _extname_from_key(key: _KeyType) -> str:
+def _string_from_key(key: _DictKey) -> str:
     """
-    Return FITS extension name for a given key.
+    Return string representation for a given key.
     """
     if isinstance(key, tuple):
-        names = list(map(_extname_from_key, key))
+        names = list(map(_string_from_key, key))
         c = ";" if any("," in name for name in names) else ","
         return c.join(names)
     return re.sub(r"\W+", "_", str(key))
 
 
-def _key_from_extname(extname: str) -> _KeyType:
+def _key_from_string(s: str) -> _DictKey:
     """
-    Return key for a given FITS extension name.
+    Return key for a given string representation.
     """
-    keys = extname.split(";")
+    keys = s.split(";")
     if len(keys) > 1:
-        return tuple(map(_key_from_extname, keys))
+        return tuple(map(_key_from_string, keys))
     keys = keys[0].split(",")
     if len(keys) > 1:
-        return tuple(map(_key_from_extname, keys))
+        return tuple(map(_key_from_string, keys))
     key = keys[0]
     return int(key) if key.isdigit() else key
 
 
-def _iterfits(path, include=None, exclude=None):
+def _get_next_extname(fits, prefix):
     """
-    Iterate over HDUs that correspond to valid keys.
+    Return the next available extension name starting with *prefix*.
+    """
+    n = 0
+    while (extname := f"{prefix}{n}") in fits:
+        n += 1
+    return extname
+
+
+def _iterfits(path, tag, include=None, exclude=None):
+    """
+    Iterate over HDUs that correspond to *tag* and have valid keys.
     """
     with fitsio.FITS(path) as fits:
         for hdu in fits:
-            extname = hdu.get_extname()
-            if not extname:
+            if not re.match(f"^{tag}\\d+$", hdu.get_extname()):
                 continue
-            key = _key_from_extname(extname)
+            key = _read_key(hdu)
+            if key is None:
+                continue
             if not toc_match(key, include=include, exclude=exclude):
                 continue
             yield key, hdu
@@ -130,7 +141,21 @@ def _read_metadata(hdu):
     return md
 
 
-def _write_map(fits, ext, m, *, names=None):
+def _write_key(hdu, key):
+    """write dictionary key to FITS HDU"""
+    hdu.write_key("DICTKEY", _string_from_key(key), "dictionary key of this extension")
+
+
+def _read_key(hdu):
+    """read dictionary key from FITS HDU"""
+    h = hdu.read_header()
+    s = h.get("DICTKEY")
+    if s is None:
+        return None
+    return _key_from_string(s)
+
+
+def _write_map(fits, ext, key, m, *, names=None):
     """write HEALPix map to FITS table"""
 
     import healpy as hp
@@ -145,6 +170,9 @@ def _write_map(fits, ext, m, *, names=None):
 
     # write the data
     fits.write_table(cols, names=names, extname=ext)
+
+    # write the key
+    _write_key(fits[ext], key)
 
     # HEALPix metadata
     npix = np.shape(m)[-1]
@@ -190,10 +218,13 @@ def _read_map(hdu):
     return m
 
 
-def _write_complex(fits, ext, arr):
+def _write_complex(fits, ext, key, arr):
     """write complex-valued data to FITS table"""
     # write the data
     fits.write_table([arr.real, arr.imag], names=["real", "imag"], extname=ext)
+
+    # write the key
+    _write_key(fits[ext], key)
 
     # write the metadata
     _write_metadata(fits[ext], arr.dtype.metadata)
@@ -212,7 +243,7 @@ def _read_complex(hdu):
     return arr
 
 
-def _write_twopoint(fits, ext, arr, name):
+def _write_twopoint(fits, ext, key, arr, name):
     """convert two-point data (i.e. one L column) to structured array"""
 
     arr = np.asanyarray(arr)
@@ -242,6 +273,9 @@ def _write_twopoint(fits, ext, arr, name):
 
     # write the twopoint data
     fits.write_table(arr, extname=ext)
+
+    # write the key
+    _write_key(fits[ext], key)
 
     # write the metadata
     _write_metadata(fits[ext], arr.dtype.metadata)
@@ -309,11 +343,11 @@ def write_maps(
 
             logger.info("writing map %s", key)
 
-            # the cl extension name
-            ext = _extname_from_key(key)
+            # extension name
+            ext = _get_next_extname(fits, "MAP")
 
             # write the map in HEALPix FITS format
-            _write_map(fits, ext, m)
+            _write_map(fits, ext, key, m)
 
     logger.info("done with %d maps", len(maps))
 
@@ -330,7 +364,7 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
     maps = TocDict()
 
     # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, include=include, exclude=exclude):
+    for key, hdu in _iterfits(path, "MAP", include=include, exclude=exclude):
         logger.info("reading map %s", key)
         maps[key] = _read_map(hdu)
 
@@ -375,11 +409,11 @@ def write_alms(
 
             logger.info("writing alm %s", key)
 
-            # the cl extension name
-            ext = _extname_from_key(key)
+            # extension name
+            ext = _get_next_extname(fits, "ALM")
 
             # write the alm as structured data with metadata
-            _write_complex(fits, ext, alm)
+            _write_complex(fits, ext, key, alm)
 
     logger.info("done with %d alms", len(alms))
 
@@ -396,7 +430,7 @@ def read_alms(filename, workdir=".", *, include=None, exclude=None):
     alms = TocDict()
 
     # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, include=include, exclude=exclude):
+    for key, hdu in _iterfits(path, "ALM", include=include, exclude=exclude):
         logger.info("reading alm %s", key)
         alms[key] = _read_complex(hdu)
 
@@ -433,11 +467,11 @@ def write_cls(filename, cls, *, clobber=False, workdir=".", include=None, exclud
 
             logger.info("writing cl %s", key)
 
-            # the cl extension name
-            ext = _extname_from_key(key)
+            # extension name
+            ext = _get_next_extname(fits, "CL")
 
             # write the data in structured format
-            _write_twopoint(fits, ext, cl, "CL")
+            _write_twopoint(fits, ext, key, cl, "CL")
 
     logger.info("done with %d cls", len(cls))
 
@@ -454,7 +488,7 @@ def read_cls(filename, workdir=".", *, include=None, exclude=None):
     cls = TocDict()
 
     # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, include=include, exclude=exclude):
+    for key, hdu in _iterfits(path, "CL", include=include, exclude=exclude):
         logger.info("reading cl %s", key)
         cls[key] = _read_twopoint(hdu)
 
@@ -491,11 +525,11 @@ def write_mms(filename, mms, *, clobber=False, workdir=".", include=None, exclud
 
             logger.info("writing mm %s", key)
 
-            # the mm extension name
-            ext = _extname_from_key(key)
+            # extension name
+            ext = _get_next_extname(fits, "MM")
 
             # write the data in structured format
-            _write_twopoint(fits, ext, mm, "MM")
+            _write_twopoint(fits, ext, key, mm, "MM")
 
     logger.info("done with %d mm(s)", len(mms))
 
@@ -512,7 +546,7 @@ def read_mms(filename, workdir=".", *, include=None, exclude=None):
     mms = TocDict()
 
     # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, include=include, exclude=exclude):
+    for key, hdu in _iterfits(path, "MM", include=include, exclude=exclude):
         logger.info("writing mm %s", key)
         mms[key] = _read_twopoint(hdu)
 
@@ -549,11 +583,14 @@ def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=N
 
             logger.info("writing covariance matrix %s", key)
 
-            # the cov extension name
-            ext = _extname_from_key(key)
+            # extension name
+            ext = _get_next_extname(fits, "COV")
 
             # write the covariance matrix as an image
             fits.write_image(mat, extname=ext)
+
+            # write the key
+            _write_key(fits[ext], key)
 
             # write the WCS
             fits[ext].write_key("WCSAXES", 2)
@@ -582,7 +619,7 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
     cov = TocDict()
 
     # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, include=include, exclude=exclude):
+    for key, hdu in _iterfits(path, "COV", include=include, exclude=exclude):
         logger.info("reading covariance matrix %s", key)
 
         # read the covariance matrix from the extension
@@ -603,18 +640,22 @@ def read_cov(filename, workdir=".", *, include=None, exclude=None):
 class TocFits(MutableMapping):
     """A FITS-backed TocDict."""
 
+    tag = "EXT"
+    """Tag for FITS extensions."""
+
     @staticmethod
     def reader(hdu):
         """Read data from FITS extension."""
         return hdu.read()
 
     @staticmethod
-    def writer(fits, ext, data):
+    def writer(fits, ext, key, data):
         """Write data to FITS extension."""
         if data.dtype.names is None:
             msg = "data must be structured array"
             raise TypeError(msg)
         fits.write_table(data, extname=ext)
+        _write_key(fits[ext], key)
 
     @property
     def fits(self):
@@ -634,12 +675,10 @@ class TocFits(MutableMapping):
             with fitsio.FITS(self.path, mode="rw", clobber=True) as fits:
                 fits.write(None)
 
-        # read extensions
-        with self.fits as fits:
-            self._toc = TocDict()
-            for hdu in fits:
-                if ext := hdu.get_extname():
-                    self._toc[_key_from_extname(ext)] = ext
+        # create a dictionary of existing data
+        self._toc = TocDict(
+            {key: hdu.get_extname() for key, hdu in _iterfits(self.path, self.tag)},
+        )
 
         # set up a weakly-referenced cache for extension data
         self._cache = WeakValueDictionary()
@@ -682,16 +721,16 @@ class TocFits(MutableMapping):
         if not isinstance(key, tuple):
             key = (key,)
 
-        # check if an extension with the given key already exists
-        # otherwise, get the first free extension with the given tag
-        if key in self._toc:
-            ext = self._toc[key]
-        else:
-            ext = _extname_from_key(key)
-
-        # write data using the class writer, and update ToC as necessary
         with self.fits as fits:
-            self.writer(fits, ext, value)
+            # check if an extension with the given key already exists
+            # otherwise, get the first free extension with the given tag
+            if key in self._toc:
+                ext = self._toc[key]
+            else:
+                ext = _get_next_extname(fits, self.tag)
+
+            # write data using the class writer, and update ToC as necessary
+            self.writer(fits, ext, key, value)
             if key not in self._toc:
                 self._toc[key] = ext
 
@@ -704,6 +743,7 @@ class TocFits(MutableMapping):
 class MapFits(TocFits):
     """FITS-backed mapping for maps."""
 
+    tag = "MAP"
     reader = staticmethod(_read_map)
     writer = staticmethod(_write_map)
 
@@ -711,6 +751,7 @@ class MapFits(TocFits):
 class AlmFits(TocFits):
     """FITS-backed mapping for alms."""
 
+    tag = "ALM"
     reader = staticmethod(_read_complex)
     writer = staticmethod(_write_complex)
 
@@ -718,6 +759,7 @@ class AlmFits(TocFits):
 class ClsFits(TocFits):
     """FITS-backed mapping for cls."""
 
+    tag = "CL"
     reader = staticmethod(_read_twopoint)
     writer = partial(_write_twopoint, name="CL")
 
@@ -725,5 +767,6 @@ class ClsFits(TocFits):
 class MmsFits(TocFits):
     """FITS-backed mapping for mixing matrices."""
 
+    tag = "MM"
     reader = staticmethod(_read_twopoint)
     writer = partial(_write_twopoint, name="MM")
