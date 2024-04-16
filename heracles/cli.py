@@ -175,7 +175,7 @@ def mapper_from_config(config, section):
 
         nside = config.getint(section, "nside")
         lmax = config.getint(section, "lmax", fallback=None)
-        deconvolve = config.getint(section, "deconvolve", fallback=None)
+        deconvolve = config.getboolean(section, "deconvolve", fallback=None)
         return Healpix(nside, lmax, deconvolve=deconvolve)
     return None
 
