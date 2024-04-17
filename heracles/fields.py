@@ -273,20 +273,17 @@ class Positions(Field, spin=0):
             vmap = hp.ud_grade(vmap, mapper.nside)
 
         # mean visibility (i.e. f_sky)
-        if vmap is None:
-            vbar = 1
-        else:
-            vbar = np.mean(vmap)
+        fsky = catalog.fsky if catalog.fsky is not None else 1.0
 
         # effective number of pixels
         npix = 4 * np.pi / mapper.area
 
         # compute average number count from map
-        nbar = ngal / vbar / npix
+        nbar = ngal / fsky / npix
         # override with provided value, but check that it makes sense
         if (nbar_ := self.nbar) is not None:
             # Poisson std dev from expected ngal assuming nbar_ is truth
-            sigma_nbar = (nbar_ / vbar / npix) ** 0.5
+            sigma_nbar = (nbar_ / fsky / npix) ** 0.5
             if abs(nbar - nbar_) > 3 * sigma_nbar:
                 warnings.warn(
                     f"The provided mean density ({nbar_:g}) differs from the "
@@ -361,20 +358,17 @@ class ScalarField(Field, spin=0):
             # clean up and yield control to main loop
             del page
 
-        # compute mean visibility
-        if catalog.visibility is None:
-            vbar = 1
-        else:
-            vbar = np.mean(catalog.visibility)
+        # sky fraction
+        fsky = catalog.fsky if catalog.fsky is not None else 1.0
 
         # compute mean weight per effective mapper "pixel"
-        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
+        wbar = ngal / (4 * np.pi * fsky) * wmean * mapper.area
 
         # normalise the map
         val /= wbar
 
         # compute bias from variance (per object)
-        bias = 4 * np.pi * vbar**2 * (var / wmean**2) / ngal
+        bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
         update_metadata(val, catalog, wbar=wbar, bias=bias)
@@ -434,20 +428,17 @@ class ComplexField(Field, spin=0):
 
             del page
 
-        # compute mean visibility
-        if catalog.visibility is None:
-            vbar = 1
-        else:
-            vbar = np.mean(catalog.visibility)
+        # sky fraction
+        fsky = catalog.fsky if catalog.fsky is not None else 1.0
 
         # mean weight per effective mapper "pixel"
-        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
+        wbar = ngal / (4 * np.pi * fsky) * wmean * mapper.area
 
         # normalise the map
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
-        bias = 2 * np.pi * vbar**2 * (var / wmean**2) / ngal
+        bias = 2 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
         update_metadata(val, catalog, wbar=wbar, bias=bias)
@@ -542,20 +533,17 @@ class Weights(Field, spin=0):
 
             del page
 
-        # compute mean visibility
-        if catalog.visibility is None:
-            vbar = 1
-        else:
-            vbar = np.mean(catalog.visibility)
+        # sky fraction
+        fsky = catalog.fsky if catalog.fsky is not None else 1.0
 
         # mean weight per effective mapper "pixel"
-        wbar = ngal / (4 * np.pi * vbar) * wmean * mapper.area
+        wbar = ngal / (4 * np.pi * fsky) * wmean * mapper.area
 
         # normalise the map
         wht /= wbar
 
         # bias from weights
-        bias = 4 * np.pi * vbar**2 * (w2mean / wmean**2) / ngal
+        bias = 4 * np.pi * fsky**2 * (w2mean / wmean**2) / ngal
 
         # set metadata of array
         update_metadata(wht, catalog, wbar=wbar, bias=bias)

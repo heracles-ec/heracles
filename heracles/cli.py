@@ -233,10 +233,13 @@ def catalog_from_config(config, section, label=None, *, out=None):
     # set base catalogue's visibility if just one was given
     if isinstance(visibility, str):
         try:
-            base_catalog.visibility = read_vmap(getpath(visibility))
+            vmap = read_vmap(getpath(visibility))
         except (TypeError, ValueError, OSError) as exc:
             msg = f"Cannot load visibility: {exc!s}"
             raise ValueError(msg)
+        else:
+            base_catalog.visibility = vmap
+            del vmap
     # create a view of the base catalogue for each selection
     # since `out` can be given, also keep track of selections added here
     if out is None:
@@ -260,16 +263,19 @@ def catalog_from_config(config, section, label=None, *, out=None):
     # assign visibilities to individual selections if a mapping was given
     # only allow visibilities for selections added here
     if isinstance(visibility, Mapping):
-        for key, vmap in visibility.items():
+        for key, value in visibility.items():
             num = int(key)
             if num not in added:
                 msg = f"Invalid value: unknown selection '{num}'"
                 raise ValueError(msg)
             try:
-                out[num].visibility = read_vmap(getpath(vmap))
+                vmap = read_vmap(getpath(value))
             except (TypeError, ValueError, OSError) as exc:
                 msg = f"Cannot load visibility: {exc!s}"
                 raise ValueError(msg)
+            else:
+                out[num].visibility = vmap
+                del vmap
     # all done, return `out` unconditionally
     return out
 

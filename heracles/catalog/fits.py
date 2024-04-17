@@ -63,7 +63,7 @@ class FitsCatalog(CatalogBase):
 
     def __repr__(self):
         """string representation of FitsCatalog"""
-        s = self._path
+        s = str(self._path)
         if self._ext is not None:
             s = s + f"[{self._ext!r}]"
         return s

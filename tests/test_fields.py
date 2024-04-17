@@ -70,6 +70,7 @@ def catalog(page):
     catalog = Mock()
     catalog.size = page.size
     catalog.visibility = None
+    catalog.fsky = None
     catalog.metadata = {"catalog": catalog.label}
     catalog.__iter__ = lambda self: iter([page])
 
@@ -225,7 +226,8 @@ def test_positions(mapper, catalog, vmap):
     # compute overdensity maps with visibility map
 
     catalog.visibility = vmap
-    nbar /= vmap.mean()
+    catalog.fsky = vmap.mean()
+    nbar /= catalog.fsky
 
     f = Positions(mapper, "ra", "dec")
     m = coroutines.run(f(catalog))

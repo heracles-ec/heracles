@@ -187,7 +187,7 @@ def test_catalog_base_properties(catalog):
 
     assert catalog.metadata == {"catalog": catalog.label}
 
-    v = object()
+    v = np.zeros(1)
     assert catalog.visibility is None
     catalog.visibility = v
     assert catalog.visibility is v
@@ -215,6 +215,7 @@ def test_catalog_base_copy():
         def __init__(self):
             super().__init__()
             self._visibility = object()
+            self._fsky = object()
 
         def _names(self):
             return []
@@ -236,6 +237,7 @@ def test_catalog_base_copy():
     assert copied is not catalog
     assert copied.__dict__ == catalog.__dict__
     assert copied.visibility is catalog.visibility
+    assert copied.fsky is catalog.fsky
     assert copied.filters is not catalog.filters
 
 
@@ -243,7 +245,8 @@ def test_catalog_view(catalog):
     from heracles.catalog import Catalog
 
     catalog.label = "label 123"
-    catalog.visibility = cvis = object()
+    catalog.visibility = cvis = np.zeros(1)
+    catalog.fsky = object()
 
     where = object()
 
@@ -259,11 +262,12 @@ def test_catalog_view(catalog):
     assert view.label == "label 123"
     assert view.selection is where
     assert view.visibility is catalog.visibility
+    assert view.fsky is catalog.fsky
 
     with pytest.raises(AttributeError):
         view.label = "different label"
 
-    view.visibility = vvis = object()
+    view.visibility = vvis = np.zeros(1)
 
     assert view.visibility is not catalog.visibility
     assert view.visibility is vvis

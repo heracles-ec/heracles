@@ -18,12 +18,29 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """base definition for catalogue interface"""
 
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from typing import Any
+
+    from numpy.typing import NDArray
+
+
+def fsky_from_visibility(visibility: NDArray[Any]) -> float:
+    """
+    Compute sky fraction from visibility.
+    """
+    # check if alm (complex) or map (real)
+    if np.iscomplexobj(visibility):
+        return visibility[0].real / (4 * np.pi) ** 0.5
+    return visibility.mean()
 
 
 class CatalogPage:
@@ -107,7 +124,7 @@ class CatalogPage:
             val = val[0]
         return val
 
-    def copy(self) -> "CatalogPage":
+    def copy(self) -> CatalogPage:
         """Create new page instance with the same data."""
         return CatalogPage(self._data)
 
@@ -161,6 +178,11 @@ class Catalog(Protocol):
         """visibility map of the catalogue"""
         ...
 
+    @property
+    def fsky(self) -> float | None:
+        """sky fraction of the catalogue"""
+        ...
+
     def where(self, selection, visibility=None):
         """create a view on this catalogue with the given selection"""
         ...
@@ -182,11 +204,14 @@ class Catalog(Protocol):
 class CatalogView:
     """a view of a catalogue with some selection applied"""
 
-    def __init__(self, catalog, selection, visibility=None):
+    def __init__(self, catalog, selection, visibility=None, fsky: float | None = None):
         """create a new view"""
         self._catalog = catalog
         self._selection = selection
         self._visibility = visibility
+        self._fsky = fsky
+        if fsky is None and visibility is not None:
+            self._fsky = fsky_from_visibility(visibility)
 
     def __repr__(self):
         """object representation of this view"""
@@ -240,6 +265,21 @@ class CatalogView:
     @visibility.setter
     def visibility(self, visibility):
         self._visibility = visibility
+        if visibility is None:
+            self._fsky = None
+        else:
+            self._fsky = fsky_from_visibility(visibility)
+
+    @property
+    def fsky(self) -> float | None:
+        """the sky fraction of this view"""
+        if self._fsky is None:
+            return self._catalog.fsky
+        return self._fsky
+
+    @fsky.setter
+    def fsky(self, fsky: float) -> None:
+        self._fsky = fsky
 
     def where(self, selection, visibility=None):
         """return a view with a subselection of this view"""
@@ -282,6 +322,7 @@ class CatalogBase(metaclass=ABCMeta):
         self._filters = []
         self._label = None
         self._visibility = None
+        self._fsky: float | None = None
 
     def __copy__(self):
         """return a shallow copy of the catalogue"""
@@ -291,6 +332,7 @@ class CatalogBase(metaclass=ABCMeta):
         other._filters = self._filters.copy()
         other._label = self._label
         other._visibility = self._visibility
+        other._fsky = self._fsky
         return other
 
     @abstractmethod
@@ -376,6 +418,19 @@ class CatalogBase(metaclass=ABCMeta):
     @visibility.setter
     def visibility(self, visibility):
         self._visibility = visibility
+        if visibility is None:
+            self._fsky = None
+        else:
+            self._fsky = fsky_from_visibility(visibility)
+
+    @property
+    def fsky(self) -> float | None:
+        """optional sky fraction for catalogue"""
+        return self._fsky
+
+    @fsky.setter
+    def fsky(self, fsky: float) -> None:
+        self._fsky = fsky
 
     def where(self, selection, visibility=None):
         """create a view on this catalogue with the given selection"""

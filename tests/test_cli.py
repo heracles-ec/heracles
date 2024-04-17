@@ -173,6 +173,8 @@ def test_fields_from_config(mock):
 def test_catalog_from_config(mock):
     from heracles.cli import ConfigParser, catalog_from_config
 
+    mock.return_value = np.zeros(1)
+
     # single visibility
 
     config = ConfigParser()
