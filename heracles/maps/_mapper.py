@@ -25,10 +25,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from typing import Any
 
-    from numpy.typing import ArrayLike, DTypeLike, NDArray
+    from numpy.typing import NDArray
 
 
 @runtime_checkable
@@ -46,7 +45,6 @@ class Mapper(Protocol):
     def create(
         self,
         *dims: int,
-        dtype: DTypeLike | None = None,
         spin: int = 0,
     ) -> NDArray[Any]:
         """
@@ -55,17 +53,16 @@ class Mapper(Protocol):
 
     def map_values(
         self,
-        lon: ArrayLike,
-        lat: ArrayLike,
-        maps: Sequence[ArrayLike],
-        values: Sequence[ArrayLike] | None = None,
-        weight: ArrayLike | None = None,
+        lon: NDArray[Any],
+        lat: NDArray[Any],
+        maps: NDArray[Any],
+        values: NDArray[Any],
     ) -> None:
         """
         Add values to maps.
         """
 
-    def transform(self, maps: ArrayLike) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
+    def transform(self, maps: NDArray[Any]) -> NDArray[Any]:
         """
         The spherical harmonic transform for this mapper.
         """
