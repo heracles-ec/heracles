@@ -25,10 +25,9 @@ def test_healpix_maps(rng):
     assert mapper.area == hp.nside2pixarea(nside)
 
     # create a map
-    m = mapper.create(1, 2, 3, dtype=np.uint16, spin=-3)
+    m = mapper.create(1, 2, 3, spin=-3)
 
     assert m.shape == (1, 2, 3, npix)
-    assert m.dtype == np.uint16
     assert m.dtype.metadata == {
         "geometry": "healpix",
         "kernel": "healpix",
@@ -44,35 +43,14 @@ def test_healpix_maps(rng):
     lat = np.degrees(np.arcsin(rng.uniform(-1, 1, size=size)))
     x = rng.standard_normal(size=size)
     y = rng.standard_normal(size=size)
-    w = 10 ** rng.standard_normal(size=size)
 
     # pixel indices of random positions
     ipix = hp.ang2pix(nside, lon, lat, lonlat=True)
 
-    # map positions
-
-    m = mapper.create()
-    mapper.map_values(lon, lat, [m])
-
-    expected = np.zeros(npix)
-    np.add.at(expected, ipix, 1)
-
-    npt.assert_array_equal(m, expected)
-
-    # map positions with weights
-
-    m = mapper.create()
-    mapper.map_values(lon, lat, [m], None, w)
-
-    expected = np.zeros(npix)
-    np.add.at(expected, ipix, w)
-
-    npt.assert_array_equal(m, expected)
-
     # map one set of values
 
     m = mapper.create()
-    mapper.map_values(lon, lat, [m], [x])
+    mapper.map_values(lon, lat, m, x)
 
     expected = np.zeros(npix)
     np.add.at(expected, ipix, x)
@@ -82,32 +60,11 @@ def test_healpix_maps(rng):
     # map two sets of values
 
     m = mapper.create(2)
-    mapper.map_values(lon, lat, [m[0], m[1]], [x, y])
+    mapper.map_values(lon, lat, m, np.stack([x, y]))
 
     expected = np.zeros((2, npix))
     np.add.at(expected[0], ipix, x)
     np.add.at(expected[1], ipix, y)
-
-    npt.assert_array_equal(m, expected)
-
-    # map one set of values with weights
-
-    m = mapper.create()
-    mapper.map_values(lon, lat, [m], [x], w)
-
-    expected = np.zeros(npix)
-    np.add.at(expected, ipix, w * x)
-
-    npt.assert_array_equal(m, expected)
-
-    # map two sets of values with weights
-
-    m = mapper.create(2)
-    mapper.map_values(lon, lat, [m[0], m[1]], [x, y], w)
-
-    expected = np.zeros((2, npix))
-    np.add.at(expected[0], ipix, w * x)
-    np.add.at(expected[1], ipix, w * y)
 
     npt.assert_array_equal(m, expected)
 
@@ -139,23 +96,14 @@ def test_healpix_transform(mock_map2alm, rng):
     m = rng.standard_normal((2, npix))
     update_metadata(m, spin=2, nside=nside, b=2)
 
-    mock_map2alm.return_value = (
-        np.empty(0, dtype=complex),
-        np.empty(0, dtype=complex),
-        np.empty(0, dtype=complex),
-    )
+    mock_map2alm.return_value = np.empty((3, 0), dtype=complex)
 
     alms = mapper.transform(m)
 
-    assert len(alms) == 2
-    assert alms[0] is mock_map2alm.return_value[1]
-    assert alms[1] is mock_map2alm.return_value[2]
-    assert alms[0].dtype.metadata["spin"] == 2
-    assert alms[1].dtype.metadata["spin"] == 2
-    assert alms[0].dtype.metadata["b"] == 2
-    assert alms[1].dtype.metadata["b"] == 2
-    assert alms[0].dtype.metadata["nside"] == nside
-    assert alms[1].dtype.metadata["nside"] == nside
+    assert alms.shape == (2, 0)
+    assert alms.dtype.metadata["spin"] == 2
+    assert alms.dtype.metadata["b"] == 2
+    assert alms.dtype.metadata["nside"] == nside
 
 
 class MockCatalog:
@@ -208,8 +156,8 @@ def test_transform_maps(rng):
 
     x = Mock()
     y = Mock()
-    x.mapper_or_error.transform.return_value = Mock()
-    y.mapper_or_error.transform.return_value = (Mock(), Mock())
+    x.mapper_or_error.transform.return_value = np.empty(0)
+    y.mapper_or_error.transform.return_value = np.empty((2, 0))
 
     fields = {"X": x, "Y": y}
     maps = {("X", 0): Mock(), ("Y", 1): Mock()}
@@ -218,6 +166,3 @@ def test_transform_maps(rng):
 
     assert len(alms) == 3
     assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}
-    assert alms["X", 0] is x.mapper_or_error.transform.return_value
-    assert alms["Y_E", 1] is y.mapper_or_error.transform.return_value[0]
-    assert alms["Y_B", 1] is y.mapper_or_error.transform.return_value[1]

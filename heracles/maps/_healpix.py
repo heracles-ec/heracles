@@ -32,19 +32,10 @@ from numba import njit
 from heracles.core import update_metadata
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
     from typing import Any
 
-    from numpy.typing import ArrayLike, DTypeLike, NDArray
-
-
-def _asnative(arr):
-    """
-    Return *arr* in native byte order.
-    """
-    if arr.dtype.byteorder != "=":
-        return arr.newbyteorder("=").byteswap()
-    return arr
+    from numpy.typing import DTypeLike, NDArray
 
 
 def _nativebyteorder(fn):
@@ -52,41 +43,14 @@ def _nativebyteorder(fn):
 
     @wraps(fn)
     def wrapper(*args):
-        native = []
-        for arg in args:
-            if isinstance(arg, (list, tuple)):
-                # turn sequences into tuples for numba interoperability
-                native.append(tuple(map(_asnative, arg)))
-            else:
-                native.append(_asnative(arg))
-        return fn(*native)
+        newargs = []
+        for arr in args:
+            if arr.dtype.byteorder != "=":
+                arr = arr.newbyteorder("=").byteswap()
+            newargs.append(arr)
+        return fn(*newargs)
 
     return wrapper
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map0(ipix, maps):
-    """
-    Compiled function to map positions.
-    """
-    n = len(maps)
-    for i in ipix:
-        for k in range(n):
-            maps[k][i] += 1
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _map0w(ipix, maps, weight):
-    """
-    Compiled function to map positions with weights.
-    """
-    n = len(maps)
-    for j, i in enumerate(ipix):
-        w = weight[j]
-        for k in range(n):
-            maps[k][i] += w
 
 
 @_nativebyteorder
@@ -95,23 +59,8 @@ def _map(ipix, maps, values):
     """
     Compiled function to map values.
     """
-    n = len(maps)
     for j, i in enumerate(ipix):
-        for k in range(n):
-            maps[k][i] += values[k][j]
-
-
-@_nativebyteorder
-@njit(nogil=True, fastmath=True)
-def _mapw(ipix, maps, values, weight):
-    """
-    Compiled function to map values with weights.
-    """
-    n = len(maps)
-    for j, i in enumerate(ipix):
-        w = weight[j]
-        for k in range(n):
-            maps[k][i] += w * values[k][j]
+        maps[..., i] += values[..., j]
 
 
 class Healpix:
@@ -173,13 +122,12 @@ class Healpix:
     def create(
         self,
         *dims: int,
-        dtype: DTypeLike | None = None,
         spin: int = 0,
     ) -> NDArray[Any]:
         """
         Create a new HEALPix map.
         """
-        m = np.zeros((*dims, hp.nside2npix(self.__nside)), dtype=dtype)
+        m = np.zeros((*dims, hp.nside2npix(self.__nside)), dtype=self.__dtype)
         update_metadata(
             m,
             geometry="healpix",
@@ -193,11 +141,10 @@ class Healpix:
 
     def map_values(
         self,
-        lon: ArrayLike,
-        lat: ArrayLike,
-        maps: Sequence[ArrayLike],
-        values: Sequence[ArrayLike] | None = None,
-        weight: ArrayLike | None = None,
+        lon: NDArray[Any],
+        lat: NDArray[Any],
+        maps: NDArray[Any],
+        values: NDArray[Any],
     ) -> None:
         """
         Add values to HEALPix maps.
@@ -206,23 +153,10 @@ class Healpix:
         # pixel indices of given positions
         ipix = hp.ang2pix(self.__nside, lon, lat, lonlat=True)
 
-        # sum weighted values in each pixel
-        # only use what is available, to minimise number of array operations
-        if values is None:
-            if weight is None:
-                _map0(ipix, maps)
-            else:
-                _map0w(ipix, maps, weight)
-        else:
-            if weight is None:
-                _map(ipix, maps, values)
-            else:
-                _mapw(ipix, maps, values, weight)
+        # sum values in each pixel
+        _map(ipix, maps, values)
 
-    def transform(
-        self,
-        maps: ArrayLike,
-    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
+    def transform(self, maps: NDArray[Any]) -> NDArray[Any]:
         """
         Spherical harmonic transform of HEALPix maps.
         """
@@ -237,7 +171,7 @@ class Healpix:
             if self.__deconv:
                 pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=False)
         elif spin == 2:
-            maps = [self.create(), maps[0], maps[1]]
+            maps = np.r_[self.create(1), maps]
             pol = True
             if self.__deconv:
                 pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=True)[1]
@@ -260,11 +194,9 @@ class Healpix:
                 hp.almxfl(alm, fl, inplace=True)
             del fl
 
-        if spin == 0:
-            update_metadata(alms, **md)
-        else:
-            alms = (alms[1], alms[2])
-            update_metadata(alms[0], **md)
-            update_metadata(alms[1], **md)
+        if spin != 0:
+            alms = alms[1:].copy()
+
+        update_metadata(alms, **md)
 
         return alms

@@ -179,7 +179,7 @@ def transform_maps(
 
             alms = field.mapper_or_error.transform(m)
 
-            if isinstance(alms, tuple):
+            if alms.ndim > 1 and alms.shape[0] == 2:
                 out[f"{k}_E", i] = alms[0]
                 out[f"{k}_B", i] = alms[1]
             else:

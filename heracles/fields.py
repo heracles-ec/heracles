@@ -202,13 +202,14 @@ class Positions(Field, spin=0):
 
     def __init__(
         self,
+        mapper: Mapper | None,
         *columns: str,
         overdensity: bool = True,
         nbar: float | None = None,
         mask: str | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(*columns, mask=mask)
+        super().__init__(mapper, *columns, mask=mask)
         self.__overdensity = overdensity
         self.__nbar = nbar
 
@@ -249,13 +250,16 @@ class Positions(Field, spin=0):
 
         # map catalogue data asynchronously
         async for page in _pages(catalog, progress):
-            lon, lat = page.get(*col)
-            mapper.map_values(lon, lat, [pos])
+            if page.size:
+                lon, lat = page.get(*col)
+                w = np.ones(page.size)
 
-            ngal += page.size
+                mapper.map_values(lon, lat, pos, w)
 
-            # clean up to free unneeded memory
-            del page, lon, lat
+                ngal += page.size
+
+                # clean up to free unneeded memory
+                del page, lon, lat, w
 
         # get visibility map if present in catalogue
         vmap = catalog.visibility
@@ -343,25 +347,19 @@ class ScalarField(Field, spin=0):
 
             if page.size:
                 lon, lat, v = page.get(*col)
-                w = page.get(wcol) if wcol is not None else None
+                w = page.get(wcol) if wcol is not None else np.ones(page.size)
+                v = v * w
 
-                mapper.map_values(lon, lat, [val], [v], w)
+                mapper.map_values(lon, lat, val, v)
 
                 ngal += page.size
-                if w is None:
-                    var += (v**2 - var).sum() / ngal
-                else:
-                    wmean += (w - wmean).sum() / ngal
-                    var += ((w * v) ** 2 - var).sum() / ngal
+                wmean += (w - wmean).sum() / ngal
+                var += (v**2 - var).sum() / ngal
 
                 del lon, lat, v, w
 
             # clean up and yield control to main loop
             del page
-
-        # fix mean weight if there was no column for it
-        if wcol is None:
-            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -423,25 +421,18 @@ class ComplexField(Field, spin=0):
 
             if page.size:
                 lon, lat, re, im = page.get(*col)
+                w = page.get(wcol) if wcol is not None else np.ones(page.size)
+                re, im = w * re, w * im
 
-                w = page.get(wcol) if wcol is not None else None
-
-                mapper.map_values(lon, lat, [val[0], val[1]], [re, im], w)
+                mapper.map_values(lon, lat, val, np.r_[[re, im]])
 
                 ngal += page.size
-                if w is None:
-                    var += (re**2 + im**2 - var).sum() / ngal
-                else:
-                    wmean += (w - wmean).sum() / ngal
-                    var += ((w * re) ** 2 + (w * im) ** 2 - var).sum() / ngal
+                wmean += (w - wmean).sum() / ngal
+                var += (re**2 + im**2 - var).sum() / ngal
 
                 del lon, lat, re, im, w
 
             del page
-
-        # set mean weight if there was no column for it
-        if wcol is None:
-            wmean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
@@ -539,23 +530,17 @@ class Weights(Field, spin=0):
 
             if page.size:
                 lon, lat = page.get(*col)
+                w = page.get(wcol) if wcol is not None else np.ones(page.size)
 
-                w = page.get(wcol) if wcol is not None else None
-
-                mapper.map_values(lon, lat, [wht], None, w)
+                mapper.map_values(lon, lat, wht, w)
 
                 ngal += page.size
-                if w is not None:
-                    wmean += (w - wmean).sum() / ngal
-                    w2mean += (w**2 - w2mean).sum() / ngal
+                wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
 
                 del lon, lat, w
 
             del page
-
-        # set mean weight if there was no column for it
-        if wcol is None:
-            wmean = w2mean = 1.0
 
         # compute mean visibility
         if catalog.visibility is None:
