@@ -505,7 +505,7 @@ def alms(
     """
 
     from .io import AlmFits
-    from .maps import Healpix, transform_maps
+    from .maps import Healpix, transform
 
     # load the config file, this contains alms setting and maps definition
     logger.info("reading configuration from %s", files)
@@ -533,7 +533,7 @@ def alms(
     # iterate over maps and transform each
     for maps in itermaps:
         logger.info("transforming %d maps", len(maps))
-        transform_maps(
+        transform(
             fields,
             maps,
             progress=progress,

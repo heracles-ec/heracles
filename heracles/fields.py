@@ -236,6 +236,11 @@ class Positions(Field, spin=0):
     ) -> ArrayLike:
         """Map the given catalogue."""
 
+        # before doing any work, check if visibility is required but not given
+        if self.__overdensity and catalog.visibility is None:
+            msg = "cannot compute density contrast: no visibility in catalog"
+            raise ValueError(msg)
+
         # get mapper
         mapper = self.mapper_or_error
 
@@ -261,17 +266,6 @@ class Positions(Field, spin=0):
                 # clean up to free unneeded memory
                 del page, lon, lat, w
 
-        # get visibility map if present in catalogue
-        vmap = catalog.visibility
-
-        # match resolution of visibility map if present
-        # FIXME generic mapper support
-        if vmap is not None and vmap.size != pos.size:
-            import healpy as hp
-
-            warnings.warn("position and visibility maps have different NSIDE")
-            vmap = hp.ud_grade(vmap, mapper.nside)
-
         # mean visibility (i.e. f_sky)
         fsky = catalog.fsky if catalog.fsky is not None else 1.0
 
@@ -296,10 +290,12 @@ class Positions(Field, spin=0):
 
         # compute density contrast if asked to
         if self.__overdensity:
-            if vmap is None:
-                pos -= 1
-            else:
-                pos -= vmap
+            vis = catalog.visibility
+            if vis is not None and vis.size != pos.size:
+                warnings.warn("positions and visibility have different size")
+                vis = mapper.resample(vis)
+            pos -= vis
+            del vis
 
         # compute bias of number counts
         bias = ngal / (4 * np.pi) * mapper.area**2 / nbar**2
@@ -461,27 +457,22 @@ class Visibility(Field, spin=0):
         # get mapper
         mapper = self.mapper_or_error
 
-        # make sure that catalogue has a visibility map
-        vmap = catalog.visibility
-        if vmap is None:
-            msg = "no visibility map in catalog"
+        # make sure that catalogue has a visibility
+        visibility = catalog.visibility
+        if visibility is None:
+            msg = "no visibility in catalog"
             raise ValueError(msg)
 
-        # create new visibility map
+        # create new visibility
         out = mapper.create(spin=self.spin)
 
         # warn if visibility is changing resolution
-        if vmap.size != out.size:
-            import healpy as hp
-
-            warnings.warn(
-                f"changing NSIDE of visibility map "
-                f"from {hp.get_nside(vmap)} to {mapper.nside}",
-            )
-            out[:] = hp.ud_grade(vmap, mapper.nside)
+        if visibility.size != out.size:
+            warnings.warn("changing size of visibility map")
+            out[:] = mapper.resample(visibility)
         else:
             # copy pixel values
-            out[:] = vmap
+            out[:] = visibility
 
         update_metadata(out, catalog)
 

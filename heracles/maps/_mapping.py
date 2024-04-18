@@ -75,9 +75,9 @@ def map_catalogs(
     exclude: Sequence[tuple[Any, Any]] | None = None,
     progress: bool = False,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
-    """Make maps for a set of catalogues."""
+    """Map a set of catalogues to fields."""
 
-    # the toc dict of maps
+    # the toc dict of results
     if out is None:
         out = TocDict()
 
@@ -136,15 +136,15 @@ def map_catalogs(
     return out
 
 
-def transform_maps(
+def transform(
     fields: Mapping[Any, Field],
-    maps: Mapping[tuple[Any, Any], NDArray],
+    data: Mapping[tuple[Any, Any], NDArray],
     *,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     progress: bool = False,
     **kwargs,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
-    """transform a set of maps to alms"""
+    """transform data to alms"""
 
     # the output toc dict
     if out is None:
@@ -156,13 +156,13 @@ def transform_maps(
         from heracles.progress import Progress
 
         progressbar = Progress()
-        task = progressbar.task("transform", total=len(maps))
+        task = progressbar.task("transform", total=len(data))
     else:
         progressbar = nullcontext()
 
-    # convert maps to alms, taking care of complex and spin-weighted maps
+    # convert data to alms, taking care of complex and spin-weighted fields
     with progressbar as prog:
-        for (k, i), m in maps.items():
+        for (k, i), m in data.items():
             if progress:
                 subtask = prog.task(
                     f"[{k}, {i}]",

@@ -143,7 +143,7 @@ class Healpix:
         self,
         lon: NDArray[Any],
         lat: NDArray[Any],
-        maps: NDArray[Any],
+        data: NDArray[Any],
         values: NDArray[Any],
     ) -> None:
         """
@@ -154,15 +154,14 @@ class Healpix:
         ipix = hp.ang2pix(self.__nside, lon, lat, lonlat=True)
 
         # sum values in each pixel
-        _map(ipix, maps, values)
+        _map(ipix, data, values)
 
-    def transform(self, maps: NDArray[Any]) -> NDArray[Any]:
+    def transform(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         Spherical harmonic transform of HEALPix maps.
         """
 
-        maps = np.asanyarray(maps)
-        md: Mapping[str, Any] = maps.dtype.metadata or {}
+        md: Mapping[str, Any] = data.dtype.metadata or {}
         spin = md.get("spin", 0)
         pw: NDArray[Any] | None = None
 
@@ -171,7 +170,7 @@ class Healpix:
             if self.__deconv:
                 pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=False)
         elif spin == 2:
-            maps = np.r_[self.create(1), maps]
+            data = np.r_[self.create(1), data]
             pol = True
             if self.__deconv:
                 pw = hp.pixwin(self.__nside, lmax=self.__lmax, pol=True)[1]
@@ -180,7 +179,7 @@ class Healpix:
             raise NotImplementedError(msg)
 
         alms = hp.map2alm(
-            maps,
+            data,
             lmax=self.__lmax,
             pol=pol,
             use_pixel_weights=True,
@@ -200,3 +199,9 @@ class Healpix:
         update_metadata(alms, **md)
 
         return alms
+
+    def resample(self, data: NDArray[Any]) -> NDArray[Any]:
+        """
+        Change resolution of HEALPix map.
+        """
+        return hp.ud_grade(data, self.__nside, dtype=self.__dtype)

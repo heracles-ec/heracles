@@ -186,6 +186,11 @@ def test_positions(mapper, catalog, vmap):
     assert f.overdensity
     assert f.nbar is None
 
+    # full-sky visibility
+    catalog.visibility = mapper.create()
+    catalog.visibility[:] = 1.0
+    catalog.fsky = 1.0
+
     # create map
     m = coroutines.run(f(catalog))
 

@@ -149,10 +149,10 @@ def test_map_catalogs_match():
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
-def test_transform_maps(rng):
+def test_transform(rng):
     from unittest.mock import Mock
 
-    from heracles.maps import transform_maps
+    from heracles.maps import transform
 
     x = Mock()
     y = Mock()
@@ -162,7 +162,7 @@ def test_transform_maps(rng):
     fields = {"X": x, "Y": y}
     maps = {("X", 0): Mock(), ("Y", 1): Mock()}
 
-    alms = transform_maps(fields, maps)
+    alms = transform(fields, maps)
 
     assert len(alms) == 3
     assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}

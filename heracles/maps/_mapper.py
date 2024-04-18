@@ -39,7 +39,7 @@ class Mapper(Protocol):
     @property
     def area(self) -> float:
         """
-        Area in steradians of one "pixel" of this mapper.
+        Effective area in steradians of one "pixel" of this mapper.
         """
 
     def create(
@@ -55,14 +55,19 @@ class Mapper(Protocol):
         self,
         lon: NDArray[Any],
         lat: NDArray[Any],
-        maps: NDArray[Any],
+        data: NDArray[Any],
         values: NDArray[Any],
     ) -> None:
         """
-        Add values to maps.
+        Add values to data.
         """
 
-    def transform(self, maps: NDArray[Any]) -> NDArray[Any]:
+    def transform(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         The spherical harmonic transform for this mapper.
+        """
+
+    def resample(self, data: NDArray[Any]) -> NDArray[Any]:
+        """
+        Change resolution of data, which must be in this mapper's format.
         """
