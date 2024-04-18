@@ -17,16 +17,16 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """
-Module for creating maps.
+Module for mapping.
 """
 
 __all__ = (
     "Healpix",
     "Mapper",
     "map_catalogs",
-    "transform_maps",
+    "transform",
 )
 
 from ._healpix import Healpix
 from ._mapper import Mapper
-from ._mapping import map_catalogs, transform_maps
+from ._mapping import map_catalogs, transform
