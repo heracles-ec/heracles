@@ -75,6 +75,9 @@ def alm2cl(alm, alm2=None, *, lmax=None):
     else:
         step = min(lmax, lmax1, lmax2)
 
+    if alm2.ndim > 1:
+        alm = alm.reshape(*alm.shape[:-1], *((1,) * (alm2.ndim - 1)), alm.shape[-1])
+
     cl = alm.real[..., : step + 1] * alm2.real[..., : step + 1]
 
     start1 = lmax1 + 1
@@ -84,7 +87,7 @@ def alm2cl(alm, alm2=None, *, lmax=None):
         stop2 = start2 + step - m + 1
         a = alm.real[..., start1:stop1] * alm2.real[..., start2:stop2]
         b = alm.imag[..., start1:stop1] * alm2.imag[..., start2:stop2]
-        cl[m:] += 2 * (a + b - cl[m:]) / (2 * m + 1)
+        cl[..., m:] += 2 * (a + b - cl[..., m:]) / (2 * m + 1)
         start1 += lmax1 - m + 1
         start2 += lmax2 - m + 1
 
