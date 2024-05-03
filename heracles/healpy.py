@@ -63,7 +63,7 @@ def _map(ipix, maps, values):
         maps[..., i] += values[..., j]
 
 
-class Healpix:
+class HealpixMapper:
     """
     Mapper for HEALPix maps.
     """

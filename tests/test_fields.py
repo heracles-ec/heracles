@@ -18,9 +18,9 @@ def sigma_e():
 # TODO: mock mapper
 @pytest.fixture
 def mapper(nside):
-    from heracles.maps import Healpix
+    from heracles.healpy import HealpixMapper
 
-    return Healpix(nside)
+    return HealpixMapper(nside)
 
 
 @pytest.fixture
@@ -132,7 +132,7 @@ def test_visibility(nside, vmap):
     from unittest.mock import Mock
 
     from heracles.fields import Visibility
-    from heracles.maps import Healpix
+    from heracles.healpy import HealpixMapper
 
     fsky = vmap.mean()
 
@@ -141,7 +141,7 @@ def test_visibility(nside, vmap):
         catalog.visibility = vmap
         catalog.metadata = {"catalog": catalog.label}
 
-        mapper_out = Healpix(nside_out)
+        mapper_out = HealpixMapper(nside_out)
 
         f = Visibility(mapper_out)
 

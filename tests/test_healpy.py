@@ -4,18 +4,25 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-
-def test_healpix_maps(rng):
+try:
     import healpy as hp
+except ImportError:
+    HAVE_HEALPY = False
+else:
+    HAVE_HEALPY = True
 
-    from heracles.maps import Healpix, Mapper
+
+@pytest.mark.skipif(not HAVE_HEALPY, reason="test requires healpy")
+def test_healpix_maps(rng):
+    from heracles.healpy import HealpixMapper
+    from heracles.mapper import Mapper
 
     nside = 1 << rng.integers(1, 10)
     npix = hp.nside2npix(nside)
     lmax = 1 << rng.integers(1, 10)
     deconv = rng.choice([True, False])
 
-    mapper = Healpix(nside, lmax, deconvolve=deconv)
+    mapper = HealpixMapper(nside, lmax, deconvolve=deconv)
 
     assert isinstance(mapper, Mapper)
 
@@ -69,15 +76,16 @@ def test_healpix_maps(rng):
     npt.assert_array_equal(m, expected)
 
 
+@pytest.mark.skipif(not HAVE_HEALPY, reason="test requires healpy")
 @unittest.mock.patch("healpy.map2alm")
 def test_healpix_transform(mock_map2alm, rng):
     from heracles.core import update_metadata
-    from heracles.maps import Healpix
+    from heracles.healpy import HealpixMapper
 
     nside = 32
     npix = 12 * nside**2
 
-    mapper = Healpix(nside)
+    mapper = HealpixMapper(nside)
 
     # single scalar map
     m = rng.standard_normal(npix)
@@ -104,65 +112,3 @@ def test_healpix_transform(mock_map2alm, rng):
     assert alms.dtype.metadata["spin"] == 2
     assert alms.dtype.metadata["b"] == 2
     assert alms.dtype.metadata["nside"] == nside
-
-
-class MockCatalog:
-    size = 10
-    page_size = 1
-
-    def __iter__(self):
-        for i in range(0, self.size, self.page_size):
-            yield {}
-
-
-@pytest.mark.parametrize("parallel", [False, True])
-def test_map_catalogs(parallel):
-    from unittest.mock import AsyncMock
-
-    from heracles.maps import map_catalogs
-
-    fields = {"a": AsyncMock(), "b": AsyncMock(), "z": AsyncMock()}
-    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
-
-    maps = map_catalogs(fields, catalogs, parallel=parallel)
-
-    for k in fields:
-        for i in catalogs:
-            fields[k].assert_any_call(catalogs[i], progress=None)
-            assert maps[k, i] is fields[k].return_value
-
-
-def test_map_catalogs_match():
-    from unittest.mock import AsyncMock
-
-    from heracles.maps import map_catalogs
-
-    fields = {"a": AsyncMock(), "b": AsyncMock(), "c": AsyncMock()}
-    catalogs = {"x": MockCatalog(), "y": MockCatalog()}
-
-    maps = map_catalogs(fields, catalogs, include=[(..., "y")])
-
-    assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
-
-    maps = map_catalogs(fields, catalogs, exclude=[("a", ...)])
-
-    assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
-
-
-def test_transform(rng):
-    from unittest.mock import Mock
-
-    from heracles.maps import transform
-
-    x = Mock()
-    y = Mock()
-
-    fields = {"X": x, "Y": y}
-    maps = {("X", 0): Mock(), ("Y", 1): Mock()}
-
-    alms = transform(fields, maps)
-
-    assert len(alms) == 2
-    assert alms.keys() == {("X", 0), ("Y", 1)}
-    assert alms["X", 0] is x.mapper_or_error.transform.return_value
-    assert alms["Y", 1] is y.mapper_or_error.transform.return_value

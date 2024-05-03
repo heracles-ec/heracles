@@ -171,12 +171,12 @@ def mapper_from_config(config, section):
     if mapper == "none":
         return None
     if mapper == "healpix":
-        from .maps import Healpix
+        from .healpy import HealpixMapper
 
         nside = config.getint(section, "nside")
         lmax = config.getint(section, "lmax", fallback=None)
         deconvolve = config.getboolean(section, "deconvolve", fallback=None)
-        return Healpix(nside, lmax, deconvolve=deconvolve)
+        return HealpixMapper(nside, lmax, deconvolve=deconvolve)
     return None
 
 
@@ -504,8 +504,9 @@ def alms(
 
     """
 
+    from . import transform
+    from .healpy import HealpixMapper
     from .io import AlmFits
-    from .maps import Healpix, transform
 
     # load the config file, this contains alms setting and maps definition
     logger.info("reading configuration from %s", files)
@@ -513,7 +514,7 @@ def alms(
 
     # set the HEALPix datapath
     if healpix_datapath is not None:
-        Healpix.DATAPATH = healpix_datapath
+        HealpixMapper.DATAPATH = healpix_datapath
 
     # construct fields to get mappers for transform
     fields = fields_from_config(config)
