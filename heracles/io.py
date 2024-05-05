@@ -220,6 +220,10 @@ def _read_map(hdu):
 
 def _write_complex(fits, ext, key, arr):
     """write complex-valued data to FITS table"""
+    # deal with extra dimensions by moving last axis to first
+    if arr.ndim > 1:
+        arr = np.moveaxis(arr, -1, 0)
+
     # write the data
     fits.write_table([arr.real, arr.imag], names=["real", "imag"], extname=ext)
 
@@ -232,14 +236,20 @@ def _write_complex(fits, ext, key, arr):
 
 def _read_complex(hdu):
     """read complex-valued data from FITS table"""
-    # read structured data as complex array
-    raw = hdu.read()
-    arr = np.empty(len(raw), dtype=complex)
-    arr.real = raw["real"]
-    arr.imag = raw["imag"]
-    del raw
-    # read and attach metadata
-    arr.dtype = np.dtype(arr.dtype, metadata=_read_metadata(hdu))
+    # get column number of real and imag columns
+    colnames = hdu.get_colnames()
+    col_real, col_imag = colnames.index("real"), colnames.index("imag")
+    # get shape of complex array
+    _, shape = hdu._get_simple_dtype_and_shape(col_real)
+    # create dtype with metadata
+    dtype = np.dtype(complex, metadata=_read_metadata(hdu))
+    # read complex array from FITS
+    arr = np.empty(shape, dtype=dtype)
+    arr.real = hdu.read_column(col_real)
+    arr.imag = hdu.read_column(col_imag)
+    # reorder axes if multidimensional
+    if arr.ndim > 1:
+        arr = np.moveaxis(arr, 0, -1)
     return arr
 
 

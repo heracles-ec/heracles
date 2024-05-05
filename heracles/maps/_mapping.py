@@ -177,15 +177,7 @@ def transform(
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg)
 
-            alms = field.mapper_or_error.transform(m)
-
-            if alms.ndim > 1 and alms.shape[0] == 2:
-                out[f"{k}_E", i] = alms[0]
-                out[f"{k}_B", i] = alms[1]
-            else:
-                out[k, i] = alms
-
-            del m, alms
+            out[k, i] = field.mapper_or_error.transform(m)
 
             if progress:
                 subtask.remove()

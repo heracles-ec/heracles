@@ -32,7 +32,7 @@ import numpy as np
 from .core import TocDict, toc_match, update_metadata
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Iterator, Mapping, MutableMapping
 
     from numpy.typing import ArrayLike, NDArray
 
@@ -161,6 +161,40 @@ def _debias_cl(
     return cl
 
 
+def _almkeys(
+    alms: Mapping[tuple[Any, Any], NDArray[Any]],
+) -> Iterator[tuple[str, Any]]:
+    """
+    Iterate with multidimensional alms flattened into separate keys.
+    """
+    for (k, i), alm in alms.items():
+        md = alm.dtype.metadata or {}
+        if alm.ndim < 2:
+            yield (k, i)
+        else:
+            eb = alm.shape[0] == 2 and md.get("spin", 0) != 0
+            for j in np.ndindex(*alm.shape[:-1]):
+                parts = [str(k), "EB"[j[0]] if eb else str(j[0]), *map(str, j[1:])]
+                yield ("_".join(parts), i)
+
+
+def _getalm(
+    alms: Mapping[tuple[Any, Any], NDArray[Any]],
+    k: str,
+    i: Any,
+) -> tuple[NDArray[Any], Mapping[str, Any]]:
+    """
+    Get alm and metadata from a flattened key.
+    """
+    k0, *parts = k.split("_")
+    alm = alms[k0, i]
+    md: Mapping[str, Any] = alm.dtype.metadata or {}
+    if parts and parts[0] in "EB":
+        parts[0] = ("EB").index(parts[0])
+    j = tuple(map(int, parts))
+    return alm[j], md
+
+
 def angular_power_spectra(
     alms,
     alms2=None,
@@ -186,10 +220,10 @@ def angular_power_spectra(
 
     # collect all alm combinations for computing cls
     if alms2 is None:
-        pairs = combinations_with_replacement(alms, 2)
+        pairs = combinations_with_replacement(_almkeys(alms), 2)
         alms2 = alms
     else:
-        pairs = product(alms, alms2)
+        pairs = product(_almkeys(alms), _almkeys(alms2))
 
     # keep track of the twopoint combinations we have seen here
     twopoint_names = set()
@@ -224,9 +258,11 @@ def angular_power_spectra(
         # retrieve alms from keys; make sure swap is respected
         # this is done only now because alms might lazy-load from file
         if swapped:
-            alm1, alm2 = alms2[k1, i1], alms[k2, i2]
+            alm1, md1 = _getalm(alms2, k1, i1)
+            alm2, md2 = _getalm(alms, k2, i2)
         else:
-            alm1, alm2 = alms[k1, i1], alms2[k2, i2]
+            alm1, md1 = _getalm(alms, k1, i1)
+            alm2, md2 = _getalm(alms2, k2, i2)
 
         # compute the raw cl from the alms
         cl = alm2cl(alm1, alm2, lmax=lmax)
@@ -234,19 +270,17 @@ def angular_power_spectra(
         # collect metadata
         md = {}
         bias = None
-        if alm1.dtype.metadata:
-            for key, value in alm1.dtype.metadata.items():
-                if key == "bias":
-                    if k1 == k2 and i1 == i2:
-                        bias = value
-                else:
-                    md[f"{key}_1"] = value
-        if alm2.dtype.metadata:
-            for key, value in alm2.dtype.metadata.items():
-                if key == "bias":
-                    pass
-                else:
-                    md[f"{key}_2"] = value
+        for key, value in md1.items():
+            if key == "bias":
+                if k1 == k2 and i1 == i2:
+                    bias = value
+            else:
+                md[f"{key}_1"] = value
+        for key, value in md2.items():
+            if key == "bias":
+                pass
+            else:
+                md[f"{key}_2"] = value
         if bias is not None:
             md["bias"] = bias
 

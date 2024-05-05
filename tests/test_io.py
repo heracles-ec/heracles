@@ -14,13 +14,15 @@ def mock_alms(rng, zbins):
 
     Nlm = (lmax + 1) * (lmax + 2) // 2
 
-    names = ["P", "E", "B"]
+    # names and spins
+    fields = {"P": 0, "G": 2}
 
     alms = {}
-    for n in names:
+    for n, s in fields.items():
+        shape = (Nlm, 2) if s == 0 else (2, Nlm, 2)
         for i in zbins:
-            a = rng.standard_normal((Nlm, 2)) @ [1, 1j]
-            a.dtype = np.dtype(a.dtype, metadata={"nside": 32})
+            a = rng.standard_normal(shape) @ [1, 1j]
+            a.dtype = np.dtype(a.dtype, metadata={"nside": 3, "spin": s})
             alms[n, i] = a
 
     return alms
