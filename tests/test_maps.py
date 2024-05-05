@@ -156,13 +156,13 @@ def test_transform(rng):
 
     x = Mock()
     y = Mock()
-    x.mapper_or_error.transform.return_value = np.empty(0)
-    y.mapper_or_error.transform.return_value = np.empty((2, 0))
 
     fields = {"X": x, "Y": y}
     maps = {("X", 0): Mock(), ("Y", 1): Mock()}
 
     alms = transform(fields, maps)
 
-    assert len(alms) == 3
-    assert alms.keys() == {("X", 0), ("Y_E", 1), ("Y_B", 1)}
+    assert len(alms) == 2
+    assert alms.keys() == {("X", 0), ("Y", 1)}
+    assert alms["X", 0] is x.mapper_or_error.transform.return_value
+    assert alms["Y", 1] is y.mapper_or_error.transform.return_value

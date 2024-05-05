@@ -22,13 +22,15 @@ def mock_alms(rng, zbins):
 
     Nlm = (lmax + 1) * (lmax + 2) // 2
 
-    names = ["P", "G_E", "G_B"]
+    # names and spins
+    fields = {"P": 0, "G": 2}
 
     alms = {}
-    for n in names:
+    for n, s in fields.items():
+        shape = (Nlm, 2) if s == 0 else (2, Nlm, 2)
         for i in zbins:
-            a = rng.standard_normal((Nlm, 2)) @ [1, 1j]
-            a.dtype = np.dtype(a.dtype, metadata={"nside": 32})
+            a = rng.standard_normal(shape) @ [1, 1j]
+            a.dtype = np.dtype(a.dtype, metadata={"nside": 32, "spin": s})
             alms[n, i] = a
 
     return alms
@@ -53,7 +55,11 @@ def test_alm2cl(mock_alms):
 
     for alm, alm2 in combinations_with_replacement(mock_alms.values(), 2):
         cl = alm2cl(alm, alm2)
-        np.testing.assert_allclose(cl, hp.alm2cl(alm, alm2))
+        expected = np.empty_like(cl)
+        for i in np.ndindex(*alm.shape[:-1]):
+            for j in np.ndindex(*alm2.shape[:-1]):
+                expected[i + j] = hp.alm2cl(alm[i], alm2[j])
+        np.testing.assert_allclose(cl, expected)
 
 
 def test_alm2cl_unequal_size(rng):
@@ -79,16 +85,65 @@ def test_alm2cl_unequal_size(rng):
     np.testing.assert_allclose(cl, hp.alm2cl(alm, alm21, lmax_out=lmax2))
 
 
+def test_almkeys():
+    from heracles.twopoint import _almkeys
+
+    dtype = np.dtype(complex)
+    spin2_dtype = np.dtype(complex, metadata={"spin": 2})
+
+    alms = {
+        ("A", 1): np.zeros((), dtype=dtype),
+        ("B", 2): np.zeros((2,), dtype=dtype),
+        ("C", 3): np.zeros((2, 10), dtype=dtype),
+        ("D", 4): np.zeros((2, 3, 10), dtype=dtype),
+        ("E", 5): np.zeros((2, 10), dtype=spin2_dtype),
+        ("F", 6): np.zeros((2, 3, 10), dtype=spin2_dtype),
+    }
+
+    keys = list(_almkeys(alms))
+
+    assert keys == [
+        ("A", 1),
+        ("B", 2),
+        ("C_0", 3),
+        ("C_1", 3),
+        ("D_0_0", 4),
+        ("D_0_1", 4),
+        ("D_0_2", 4),
+        ("D_1_0", 4),
+        ("D_1_1", 4),
+        ("D_1_2", 4),
+        ("E_E", 5),
+        ("E_B", 5),
+        ("F_E_0", 6),
+        ("F_E_1", 6),
+        ("F_E_2", 6),
+        ("F_B_0", 6),
+        ("F_B_1", 6),
+        ("F_B_2", 6),
+    ]
+
+
 def test_angular_power_spectra(mock_alms):
     from itertools import combinations_with_replacement
 
     from heracles.twopoint import angular_power_spectra
 
+    order = ["P", "G_E", "G_B"]
+
+    fields = []
+    for (k, i), alm in mock_alms.items():
+        if alm.dtype.metadata["spin"] == 0:
+            fields.append((k, i))
+        else:
+            fields.append((f"{k}_E", i))
+            fields.append((f"{k}_B", i))
+
     # alms cross themselves
 
     comb = {
-        (k1, k2, i1, i2)
-        for (k1, i1), (k2, i2) in combinations_with_replacement(mock_alms, 2)
+        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
+        for (k1, i1), (k2, i2) in combinations_with_replacement(fields, 2)
     }
 
     cls = angular_power_spectra(mock_alms)
@@ -109,7 +164,7 @@ def test_angular_power_spectra(mock_alms):
     )
 
     assert cls.keys() == {
-        (k1, k2, i1, i2)
+        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
         for k1, k2, i1, i2 in comb
         if (k1, k2) in [("P", "P"), ("P", "G_E")]
     }
@@ -117,7 +172,7 @@ def test_angular_power_spectra(mock_alms):
     cls = angular_power_spectra(mock_alms, include=[("P", "P", 0), ("P", "G_E", 1)])
 
     assert cls.keys() == {
-        (k1, k2, i1, i2)
+        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
         for k1, k2, i1, i2 in comb
         if (k1, k2, i1) in [("P", "P", 0), ("P", "G_E", 1)]
     }
@@ -130,7 +185,7 @@ def test_angular_power_spectra(mock_alms):
     )
 
     assert cls.keys() == {
-        (k1, k2, i1, i2)
+        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
         for k1, k2, i1, i2 in comb
         if (k1, k2) not in [("P", "P"), ("P", "G_E"), ("P", "G_B")]
     }
@@ -143,13 +198,13 @@ def test_angular_power_spectra(mock_alms):
 
     mock_alms1 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 0}
     mock_alms2 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 1}
-
-    order = ["P", "G_E", "G_B"]
+    fields1 = [(k, i) for (k, i) in fields if i % 2 == 0]
+    fields2 = [(k, i) for (k, i) in fields if i % 2 == 1]
 
     comb12 = {
         (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for k1, i1 in mock_alms1.keys()
-        for k2, i2 in mock_alms2.keys()
+        for k1, i1 in fields1
+        for k2, i2 in fields2
     }
 
     cls = angular_power_spectra(mock_alms1, mock_alms2)
