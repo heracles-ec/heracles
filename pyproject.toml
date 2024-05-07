@@ -43,6 +43,7 @@ optional-dependencies = {all = [
     "sphinx",
     "sphinxcontrib-katex",
 ], test = [
+    "ducc0",
     "pytest",
     "pytest-rerunfailures",
 ]}

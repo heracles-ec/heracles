@@ -300,7 +300,7 @@ def _read_twopoint(hdu):
     return arr
 
 
-def read_vmap(filename, nside=None, field=0):
+def read_vmap(filename, nside=None, field=0, *, transform=False, lmax=None):
     """read visibility map from a HEALPix map file"""
 
     import healpy as hp
@@ -314,6 +314,9 @@ def read_vmap(filename, nside=None, field=0):
         # vmap is provided at a different resolution
         warn(f"{filename}: changing NSIDE to {nside}")
         vmap = hp.ud_grade(vmap, nside)
+
+    if transform:
+        vmap = hp.map2alm(vmap, lmax=lmax, use_pixel_weights=True)
 
     return vmap
 
