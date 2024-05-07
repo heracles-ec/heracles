@@ -29,8 +29,9 @@ TODO - Document configParser without automatically documenting base class member
 .. autofunction:: main
 
 .. autoclass:: ConfigParser
-     :exclude-members: add_section, getchoice, getinit, has_option, has_section, options, read, read_dict, clear, get,
-         getint, items, keys, pop, popitem, read_file, read_string, readfp, remove_option, remove_section, sections,
+     :exclude-members: add_section, getchoice, getinit, has_option, has_section, 
+     options, read, read_dict, clear, get, getint, items, keys, pop, popitem, 
+     read_file, read_string, readfp, remove_option, remove_section, sections,
          set, setdefault, subsections, update, values, write
 '''
 
@@ -220,7 +221,7 @@ def field_from_config(config, section):
     return cls(mapper, *columns, mask=mask)
 
 
-def mapper_from_config(config):
+def fields_from_config(config):
     """Construct all field instances from config."""
     sections = config.subsections("fields")
     return {

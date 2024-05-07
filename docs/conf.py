@@ -63,11 +63,3 @@ html_theme = "furo"
 html_static_path = ["_static"]
 
 html_logo = '_static/Heracles.jpg'
-
-def skip_member(app, what, name, obj, skip, options):
-    if name == '__call__':
-        return True
-    return None
-
-def setup(app):
-    app.connect('autodoc-skip-member', skip_member)
