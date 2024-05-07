@@ -1,0 +1,1 @@
+.. automodule:: heracles.catalog.base

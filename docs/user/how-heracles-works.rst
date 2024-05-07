@@ -1,0 +1,4 @@
+
+How *Heracles* works
+====================
+Todo

@@ -1,22 +1,38 @@
-# Heracles: Euclid code for harmonic-space statistics on the sphere
-#
-# Copyright (C) 2023 Euclid Science Ground Segment
-#
-# This file is part of Heracles.
-#
-# Heracles is free software: you can redistribute it and/or modify it
-# under the terms of the GNU Lesser General Public License as published
-# by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Heracles is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""The Heracles command line interface."""
+'''
+Command Line Interface (:mod:`heracles.cli`)
+============================================
+
+.. currentmodule:: heracles.cli
+
+The :mod:`heracles.cli` module provides a Heracles command line interface.
+
+TODO - This is quite a large module, maybe it needs to be split
+
+TODO - Document configParser without automatically documenting base class members
+ (fix the messy exlude solution)
+
+.. autofunction:: getlist
+.. autofunction:: getdict
+.. autofunction:: getchoice
+.. autofunction:: getpath
+.. autofunction:: getfilter
+.. autofunction:: mapper_from_config
+.. autofunction:: field_from_config
+.. autofunction:: catalog_from_config
+.. autofunction:: catalogs_from_config
+.. autofunction:: bins_from_config
+.. autofunction:: spectrum_from_config
+.. autofunction:: spectra_from_config
+.. autofunction:: configloader
+.. autofunction:: map_all_selections
+.. autofunction:: load_all_maps
+.. autofunction:: main
+
+.. autoclass:: ConfigParser
+     :exclude-members: add_section, getchoice, getinit, has_option, has_section, options, read, read_dict, clear, get,
+         getint, items, keys, pop, popitem, read_file, read_string, readfp, remove_option, remove_section, sections,
+         set, setdefault, subsections, update, values, write
+'''
 
 from __future__ import annotations
 
@@ -204,7 +220,7 @@ def field_from_config(config, section):
     return cls(mapper, *columns, mask=mask)
 
 
-def fields_from_config(config):
+def mapper_from_config(config):
     """Construct all field instances from config."""
     sections = config.subsections("fields")
     return {

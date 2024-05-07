@@ -1,22 +1,20 @@
-# Heracles: Euclid code for harmonic-space statistics on the sphere
-#
-# Copyright (C) 2023 Euclid Science Ground Segment
-#
-# This file is part of Heracles.
-#
-# Heracles is free software: you can redistribute it and/or modify it
-# under the terms of the GNU Lesser General Public License as published
-# by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Heracles is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for progress reporting with rich"""
+'''
+Progress (:mod:`heracles.progress`)
+===================================
+
+module for progress reporting with rich
+
+
+.. currentmodule:: heracles.progress
+
+.. autoclass:: ProgressTask
+.. autoclass:: Progress
+   :exclude-members: add_task, advance, get_default_columns, get_renderable, make_tasks_table, open,
+       refresh, remove_task, reset, start, start_task, stop, stop_task, track, update, wrap_file, get_renderables
+
+
+'''
+
 
 try:
     import rich.box
