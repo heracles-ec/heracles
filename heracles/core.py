@@ -1,4 +1,4 @@
-'''
+"""
 Core (:mod:`heracles.core`)
 ============================
 
@@ -11,9 +11,10 @@ The :mod:`heracles.core` module provides common core functionality
 .. autofunction:: TocDict
 .. autofunction:: update_metadata
 
-'''
+"""
 
 from __future__ import annotations
+
 from collections import UserDict
 from collections.abc import Mapping, Sequence
 from typing import TypeVar

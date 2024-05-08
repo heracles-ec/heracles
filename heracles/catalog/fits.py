@@ -1,4 +1,4 @@
-'''
+"""
 Fits (:mod:`heracles.catalog.fits`)
 =========================================
 
@@ -10,7 +10,7 @@ module for catalogue processing
 .. autoclass:: FitsCatalog
     :exclude-members: add_filter, hdu, select, where
 
-'''
+"""
 
 
 from functools import lru_cache

@@ -9,5 +9,3 @@ Catalog Function reference
    base
    filters
    fits
-
-

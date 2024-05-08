@@ -1,4 +1,4 @@
-'''
+"""
 Progress (:mod:`heracles.progress`)
 ===================================
 
@@ -9,11 +9,12 @@ module for progress reporting with rich
 
 .. autoclass:: ProgressTask
 .. autoclass:: Progress
-   :exclude-members: add_task, advance, get_default_columns, get_renderable, make_tasks_table, open,
-       refresh, remove_task, reset, start, start_task, stop, stop_task, track, update, wrap_file, get_renderables
+   :exclude-members: add_task, advance, get_default_columns, get_renderable,
+       make_tasks_table, open, refresh, remove_task, reset, start, start_task,
+       stop, stop_task, track, update, wrap_file, get_renderables
 
 
-'''
+"""
 
 
 try:

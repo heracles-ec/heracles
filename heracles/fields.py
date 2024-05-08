@@ -1,4 +1,4 @@
-'''
+"""
 Fields (:mod:`heracles.fields`)
 ===============================
 
@@ -23,7 +23,7 @@ TODO - fix the messy exlude solution for autoclass abstract function
     :exclude-members: __call__
 .. autofunction:: get_masks
 
-'''
+"""
 
 from __future__ import annotations
 

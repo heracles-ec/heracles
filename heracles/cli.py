@@ -1,4 +1,4 @@
-'''
+"""
 Command Line Interface (:mod:`heracles.cli`)
 ============================================
 
@@ -29,11 +29,11 @@ TODO - Document configParser without automatically documenting base class member
 .. autofunction:: main
 
 .. autoclass:: ConfigParser
-     :exclude-members: add_section, getchoice, getinit, has_option, has_section, 
-     options, read, read_dict, clear, get, getint, items, keys, pop, popitem, 
-     read_file, read_string, readfp, remove_option, remove_section, sections,
+     :exclude-members: add_section, getchoice, getinit, has_option, has_section,
+         options, read, read_dict, clear, get, getint, items, keys, pop, popitem,
+         read_file, read_string, readfp, remove_option, remove_section, sections,
          set, setdefault, subsections, update, values, write
-'''
+"""
 
 from __future__ import annotations
 

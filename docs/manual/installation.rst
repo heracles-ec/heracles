@@ -15,4 +15,4 @@ install the package in editable mode::
 
     $ pip install -e .
 
-This will automatically add Heracles modules to your python path so that you can import into you Python codes. 
+This will automatically add Heracles modules to your python path so that you can import into you Python codes.

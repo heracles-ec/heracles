@@ -1,4 +1,4 @@
-'''
+"""
 Base (:mod:`heracles.catalog.base`)
 ============================================
 
@@ -17,7 +17,7 @@ TODO - fix the messy exlude solution
      :exclude-members: select, where
 .. autoclass:: CatalogBase
      :exclude-members: add_filter, select, where
-'''
+"""
 
 from __future__ import annotations
 

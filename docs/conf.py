@@ -10,16 +10,12 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = "Heracles"
-copyright = '2023 Euclid Science Ground Segment'
-author = 'Nicolas Tessore'
+author = "Nicolas Tessore"
 
 
 # -- General configuration ---------------------------------------------------
@@ -27,10 +23,10 @@ author = 'Nicolas Tessore'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'numpydoc',
-    'sphinx.ext.intersphinx',
-    'sphinxcontrib.katex',
-    'matplotlib.sphinxext.plot_directive',
+    "numpydoc",
+    "sphinx.ext.intersphinx",
+    "sphinxcontrib.katex",
+    "matplotlib.sphinxext.plot_directive",
 ]
 
 intersphinx_mapping = {
@@ -62,4 +58,4 @@ html_theme = "furo"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_logo = '_static/Heracles.jpg'
+html_logo = "_static/Heracles.jpg"

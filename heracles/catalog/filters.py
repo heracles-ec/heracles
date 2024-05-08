@@ -1,4 +1,4 @@
-'''
+"""
 Filters (:mod:`heracles.catalog.filters`)
 =========================================
 
@@ -10,7 +10,7 @@ module for catalogue filters
     :exclude-members:  __call__
 .. autoclass:: FootprintFilter
     :exclude-members:  __call__
-'''
+"""
 
 
 import warnings

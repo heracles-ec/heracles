@@ -1,4 +1,4 @@
-'''
+"""
 IO (:mod:`heracles.io`)
 ========================================
 
@@ -19,22 +19,22 @@ TODO - fix the messy exlude solution for autoclass
 .. autofunction:: read_cov
 
 .. autoclass:: TocFits
-     :exclude-members: clear, get, items, keys, pop, popitem, reader, 
+     :exclude-members: clear, get, items, keys, pop, popitem, reader,
          setdefault, update, writer, values
 .. autoclass:: MapFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader, 
+    :exclude-members: clear, get, items, keys, pop, popitem, reader,
         setdefault, update, writer, values
 .. autoclass:: AlmFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader, s
-        etdefault, update, writer, values
+    :exclude-members: clear, get, items, keys, pop, popitem, reader,
+        setdefault, update, writer, values
 .. autoclass:: ClsFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader, 
+    :exclude-members: clear, get, items, keys, pop, popitem, reader,
         setdefault, update, writer, values
 .. autoclass:: MmsFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader, 
+    :exclude-members: clear, get, items, keys, pop, popitem, reader,
         setdefault, update, writer, values
 
-'''
+"""
 
 
 import logging

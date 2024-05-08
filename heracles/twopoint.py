@@ -1,4 +1,4 @@
-'''
+"""
 TwoPoint (:mod:`heracles.twopoint`)
 ===================================
 
@@ -15,7 +15,7 @@ module for angular power spectrum estimation
 .. autofunction:: binned_cls
 .. autofunction:: binned_mms
 
-'''
+"""
 
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-'''
+"""
 Covariance (:mod:`heracles.covariance`)
 ========================================
 
@@ -9,7 +9,7 @@ Covariance (:mod:`heracles.covariance`)
 .. autofunction:: update_covariance
 .. autofunction:: jackknife_regions_kmeans
 
-'''
+"""
 
 import logging
 import time

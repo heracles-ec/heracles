@@ -1,4 +1,4 @@
-'''
+"""
 Plot (:mod:`heracles.plot`)
 ========================================
 
@@ -8,7 +8,7 @@ utility functions for plotting
 
 .. autofunction:: postage_stamps
 
-'''
+"""
 
 
 from collections import Counter, defaultdict

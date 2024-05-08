@@ -1,4 +1,4 @@
-'''
+"""
 Array (:mod:`heracles.catalog.array`)
 ============================================
 
@@ -8,7 +8,7 @@ TODO - fix the messy exlude solution
 
 .. autoclass:: ArrayCatalog
      :exclude-members: add_filter, select, where
-'''
+"""
 
 from .base import CatalogBase, CatalogPage
 
