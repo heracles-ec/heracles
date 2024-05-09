@@ -178,7 +178,7 @@ class HealpixMapper:
             msg = f"spin-{spin} maps not yet supported"
             raise NotImplementedError(msg)
 
-        alms = hp.map2alm(
+        alm = hp.map2alm(
             data,
             lmax=self.__lmax,
             pol=pol,
@@ -189,16 +189,16 @@ class HealpixMapper:
         if pw is not None:
             fl = np.ones(self.__lmax + 1)
             fl[abs(spin) :] /= pw[abs(spin) :]
-            for alm in alms:
-                hp.almxfl(alm, fl, inplace=True)
+            for i in np.ndindex(*alm.shape[:-1]):
+                alm[i] = hp.almxfl(alm[i], fl)
             del fl
 
         if spin != 0:
-            alms = alms[1:].copy()
+            alm = alm[1:].copy()
 
-        update_metadata(alms, **md)
+        update_metadata(alm, **md)
 
-        return alms
+        return alm
 
     def resample(self, data: NDArray[Any]) -> NDArray[Any]:
         """
