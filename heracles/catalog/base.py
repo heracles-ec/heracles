@@ -312,7 +312,7 @@ class CatalogView:
 class CatalogBase(metaclass=ABCMeta):
     """abstract base class for base catalogues (not views)"""
 
-    default_page_size: int = 100_000
+    default_page_size: int = 1_000_000
     """default value for page size"""
 
     def __init__(self):
