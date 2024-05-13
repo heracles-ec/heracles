@@ -18,7 +18,16 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """Main module of the *Heracles* package."""
 
+__all__ = [
+    "__version__",
+    "__version_tuple__",
+    "map_catalogs",
+    "transform",
+]
+
 try:
-    from ._version import __version__, __version_tuple__  # noqa: F401
+    from ._version import __version__, __version_tuple__
 except ModuleNotFoundError:
     pass
+
+from ._mapping import map_catalogs, transform
