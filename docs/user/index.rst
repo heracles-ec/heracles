@@ -7,5 +7,3 @@ User guide
 
    how-heracles-works
    publications
-   definitions
-   get-in-touch

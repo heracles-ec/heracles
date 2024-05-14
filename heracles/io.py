@@ -1,40 +1,22 @@
-"""
-IO (:mod:`heracles.io`)
-========================================
-
-.. currentmodule:: heracles.io
-
-TODO - fix the messy exlude solution for autoclass
-
-.. autofunction:: read_vmap
-.. autofunction:: write_maps
-.. autofunction:: read_maps
-.. autofunction:: write_alms
-.. autofunction:: read_alms
-.. autofunction:: write_cls
-.. autofunction:: read_cls
-.. autofunction:: write_mms
-.. autofunction:: read_mms
-.. autofunction:: write_cov
-.. autofunction:: read_cov
-
-.. autoclass:: TocFits
-     :exclude-members: clear, get, items, keys, pop, popitem, reader,
-         setdefault, update, writer, values
-.. autoclass:: MapFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader,
-        setdefault, update, writer, values
-.. autoclass:: AlmFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader,
-        setdefault, update, writer, values
-.. autoclass:: ClsFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader,
-        setdefault, update, writer, values
-.. autoclass:: MmsFits
-    :exclude-members: clear, get, items, keys, pop, popitem, reader,
-        setdefault, update, writer, values
-
-"""
+# Heracles: Euclid code for harmonic-space statistics on the sphere
+#
+# Copyright (C) 2023 Euclid Science Ground Segment
+#
+# This file is part of Heracles.
+#
+# Heracles is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Heracles is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
+"""module for file reading and writing"""
 
 
 import logging

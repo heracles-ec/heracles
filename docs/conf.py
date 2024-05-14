@@ -14,8 +14,12 @@
 
 # -- Project information -----------------------------------------------------
 
-project = "Heracles"
-author = "Nicolas Tessore"
+from importlib import metadata
+project = "heracles"
+copyright = "2024, Euclid Science Ground Segment"
+author = "Euclid Science Ground Segment"
+version = metadata.version(project)
+release = version
 
 
 # -- General configuration ---------------------------------------------------
@@ -30,21 +34,12 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-    "rtd": ("https://docs.readthedocs.io/en/stable/", None),
-    "python": ("https://docs.python.org/3/", None),
-    "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
+   "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
-intersphinx_disabled_domains = ["std"]
 
 templates_path = ["_templates"]
 
-# -- Options for EPUB output
-epub_show_urls = "footnote"
-
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 

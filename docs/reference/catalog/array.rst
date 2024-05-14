@@ -1,1 +1,0 @@
-.. automodule:: heracles.catalog.array
