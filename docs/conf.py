@@ -15,8 +15,8 @@
 # -- Project information -----------------------------------------------------
 
 from importlib import metadata
+
 project = "heracles"
-copyright = "2024, Euclid Science Ground Segment"
 author = "Euclid Science Ground Segment"
 version = metadata.version(project)
 release = version
@@ -34,7 +34,7 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-   "python": ("https://docs.python.org/3", None),
+    "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
 }
 

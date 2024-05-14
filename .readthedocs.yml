@@ -7,13 +7,13 @@ build:
 
 mkdocs:
   configuration: mkdocs.yml
-  
+
 sphinx:
   configuration: docs/conf.py
 
 python:
   install:
-       - method: pip
-      path: .
-      extra_requirements:
-        - docs
+  method: pip
+  path: .
+  extra_requirements:
+    - docs

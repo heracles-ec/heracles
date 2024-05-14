@@ -1,4 +1,3 @@
-
 # Heracles: Euclid code for harmonic-space statistics on the sphere
 #
 # Copyright (C) 2023 Euclid Science Ground Segment
