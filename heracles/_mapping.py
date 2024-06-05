@@ -177,7 +177,7 @@ def transform(
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg)
 
-            out[k, i] = field.mapper_or_error.transform(m)
+            out[k, i] = field.mapper.transform(m)
 
             if progress:
                 subtask.remove()
