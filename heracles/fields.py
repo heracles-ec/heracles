@@ -74,7 +74,7 @@ class Field(metaclass=ABCMeta):
         self,
         mapper: Mapper | None,
         *columns: str, 
-        weight: str | None,
+        weight: str | None = None,
         mask: str | None = None,
     ) -> None:
         """Initialise the field."""
@@ -120,9 +120,11 @@ class Field(metaclass=ABCMeta):
         ...
     
     def CheckColumns(self, *expected):
+        if(self.columns==None):
+            raise ValueError("No columns defined!")
         if(len(expected)!=len(self.columns)):
             error = "Column error.  Expected " + str(len(expected)) + " columns"
-            error += "with a format " + str(expected) + ". Received  " + str(self.columns)
+            error += " with a format " + str(expected) + ". Received  " + str(self.columns)
             raise ValueError(error)
         
 
@@ -282,9 +284,9 @@ class ScalarField(Field):
 
         # get the column definition of the catalogue
         col = self.columns
-        self.CheckColumns(self, "longitude", "latitude", "value")
+        self.CheckColumns("longitude", "latitude", "value")
         
-        wcol = self.__weight
+        wcol = self.weight
         # scalar field map
         val = mapper.create(spin=self.spin)
 
@@ -354,7 +356,7 @@ class ComplexField(Field):
         # get the column definition of the catalogue
         col = self.columns
         
-        self.CheckColumns(self, "longitude", "latitude", "real", "imag")
+        self.CheckColumns("longitude", "latitude", "real", "imag")
             
         wcol = self.weight
 
@@ -456,7 +458,7 @@ class Weights(Field):
 
         # get the columns for this field
         col = self.columns
-        self.CheckColumns(self, "longitude", "latitude")
+        self.CheckColumns("longitude", "latitude")
         wcol = self.weight
 
         # weight map
