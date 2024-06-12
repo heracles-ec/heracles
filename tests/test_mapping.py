@@ -63,5 +63,5 @@ def test_transform(rng):
 
     assert len(alms) == 2
     assert alms.keys() == {("X", 0), ("Y", 1)}
-    assert alms["X", 0] is x.mapper_or_error.transform.return_value
-    assert alms["Y", 1] is y.mapper_or_error.transform.return_value
+    assert alms["X", 0] is x.mapper.transform.return_value
+    assert alms["Y", 1] is y.mapper.transform.return_value
