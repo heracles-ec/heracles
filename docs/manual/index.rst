@@ -8,4 +8,3 @@ Software manual
    installation
    Examples
    releases
-   license
