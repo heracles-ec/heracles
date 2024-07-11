@@ -27,7 +27,6 @@ dependencies = [
     "healpy",
     "numba",
     "numpy",
-    "matplotlib",
 ]
 description = "Harmonic-space statistics on the sphere"
 dynamic = [
