@@ -336,7 +336,7 @@ def test_complex_field(mapper, catalog):
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2, abs=1e-6),
     }
-  
+
     np.testing.assert_array_almost_equal(m, 0)
 
 
