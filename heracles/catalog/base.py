@@ -440,7 +440,7 @@ class CatalogBase(metaclass=ABCMeta):
 
     @property
     def page_size(self):
-        """number of rows per page (default: 100_000)"""
+        """number of rows per page (default: 1_000_000)"""
         return self._page_size
 
     @page_size.setter
