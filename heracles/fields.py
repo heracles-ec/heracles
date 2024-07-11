@@ -59,15 +59,10 @@ class Field(metaclass=ABCMeta):
 
     # every field subclass has a static spin weight attribute, which can be
     # overwritten by the class (or even an individual instance)
-    __spin: int | None = None
+    _spin: int | None = None
 
     # definition of required and optional columns
     __ncol: tuple[int, int]
-
-    ''' def __init_subclass__(cls, *, spin: int | None = None) -> None:
-        """Initialise spin weight of field subclasses."""
-        super().__init_subclass__()
-        cls.__spin = spin'''
 
     def __init__(
         self,
@@ -82,7 +77,7 @@ class Field(metaclass=ABCMeta):
         self.__columns = columns if columns else None
         self.__weight = weight if weight else None
         self.__mask = mask
-        self.__spin = 0
+        self._spin = 0
 
     @property
     def mapper(self) -> Mapper | None:
@@ -101,7 +96,7 @@ class Field(metaclass=ABCMeta):
 
     @property
     def spin(self) -> int:
-        return self.__spin
+        return self._spin
 
     @property
     def mask(self) -> str | None:
@@ -519,7 +514,7 @@ class Spin2Field(ComplexField):
     ) -> None:
         """Initialise the field."""
         super().__init__(mapper, *columns, weight=weight, mask=mask)
-        self.__spin = 2
+        self._spin = 2
 
 
 Shears = Spin2Field

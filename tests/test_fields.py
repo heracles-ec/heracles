@@ -325,7 +325,7 @@ def test_complex_field(mapper, catalog):
     }
     print(testdata)
     print(m.dtype.metadata)
-    """assert m.dtype.metadata == {
+    assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 2,
         "wbar": pytest.approx(wbar),
@@ -335,7 +335,8 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2, abs=1e-6),
-    }"""
+    }
+  
     np.testing.assert_array_almost_equal(m, 0)
 
 
