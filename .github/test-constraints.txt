@@ -1,2 +1,2 @@
 --prefer-binary
---only-binary healpy,numba,numpy,matplotlib
+--only-binary healpy,numba,numpy
