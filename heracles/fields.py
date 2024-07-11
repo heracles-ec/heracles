@@ -69,11 +69,10 @@ class Field(metaclass=ABCMeta):
         super().__init_subclass__()
         cls.__spin = spin'''
 
-
     def __init__(
         self,
         mapper: Mapper | None,
-        *columns: str, 
+        *columns: str,
         weight: str | None = None,
         mask: str | None = None,
     ) -> None:
@@ -83,13 +82,13 @@ class Field(metaclass=ABCMeta):
         self.__columns = columns if columns else None
         self.__weight = weight if weight else None
         self.__mask = mask
-        self.__spin = 0 
+        self.__spin = 0
 
     @property
     def mapper(self) -> Mapper | None:
         """Return the mapper used by this field."""
         return self.__mapper
-    
+
     @property
     def weight(self) -> str | None:
         """Return the mapper used by this field."""
@@ -118,15 +117,18 @@ class Field(metaclass=ABCMeta):
     ) -> ArrayLike:
         """Implementation for mapping a catalogue."""
         ...
-    
+
     def CheckColumns(self, *expected):
-        if(self.columns==None):
-            raise ValueError("No columns defined!")
-        if(len(expected)!=len(self.columns)):
+        if self.columns is None:
+            msg = "No columns defined!"
+            raise ValueError(msg)
+        if len(expected) != len(self.columns):
             error = "Column error.  Expected " + str(len(expected)) + " columns"
-            error += " with a format " + str(expected) + ". Received  " + str(self.columns)
+            error += (
+                " with a format " + str(expected) + ". Received  " + str(self.columns)
+            )
             raise ValueError(error)
-        
+
 
 async def _pages(
     catalog: Catalog,
@@ -166,7 +168,7 @@ class Positions(Field):
         mask: str | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(mapper, *columns,weight=weight, mask=mask)
+        super().__init__(mapper, *columns, weight=weight, mask=mask)
         self.__overdensity = overdensity
         self.__nbar = nbar
 
@@ -198,15 +200,14 @@ class Positions(Field):
             msg = "cannot compute density contrast: no visibility in catalog"
             raise ValueError(msg)
 
-        #get mapper
+        # get mapper
         mapper = self.mapper
 
         # get catalogue column definition
         col = self.columns
         self.CheckColumns("longitude", "latitude")
 
-        #if(len(col)!=2):
-        #    raise ValueError("Expect 2 colummns, longitude and latitude")
+        # if(len(col)!=2):
 
         # position map
         pos = mapper.create(spin=self.spin)
@@ -285,7 +286,7 @@ class ScalarField(Field):
         # get the column definition of the catalogue
         col = self.columns
         self.CheckColumns("longitude", "latitude", "value")
-        
+
         wcol = self.weight
         # scalar field map
         val = mapper.create(spin=self.spin)
@@ -355,9 +356,9 @@ class ComplexField(Field):
 
         # get the column definition of the catalogue
         col = self.columns
-        
+
         self.CheckColumns("longitude", "latitude", "real", "imag")
-            
+
         wcol = self.weight
 
         # complex map with real and imaginary part
@@ -508,16 +509,17 @@ class Weights(Field):
 
 class Spin2Field(ComplexField):
     """Spin-2 complex field."""
+
     def __init__(
         self,
         mapper: Mapper | None,
-        *columns: str, 
+        *columns: str,
         weight: str | None,
         mask: str | None = None,
     ) -> None:
         """Initialise the field."""
-        super().__init__(mapper, *columns,weight=weight, mask=mask)
-        self.__spin=2
+        super().__init__(mapper, *columns, weight=weight, mask=mask)
+        self.__spin = 2
 
 
 Shears = Spin2Field

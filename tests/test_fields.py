@@ -78,16 +78,15 @@ def catalog(page):
 
 
 def test_field_abc():
-    from unittest.mock import Mock
-
-    from heracles.fields import Columns, Field
+    from heracles.fields import Field
 
     with pytest.raises(TypeError):
         Field()
 
     class SpinLessField(Field):
-            async def __call__(self):
-                pass
+        async def __call__(self):
+            pass
+
     f = SpinLessField(None, weight=None)
     assert f.spin == 0
 
@@ -95,13 +94,13 @@ def test_field_abc():
         async def __call__(self):
             pass
 
-    f = TestField(None, weight = None)
+    f = TestField(None, weight=None)
 
     assert f.mapper is None
     assert f.columns is None
     assert f.spin == 0
 
-    with pytest.raises(ValueError,match="No columns defined"):
+    with pytest.raises(ValueError, match="No columns defined"):
         f.CheckColumns(None)
 
     with pytest.raises(ValueError):
@@ -326,7 +325,7 @@ def test_complex_field(mapper, catalog):
     }
     print(testdata)
     print(m.dtype.metadata)
-    '''assert m.dtype.metadata == {
+    """assert m.dtype.metadata == {
         "catalog": catalog.label,
         "spin": 2,
         "wbar": pytest.approx(wbar),
@@ -336,7 +335,7 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2, abs=1e-6),
-    }'''
+    }"""
     np.testing.assert_array_almost_equal(m, 0)
 
 
@@ -345,7 +344,7 @@ def test_weights(mapper, catalog):
 
     npix = 12 * mapper.nside**2
 
-    f = Weights(mapper, "ra", "dec", weight = "w")
+    f = Weights(mapper, "ra", "dec", weight="w")
     m = coroutines.run(f(catalog))
 
     w = next(iter(catalog))["w"]
