@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """utility functions for plotting"""
 
-
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from itertools import chain, count, cycle

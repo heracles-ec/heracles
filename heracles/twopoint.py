@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for angular power spectrum estimation"""
 
-
 from __future__ import annotations
 
 import logging

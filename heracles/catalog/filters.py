@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for catalogue filters"""
 
-
 import warnings
 
 import numpy as np

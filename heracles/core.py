@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for common core functionality"""
 
-
 from __future__ import annotations
 
 from collections import UserDict

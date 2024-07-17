@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for file reading and writing"""
 
-
 import logging
 import os
 import re

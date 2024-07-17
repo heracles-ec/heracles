@@ -18,7 +18,6 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 """module for progress reporting with rich"""
 
-
 try:
     import rich.box
     import rich.panel
