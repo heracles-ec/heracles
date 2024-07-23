@@ -35,18 +35,18 @@ dynamic = [
 license = "LGPL-3.0-or-later"
 name = "heracles"
 optional-dependencies = {all = [
+    "matplotlib",
     "rich",
-    "matplotlib",
 ], docs = [
-    "sphinx",
     "furo",
-    "sphinxcontrib-katex",
-    "numpydoc",
     "matplotlib",
+    "numpydoc",
+    "sphinx",
+    "sphinxcontrib-katex",
 ], test = [
+    "matplotlib",
     "pytest",
     "pytest-rerunfailures",
-    "matplotlib",
 ]}
 readme = "README.md"
 requires-python = ">=3.9"
