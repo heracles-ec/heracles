@@ -6,5 +6,5 @@ Software manual
    :maxdepth: 2
 
    installation
-   Examples
+   examples
    releases
