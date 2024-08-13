@@ -4,6 +4,7 @@ dependencies:
   - healpy
   - numba
   - numpy
+  - matplotlib
   - pip
   - pip:
       - convolvecl
