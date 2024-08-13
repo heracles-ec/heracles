@@ -33,8 +33,7 @@ def page(nside, rng):
     from unittest.mock import Mock
 
     ipix = np.ravel(
-        4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis]
-        + [0, 1, 2, 3],
+        4 * hp.ring2nest(nside, np.arange(12 * nside**2))[:, np.newaxis] + [0, 1, 2, 3],
     )
 
     ra, dec = hp.pix2ang(nside * 2, ipix, nest=True, lonlat=True)

@@ -72,9 +72,9 @@ def test_tocdict():
     assert d[...] == d
     assert d[()] == d
 
-    assert type(d.copy()) == type(d)
-    assert type(copy(d)) == type(d)
-    assert type(deepcopy(d)) == type(d)
+    assert type(d.copy()) is type(d)
+    assert type(copy(d)) is type(d)
+    assert type(deepcopy(d)) is type(d)
 
     d = TocDict(a=1) | TocDict(b=2)
     assert type(d) is TocDict

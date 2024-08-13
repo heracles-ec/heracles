@@ -70,19 +70,19 @@ testpaths = [
 ]
 
 [tool.ruff]
-include = ["pyproject.toml", "heracles/**/*.py", "tests/**/*.py"]
 extend-exclude = [
     "_kmeans_radec.py",
 ]
 force-exclude = true
-per-file-ignores = {"test_*" = [
+include = ["heracles/**/*.py", "pyproject.toml", "tests/**/*.py"]
+target-version = "py39"
+lint.per-file-ignores = {"test_*" = [
     "S101",
 ]}
-target-version = "py39"
-isort.known-first-party = [
+lint.isort.known-first-party = [
     "heracles",
 ]
-mccabe.max-complexity = 18
+lint.mccabe.max-complexity = 18
 
 [tool.tomlsort]
 all = true
