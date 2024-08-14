@@ -59,13 +59,6 @@ Documentation = "https://heracles.readthedocs.io/"
 Homepage = "https://github.com/heracles-ec/heracles"
 Issues = "https://github.com/heracles-ec/heracles/issues"
 
-[tool.black]
-force-exclude = """
-(
-  _kmeans_radec.py
-)
-"""
-
 [tool.hatch]
 build.hooks.vcs.version-file = "heracles/_version.py"
 version.source = "vcs"
@@ -80,43 +73,16 @@ testpaths = [
 extend-exclude = [
     "_kmeans_radec.py",
 ]
-fix = true
 force-exclude = true
-line-length = 100
-per-file-ignores = {"test_*" = [
+include = ["heracles/**/*.py", "pyproject.toml", "tests/**/*.py"]
+target-version = "py39"
+lint.per-file-ignores = {"test_*" = [
     "S101",
 ]}
-select = [
-    "A",
-    "BLE",
-    "COM",
-    "DJ",
-    "DTZ",
-    "E",
-    "EM",
-    "ERA",
-    "EXE",
-    "F",
-    "I",
-    "ICN",
-    "INP",
-    "ISC",
-    "PIE",
-    "PYI",
-    "Q",
-    "RET",
-    "RSE",
-    "TCH",
-    "TID",
-    "UP",
-    "W",
-    "YTT",
-]
-target-version = "py39"
-isort.known-first-party = [
+lint.isort.known-first-party = [
     "heracles",
 ]
-mccabe.max-complexity = 18
+lint.mccabe.max-complexity = 18
 
 [tool.tomlsort]
 all = true

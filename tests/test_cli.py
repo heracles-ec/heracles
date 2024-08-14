@@ -8,32 +8,26 @@ import pytest
 def test_getlist():
     from heracles.cli import getlist
 
-    assert (
-        getlist(
-            """
+    assert getlist(
+        """
                 x
                 y
                 z
             """,
-        )
-        == ["x", "y", "z"]
-    )
+    ) == ["x", "y", "z"]
     assert getlist("xyz") == ["xyz"]
 
 
 def test_getdict():
     from heracles.cli import getdict
 
-    assert (
-        getdict(
-            """
+    assert getdict(
+        """
                 x=1
                 y = 2
                 z= 3
             """,
-        )
-        == {"x": "1", "y": "2", "z": "3"}
-    )
+    ) == {"x": "1", "y": "2", "z": "3"}
 
     with pytest.raises(ValueError, match="Invalid value"):
         getdict(
@@ -70,15 +64,12 @@ def test_getfilter():
 
     assert getfilter("a") == [("a",)]
     assert getfilter("a, ..., 1, 2") == [("a", ..., 1, 2)]
-    assert (
-        getfilter(
-            """
+    assert getfilter(
+        """
                 a, 1
                 b, 2
             """,
-        )
-        == [("a", 1), ("b", 2)]
-    )
+    ) == [("a", 1), ("b", 2)]
 
 
 def test_subsections():
