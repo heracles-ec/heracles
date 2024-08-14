@@ -1,9 +1,10 @@
 
-***************************************************************
-*HERACLES* --- Harmonic-space statistics on the sphere
-***************************************************************
+******************************************************
+*Heracles* --- Harmonic-space statistics on the sphere
+******************************************************
 
-.. image:: _static/Heracles.jpg
+.. image:: _static/logo.png
+   :width: 50%
 
 =================
 Table of Contents

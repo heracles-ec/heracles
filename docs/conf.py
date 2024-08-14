@@ -17,6 +17,7 @@
 from importlib import metadata
 
 project = "heracles"
+copyright = "2023-2024 Euclid Science Ground Segment"
 author = "Euclid Science Ground Segment"
 version = metadata.version(project)
 release = version
@@ -53,4 +54,4 @@ html_theme = "furo"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_logo = "_static/Heracles.jpg"
+html_logo = "_static/logo.png"
