@@ -35,7 +35,6 @@ dynamic = [
 license = "LGPL-3.0-or-later"
 name = "heracles"
 optional-dependencies = {all = [
-    "matplotlib",
     "rich",
 ], docs = [
     "furo",
@@ -44,7 +43,6 @@ optional-dependencies = {all = [
     "sphinx",
     "sphinxcontrib-katex",
 ], test = [
-    "matplotlib",
     "pytest",
     "pytest-rerunfailures",
 ]}
@@ -70,19 +68,8 @@ testpaths = [
 ]
 
 [tool.ruff]
-extend-exclude = [
-    "_kmeans_radec.py",
-]
-force-exclude = true
 include = ["heracles/**/*.py", "pyproject.toml", "tests/**/*.py"]
 target-version = "py39"
-lint.per-file-ignores = {"test_*" = [
-    "S101",
-]}
-lint.isort.known-first-party = [
-    "heracles",
-]
-lint.mccabe.max-complexity = 18
 
 [tool.tomlsort]
 all = true
