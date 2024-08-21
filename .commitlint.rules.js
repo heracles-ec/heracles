@@ -13,6 +13,7 @@ module.exports = {
         "healpy",
         "io",
         "mapper",
+        "mapping",
         "progress",
         "twopoint",
       ],

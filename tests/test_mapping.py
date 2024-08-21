@@ -14,7 +14,7 @@ class MockCatalog:
 
 @pytest.mark.parametrize("parallel", [False, True])
 def test_map_catalogs(parallel):
-    from heracles._mapping import map_catalogs
+    from heracles.mapping import map_catalogs
 
     fields = {
         "a": unittest.mock.AsyncMock(),
@@ -32,7 +32,7 @@ def test_map_catalogs(parallel):
 
 
 def test_map_catalogs_match():
-    from heracles._mapping import map_catalogs
+    from heracles.mapping import map_catalogs
 
     fields = {
         "a": unittest.mock.AsyncMock(),
@@ -51,7 +51,7 @@ def test_map_catalogs_match():
 
 
 def test_transform(rng):
-    from heracles._mapping import transform
+    from heracles.mapping import transform
 
     x = unittest.mock.Mock()
     y = unittest.mock.Mock()
