@@ -67,7 +67,7 @@ def catalog(page):
     from unittest.mock import Mock
 
     catalog = Mock()
-    catalog.size = page.size
+    catalog.size = catalog.page_size = page.size
     catalog.visibility = None
     catalog.fsky = None
     catalog.metadata = {"catalog": catalog.label}

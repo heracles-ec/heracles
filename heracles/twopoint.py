@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import logging
 import time
-from contextlib import nullcontext
 from datetime import timedelta
 from itertools import combinations_with_replacement, product
 from typing import TYPE_CHECKING, Any
@@ -30,6 +29,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from .core import TocDict, toc_match, update_metadata
+from .progress import NoProgress, Progress
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, MutableMapping
@@ -37,7 +37,6 @@ if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
 
     from .fields import Field
-    from .progress import Progress
 
 # type alias for the keys of two-point data
 TwoPointKey = tuple[Any, Any, Any, Any]
@@ -335,7 +334,7 @@ def mixing_matrices(
     bins: ArrayLike | None = None,
     weights: str | ArrayLike | None = None,
     out: MutableMapping[TwoPointKey, ArrayLike] | None = None,
-    progress: bool = False,
+    progress: Progress | None = None,
 ) -> MutableMapping[TwoPointKey, ArrayLike]:
     """compute mixing matrices for fields from a set of cls"""
 
@@ -344,6 +343,10 @@ def mixing_matrices(
     # output dictionary if not provided
     if out is None:
         out = TocDict()
+
+    # create dummy progress object if none was given
+    if progress is None:
+        progress = NoProgress()
 
     # inverse mapping of masks to fields
     masks: dict[str, dict[Any, Field]] = {}
@@ -356,47 +359,33 @@ def mixing_matrices(
     # keep track of combinations that have been done already
     done = set()
 
-    # display a progress bar if asked to
-    progressbar: Progress | nullcontext[None]
-    if progress:
-        from heracles.progress import Progress
-
-        progressbar = Progress()
-        progressbar.task("mixing matrices", total=None)
-    else:
-        progressbar = nullcontext()
-
     # go through the toc dict of cls and compute mixing matrices
     # which mixing matrix is computed depends on the `masks` mapping
-    with progressbar as prog:
-        for (k1, k2, i1, i2), cl in cls.items():
-            # if the masks are not named then skip this cl
-            try:
-                fields1 = masks[k1]
-                fields2 = masks[k2]
-            except KeyError:
+    current, total = 0, len(cls)
+    for (k1, k2, i1, i2), cl in cls.items():
+        current += 1
+        progress.update(current, total)
+
+        # if the masks are not named then skip this cl
+        try:
+            fields1 = masks[k1]
+            fields2 = masks[k2]
+        except KeyError:
+            continue
+
+        # deal with structured cl arrays
+        if cl.dtype.names is not None:
+            cl = cl["CL"]
+
+        # compute mixing matrices for all fields of this mask combination
+        for f1, f2 in product(fields1, fields2):
+            # check if this combination has been done already
+            if (f1, f2, i1, i2) in done or (f2, f1, i2, i1) in done:
                 continue
+            # otherwise, mark it as done
+            done.add((f1, f2, i1, i2))
 
-            # deal with structured cl arrays
-            if cl.dtype.names is not None:
-                cl = cl["CL"]
-
-            # compute mixing matrices for all fields of this mask combination
-            for f1, f2 in product(fields1, fields2):
-                # check if this combination has been done already
-                if (f1, f2, i1, i2) in done or (f2, f1, i2, i1) in done:
-                    continue
-                # otherwise, mark it as done
-                done.add((f1, f2, i1, i2))
-
-                if prog is not None:
-                    subtask = prog.task(
-                        f"[{f1}, {f2}, {i1}, {i2}]",
-                        subtask=True,
-                        start=False,
-                        total=None,
-                    )
-
+            with progress.task(f"({f1}, {f2}, {i1}, {i2})"):
                 # get spins of fields
                 spin1, spin2 = fields1[f1].spin, fields2[f2].spin
 
@@ -432,12 +421,6 @@ def mixing_matrices(
                     out[f"{f1}_B", f"{f2}_B", i1, i2] = mm_bb
                     out[f"{f1}_E", f"{f2}_B", i1, i2] = mm_eb
                     del mm_ee, mm_bb, mm_eb
-
-                if prog is not None:
-                    subtask.remove()
-
-        if prog is not None:
-            prog.refresh()
 
     # return the toc dict of mixing matrices
     return out

@@ -22,12 +22,12 @@ Module for creating maps from fields and catalogues.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import coroutines
 
 from heracles.core import TocDict, toc_match
+from heracles.progress import Progress, NoProgress
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping, Sequence
@@ -36,31 +36,24 @@ if TYPE_CHECKING:
 
     from heracles.catalog import Catalog
     from heracles.fields import Field
-    from heracles.progress import Progress, ProgressTask
 
 
-async def _map_progress(
+async def _map_field(
     key: tuple[Any, ...],
     field: Field,
     catalog: Catalog,
-    progress: Progress | None,
+    progress: Progress,
+    task_done: Callable[[], None],
 ) -> NDArray:
     """
-    Coroutine that keeps track of progress.
+    Coroutine to map an individual field.
     """
 
-    task: ProgressTask | None
-    if progress is not None:
-        name = "[" + ", ".join(map(str, key)) + "]"
-        task = progress.task(name, subtask=True, total=None)
-    else:
-        task = None
+    label = ", ".join(map(str, key))
+    with progress.task(label) as task:
+        result = await field(catalog, progress=task)
 
-    result = await field(catalog, progress=task)
-
-    if progress is not None:
-        task.remove()
-        progress.advance(progress.task_ids[0])
+    task_done()
 
     return result
 
@@ -73,13 +66,17 @@ def map_catalogs(
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     include: Sequence[tuple[Any, Any]] | None = None,
     exclude: Sequence[tuple[Any, Any]] | None = None,
-    progress: bool = False,
+    progress: Progress | None = None,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
     """Map a set of catalogues to fields."""
 
     # the toc dict of results
     if out is None:
         out = TocDict()
+
+    # create dummy progress object if none was given
+    if progress is None:
+        progress = NoProgress()
 
     # collect groups of items to go through
     # items are tuples of (key, field, catalog)
@@ -92,45 +89,39 @@ def map_catalogs(
     if parallel:
         groups = [sum(groups, [])]
 
-    # display a progress bar if asked to
-    progressbar: Progress | nullcontext
-    if progress:
-        from heracles.progress import Progress
+    # progress tracking
+    current, total = 0, sum(map(len, groups))
+    progress.update(0, total)
 
-        # create the progress bar
-        # add the main task -- this must be the first task
-        progressbar = Progress()
-        progressbar.add_task("mapping", total=sum(map(len, groups)))
-    else:
-        progressbar = nullcontext()
+    def _task_done():
+        """callback for async execution"""
+        nonlocal current
+        current += 1
+        progress.update(current, total)
 
     # process all groups of fields and catalogues
-    with progressbar as prog:
-        for items in groups:
-            # fields return coroutines, which are ran concurrently
-            keys, coros = [], []
-            for key, field, catalog in items:
-                if toc_match(key, include, exclude):
-                    keys.append(key)
-                    coros.append(_map_progress(key, field, catalog, prog))
+    for items in groups:
+        # fields return coroutines, which are ran concurrently
+        keys, coros = [], []
+        for key, field, catalog in items:
+            if toc_match(key, include, exclude):
+                keys.append(key)
+                coros.append(_map_field(key, field, catalog, progress, _task_done))
 
-            # run all coroutines concurrently
-            try:
-                results = coroutines.run(coroutines.gather(*coros))
-            finally:
-                # force-close coroutines to prevent "never awaited" warnings
-                for coro in coros:
-                    coro.close()
+        # run all coroutines concurrently
+        try:
+            results = coroutines.run(coroutines.gather(*coros))
+        finally:
+            # force-close coroutines to prevent "never awaited" warnings
+            for coro in coros:
+                coro.close()
 
-            # store results
-            for key, value in zip(keys, results):
-                out[key] = value
+        # store results
+        for key, value in zip(keys, results):
+            out[key] = value
 
-            # free up memory for next group
-            del results
-
-        if prog is not None:
-            prog.refresh()
+        # free up memory for next group
+        del results
 
     # return the toc dict
     return out
@@ -141,8 +132,7 @@ def transform(
     data: Mapping[tuple[Any, Any], NDArray],
     *,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
-    progress: bool = False,
-    **kwargs,
+    progress: Progress | None = None,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
     """transform data to alms"""
 
@@ -150,41 +140,26 @@ def transform(
     if out is None:
         out = TocDict()
 
-    # display a progress bar if asked to
-    progressbar: Progress | nullcontext
-    if progress:
-        from heracles.progress import Progress
+    # create dummy progress object if none was given
+    if progress is None:
+        progress = NoProgress()
 
-        progressbar = Progress()
-        task = progressbar.task("transform", total=len(data))
-    else:
-        progressbar = nullcontext()
+    # progress reporting
+    current, total = 0, len(data)
 
     # convert data to alms, taking care of complex and spin-weighted fields
-    with progressbar as prog:
-        for (k, i), m in data.items():
-            if progress:
-                subtask = prog.task(
-                    f"[{k}, {i}]",
-                    subtask=True,
-                    start=False,
-                    total=None,
-                )
+    for (k, i), m in data.items():
+        current += 1
+        progress.update(current, total)
 
+        with progress.task(f"({k}, {i})"):
             try:
                 field = fields[k]
             except KeyError:
                 msg = f"unknown field name: {k}"
-                raise ValueError(msg)
+                raise ValueError(msg) from None
 
             out[k, i] = field.mapper_or_error.transform(m)
-
-            if progress:
-                subtask.remove()
-                task.update(advance=1)
-
-        if prog is not None:
-            prog.refresh()
 
     # return the toc dict of alms
     return out

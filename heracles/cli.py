@@ -413,7 +413,7 @@ def map_all_selections(
 ) -> Iterator:
     """Iteratively map the catalogues defined in config."""
 
-    from .maps import map_catalogs
+    from .mapping import map_catalogs
 
     # load catalogues to process
     catalogs = catalogs_from_config(config)

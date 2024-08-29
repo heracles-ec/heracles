@@ -15,6 +15,7 @@ module.exports = {
         "mapper",
         "mapping",
         "progress",
+        "rich",
         "twopoint",
       ],
     ],
