@@ -21,6 +21,8 @@ Module for the integration with the rich package.
 Contains a progress bar implementation.
 """
 
+from __future__ import annotations
+
 import rich.box
 import rich.panel
 import rich.progress

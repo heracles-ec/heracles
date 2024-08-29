@@ -20,6 +20,8 @@
 Module for the progress reporting protocol.
 """
 
+from __future__ import annotations
+
 from typing import Protocol
 
 
