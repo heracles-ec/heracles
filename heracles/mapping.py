@@ -49,7 +49,7 @@ async def _map_field(
     Coroutine to map an individual field.
     """
 
-    label = ", ".join(map(str, key))
+    label = "(" + ", ".join(map(str, key)) + ")"
     with progress.task(label) as task:
         result = await field(catalog, progress=task)
 
