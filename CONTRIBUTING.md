@@ -10,37 +10,17 @@ existing issue. The only exception are minor, obvious changes such as fixing
 typos in the documentation.
 
 The discussion in a pull request should only be about the low-level details of
-its implementation. All high-level, conceptual discussion belongs to the issue
-to which the pull request refers.
+its implementation. All high-level, conceptual discussion belongs in the issue
+that is addressed by the pull request.
 
 ## Pull requests
 
 Pull requests to the `main` branch should have titles of the following form:
 
-    TYPE: Subject line
+    gh-NN: Subject line
 
-The title can optionally refer to the module which is being changed:
-
-    TYPE(module): Subject line
-
-The `TYPE` prefix should indicate the nature of the change and must be taken
-from the following list:
-
-    API -- an (incompatible) API change
-    BUG -- bug fix
-    DEP -- deprecate something, or remove a deprecated object
-    DEV -- development infrastructure (tools, packaging, etc.)
-    DOC -- documentation
-    ENH -- enhancement
-    MNT -- maintenance commit (refactoring, typos, etc.)
-    REV -- revert an earlier commit
-    STY -- style fix (whitespace, PEP8)
-    TST -- addition or modification of tests
-    TYP -- static typing
-    REL -- related to releasing Heracles
-
-The optional `module` tag should indicate which modules are affected by the
-change, and refer to an existing module name.
+The prefix `gh-NN` should refer to the issue number (`NN`) that is addressed
+by the pull request.
 
 The body of the pull request should contain a description of the changes, and
 any relevant details or caveats of the implementation.
@@ -61,16 +41,6 @@ a single GitHub issue number:
 
     Closes: #17
 
-Changelog entries are collected using the following trailers, and later parsed
-into the [changelog](CHANGELOG.md) for the next release:
-
-    Added: Some new feature
-    Changed: Some change in existing functionality
-    Deprecated: Some soon-to-be removed feature
-    Removed: Some now removed feature
-    Fixed: Some bug fix
-    Security: Some vulnerability was fixed
-
 You can use any of the other common git trailers. In particular, you can use
 `Cc` to notify others of your pull request via their GitHub usernames:
 
@@ -78,30 +48,12 @@ You can use any of the other common git trailers. In particular, you can use
 
 ## Versioning
 
-The current version number is automatically inferred from the last release
-(i.e. git tag), subsequent unreleased commits, and local changes, if any.
+The current version number is automatically inferred from the last release,
+subsequent unreleased commits, and local changes, if any.
 
 ## Releasing
 
-To release a new version of _Heracles_, there should be a commit titled
-`REL: heracles yyyy.mm` that includes the following changes:
+New versions of _Heracles_ are prepared using GitHub releases.
 
-- The changelog trailers since the last release are parsed into the
-  [changelog](CHANGELOG.md) under a section titled `[yyyy.mm]  (DD Mon YYYY)`.
-  A new link to the changeset is added at the bottom of the file.
-- The [release notes](docs/manual/releases.rst) are updated with the new
-  version. The release notes should translate the changelog entries into
-  prose that can be understood by non-developer users of the code. If there
-  are breaking changes, a release note should explain what the changes mean for
-  existing code.
-
-Once these changes are merged into the `main` branch, a new release with title
-`heracles yyyy.mm` should be created in the GitHub repository. The description
-of the release should be a copy of its release note.
-
-Creating the release will automatically start the build process that uploads
-Python packages for the new version to `PyPI`.
-
-If any _Heracles_ extension packages depend on the new release, new versions of
-these packages should be produced as soon as the new release is published to
-`PyPI`.
+Creating a GitHub release will automatically start the build process that
+uploads Python packages for the new version to `PyPI`.
