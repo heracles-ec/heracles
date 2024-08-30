@@ -45,6 +45,7 @@ optional-dependencies = {all = [
 ], test = [
     "ducc0",
     "pytest",
+    "pytest-cov",
     "pytest-rerunfailures",
 ]}
 readme = "README.md"

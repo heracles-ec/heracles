@@ -1,4 +1,6 @@
 __pycache__
 _version.py
 .*.swp
+.coverage*
 .envrc
+*.lcov
