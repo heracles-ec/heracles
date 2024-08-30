@@ -120,3 +120,36 @@ def test_update_metadata():
 
     assert a.dtype.fields == a_fields_original
     assert a.dtype.metadata == {"x": 1, "y": 2}
+
+
+def test_exception_explainer():
+    from heracles.core import ExceptionExplainer
+
+    class TestException(BaseException):
+        def __init__(self):
+            super().__init__()
+            self.notes = []
+
+        def add_note(self, note):
+            self.notes.append(note)
+
+    with ExceptionExplainer(TestException, "explanation"):
+        pass
+
+    with pytest.raises(TestException) as excinfo:
+        with ExceptionExplainer(TestException, "explanation"):
+            raise TestException()
+
+    assert excinfo.value.notes == ["explanation"]
+
+    with pytest.raises(TestException) as excinfo:
+        with ExceptionExplainer((TestException, ValueError), "explanation"):
+            raise TestException()
+
+    assert excinfo.value.notes == ["explanation"]
+
+    with pytest.raises(TestException) as excinfo:
+        with ExceptionExplainer(ValueError, "explanation"):
+            raise TestException()
+
+    assert excinfo.value.notes == []

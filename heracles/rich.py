@@ -23,9 +23,12 @@ Contains a progress bar implementation.
 
 from __future__ import annotations
 
-import rich.box
-import rich.panel
-import rich.progress
+from .core import external_dependency_explainer
+
+with external_dependency_explainer:
+    import rich.box
+    import rich.panel
+    import rich.progress
 
 
 class _RichProgressBar(rich.progress.Progress):
@@ -105,7 +108,7 @@ class Progress:
             self.progress.stop()
         self.progress.refresh()
 
-    def update(self, current: int | None = None, total: int | None = None):
+    def update(self, current: int | None = None, total: int | None = None) -> None:
         if self.task_id is not None:
             self.progress.update(self.task_id, total=total, completed=current)
         self.progress.refresh()

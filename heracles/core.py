@@ -16,7 +16,9 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
-"""module for common core functionality"""
+"""
+Module for common core functionality.
+"""
 
 from __future__ import annotations
 
@@ -118,3 +120,36 @@ def update_metadata(array, *sources, **metadata):
         raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
+
+
+class ExceptionExplainer:
+    """
+    Context manager that adds a note to exceptions.
+    """
+
+    def __init__(
+        self,
+        exc_type: type[BaseException] | tuple[type[BaseException], ...],
+        note: str,
+    ) -> None:
+        self.exc_type = exc_type
+        self.note = note
+
+    def __enter__(self) -> None:
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if exc_type and issubclass(exc_type, self.exc_type):
+            try:
+                exc_value.add_note(self.note)
+            except AttributeError:
+                pass
+
+
+external_dependency_explainer = ExceptionExplainer(
+    ModuleNotFoundError,
+    "You are trying to import a Heracles module that relies on a missing "
+    "external dependency. These dependencies are not part of the core "
+    "Heracles functionality, and are therefore not installed automatically. "
+    "Please install the missing packages, and this error will disappear.",
+)
