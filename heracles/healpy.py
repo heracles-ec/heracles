@@ -25,11 +25,13 @@ from __future__ import annotations
 from functools import cached_property, wraps
 from typing import TYPE_CHECKING
 
-import healpy as hp
 import numpy as np
 from numba import njit
 
-from heracles.core import update_metadata
+from heracles.core import external_dependency_explainer, update_metadata
+
+with external_dependency_explainer:
+    import healpy as hp
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
