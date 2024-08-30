@@ -24,10 +24,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import ducc0
 import numpy as np
 
-from heracles.core import update_metadata
+from heracles.core import external_dependency_explainer, update_metadata
+
+with external_dependency_explainer:
+    import ducc0
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
