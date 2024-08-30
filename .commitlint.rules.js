@@ -9,6 +9,7 @@ module.exports = {
         "catalog",
         "cli",
         "core",
+        "ducc",
         "fields",
         "healpy",
         "io",

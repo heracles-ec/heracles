@@ -191,6 +191,8 @@ def test_catalog_from_config(mock):
                     0 = vmap.0.fits
                     2 = vmap.2.fits
                 """,
+                "visibility-transform": "true",
+                "visibility-lmax": "100",
             },
         },
     )
@@ -213,7 +215,7 @@ def test_catalog_from_config(mock):
     assert catalog[0].visibility is catalog[0].base.visibility
     assert catalog[1].visibility is catalog[0].base.visibility
     assert catalog[2].visibility is catalog[0].base.visibility
-    assert mock.call_args_list == [(("vmap.fits",),)]
+    assert mock.call_args_list == [(("vmap.fits",), dict(transform=False, lmax=None))]
 
     mock.reset_mock()
 
@@ -236,8 +238,8 @@ def test_catalog_from_config(mock):
     assert catalog[1].visibility is None
     assert catalog[2].visibility is mock.return_value
     assert mock.call_args_list == [
-        (("vmap.0.fits",),),
-        (("vmap.2.fits",),),
+        (("vmap.0.fits",), dict(transform=True, lmax=100)),
+        (("vmap.2.fits",), dict(transform=True, lmax=100)),
     ]
 
     with pytest.raises(ValueError, match="Duplicate selection"):

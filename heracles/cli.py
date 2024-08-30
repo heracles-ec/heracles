@@ -165,11 +165,11 @@ def mapper_from_config(config, section):
     choices = {
         "none": "none",
         "healpix": "healpix",
+        "discrete": "discrete",
     }
 
     mapper = config.getchoice(section, "mapper", choices)
-    if mapper == "none":
-        return None
+
     if mapper == "healpix":
         from .healpy import HealpixMapper
 
@@ -177,6 +177,13 @@ def mapper_from_config(config, section):
         lmax = config.getint(section, "lmax", fallback=None)
         deconvolve = config.getboolean(section, "deconvolve", fallback=None)
         return HealpixMapper(nside, lmax, deconvolve=deconvolve)
+
+    if mapper == "discrete":
+        from .ducc import DiscreteMapper
+
+        lmax = config.getint(section, "lmax", fallback=None)
+        return DiscreteMapper(lmax)
+
     return None
 
 
@@ -223,6 +230,12 @@ def catalog_from_config(config, section, label=None, *, out=None):
     # check if visibility is per catalogue or per selection
     visibility: str | Mapping[str, str]
     visibility = config.get(section, "visibility", fallback=None)
+    visibility_transform = config.getboolean(
+        section,
+        "visibility-transform",
+        fallback=False,
+    )
+    visibility_lmax = config.getint(section, "visibility-lmax", fallback=None)
     # check if visibility is a mapping
     if visibility and "\n" in visibility:
         visibility = config.getdict(section, "visibility")
@@ -233,7 +246,11 @@ def catalog_from_config(config, section, label=None, *, out=None):
     # set base catalogue's visibility if just one was given
     if isinstance(visibility, str):
         try:
-            vmap = read_vmap(getpath(visibility))
+            vmap = read_vmap(
+                getpath(visibility),
+                transform=visibility_transform,
+                lmax=visibility_lmax,
+            )
         except (TypeError, ValueError, OSError) as exc:
             msg = f"Cannot load visibility: {exc!s}"
             raise ValueError(msg)
@@ -269,7 +286,11 @@ def catalog_from_config(config, section, label=None, *, out=None):
                 msg = f"Invalid value: unknown selection '{num}'"
                 raise ValueError(msg)
             try:
-                vmap = read_vmap(getpath(value))
+                vmap = read_vmap(
+                    getpath(value),
+                    transform=visibility_transform,
+                    lmax=visibility_lmax,
+                )
             except (TypeError, ValueError, OSError) as exc:
                 msg = f"Cannot load visibility: {exc!s}"
                 raise ValueError(msg)
