@@ -38,8 +38,8 @@ if TYPE_CHECKING:
     from numpy.typing import ArrayLike
 
     from .catalog import Catalog, CatalogPage
-    from .maps import Mapper
-    from .progress import ProgressTask
+    from .mapper import Mapper
+    from .progress import Progress
 
 
 # type alias for column specification
@@ -164,28 +164,32 @@ class Field(metaclass=ABCMeta):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Implementation for mapping a catalogue."""
         ...
 
 
-async def _pages(
+async def aiter_pages(
     catalog: Catalog,
-    progress: ProgressTask | None,
+    progress: Progress | None,
 ) -> AsyncIterable[CatalogPage]:
     """
     Asynchronous generator for the pages of a catalogue.  Also manages
     progress updates.
     """
     page_size = catalog.page_size
-    if progress:
-        progress.update(completed=0, total=catalog.size)
+    current, total = 0, catalog.size
+
     for page in catalog:
+        if progress is not None:
+            progress.update(current, total)
+
         await coroutines.sleep()
         yield page
-        if progress:
-            progress.update(advance=page_size)
+
+        current += page_size
+
     # suspend again to give all concurrent loops a chance to finish
     await coroutines.sleep()
 
@@ -232,7 +236,7 @@ class Positions(Field, spin=0):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Map the given catalogue."""
 
@@ -254,7 +258,7 @@ class Positions(Field, spin=0):
         ngal = 0
 
         # map catalogue data asynchronously
-        async for page in _pages(catalog, progress):
+        async for page in aiter_pages(catalog, progress):
             if page.size:
                 lon, lat = page.get(*col)
                 w = np.ones(page.size)
@@ -316,7 +320,7 @@ class ScalarField(Field, spin=0):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Map real values from catalogue to HEALPix map."""
 
@@ -334,7 +338,7 @@ class ScalarField(Field, spin=0):
         wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and map values
-        async for page in _pages(catalog, progress):
+        async for page in aiter_pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -387,7 +391,7 @@ class ComplexField(Field, spin=0):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Map complex values from catalogue to HEALPix map."""
 
@@ -405,7 +409,7 @@ class ComplexField(Field, spin=0):
         wmean, var = 0.0, 0.0
 
         # go through pages in catalogue and get the shear values,
-        async for page in _pages(catalog, progress):
+        async for page in aiter_pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 
@@ -450,7 +454,7 @@ class Visibility(Field, spin=0):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Create a visibility map from the given catalogue."""
 
@@ -488,7 +492,7 @@ class Weights(Field, spin=0):
         self,
         catalog: Catalog,
         *,
-        progress: ProgressTask | None = None,
+        progress: Progress | None = None,
     ) -> ArrayLike:
         """Map catalogue weights."""
 
@@ -506,7 +510,7 @@ class Weights(Field, spin=0):
         wmean, w2mean = 0.0, 0.0
 
         # map catalogue
-        async for page in _pages(catalog, progress):
+        async for page in aiter_pages(catalog, progress):
             if wcol is not None:
                 page.delete(page[wcol] == 0)
 

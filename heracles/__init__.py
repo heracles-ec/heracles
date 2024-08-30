@@ -59,6 +59,9 @@ __all__ = [
     # mapping
     "map_catalogs",
     "transform",
+    # progress
+    "NoProgress",
+    "Progress",
     # twopoint
     "angular_power_spectra",
     "debias_cls",
@@ -119,6 +122,11 @@ from .mapper import (
 from .mapping import (
     map_catalogs,
     transform,
+)
+
+from .progress import (
+    NoProgress,
+    Progress,
 )
 
 from .twopoint import (

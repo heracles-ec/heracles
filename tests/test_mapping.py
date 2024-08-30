@@ -27,7 +27,7 @@ def test_map_catalogs(parallel):
 
     for k in fields:
         for i in catalogs:
-            fields[k].assert_any_call(catalogs[i], progress=None)
+            fields[k].assert_any_call(catalogs[i], progress=unittest.mock.ANY)
             assert maps[k, i] is fields[k].return_value
 
 
