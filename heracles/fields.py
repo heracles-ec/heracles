@@ -202,7 +202,7 @@ class Positions(Field, spin=0):
 
     """
 
-    uses = "longitude", "latitude"
+    uses = "longitude", "latitude", "[weight]"
 
     def __init__(
         self,
@@ -249,23 +249,26 @@ class Positions(Field, spin=0):
         mapper = self.mapper_or_error
 
         # get catalogue column definition
-        col = self.columns_or_error
+        *col, wcol = self.columns_or_error
 
         # position map
         pos = mapper.create(spin=self.spin)
 
         # keep track of the total number of galaxies
         ngal = 0
+        wmean, w2mean = 0.0, 0.0
 
         # map catalogue data asynchronously
         async for page in aiter_pages(catalog, progress):
             if page.size:
                 lon, lat = page.get(*col)
-                w = np.ones(page.size)
+                w = page.get(wcol) if wcol is not None else np.ones(page.size)
 
                 mapper.map_values(lon, lat, pos, w)
 
                 ngal += page.size
+                wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
 
                 # clean up to free unneeded memory
                 del page, lon, lat, w
@@ -276,8 +279,8 @@ class Positions(Field, spin=0):
         # effective number of pixels
         npix = 4 * np.pi / mapper.area
 
-        # compute average number count from map
-        nbar = ngal / fsky / npix
+        # compute mean weighted number count per effective mapper "pixel"
+        nbar = ngal * wmean / fsky / npix
         # override with provided value, but check that it makes sense
         if (nbar_ := self.nbar) is not None:
             # Poisson std dev from expected ngal assuming nbar_ is truth
@@ -301,8 +304,8 @@ class Positions(Field, spin=0):
             pos -= vis
             del vis
 
-        # compute bias of number counts
-        bias = ngal / (4 * np.pi) * mapper.area**2 / nbar**2
+        # compute bias of positions, including weight variance
+        bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
 
         # set metadata of array
         update_metadata(pos, catalog, nbar=nbar, bias=bias)
