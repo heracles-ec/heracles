@@ -27,6 +27,7 @@ __all__ = [
     # catalog
     "ArrayCatalog",
     "Catalog",
+    "CatalogBase",
     "CatalogPage",
     "FitsCatalog",
     "FootprintFilter",
@@ -80,6 +81,7 @@ except ModuleNotFoundError:
 from .catalog import (
     ArrayCatalog,
     Catalog,
+    CatalogBase,
     CatalogPage,
     FitsCatalog,
     FootprintFilter,

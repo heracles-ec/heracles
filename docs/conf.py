@@ -16,7 +16,7 @@
 
 from importlib import metadata
 
-project = "heracles"
+project = "Heracles"
 copyright = "2023-2024 Euclid Science Ground Segment"
 author = "Euclid Science Ground Segment"
 version = metadata.version(project)
@@ -28,10 +28,11 @@ release = version
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "numpydoc",
+    "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
     "sphinxcontrib.katex",
     "matplotlib.sphinxext.plot_directive",
+    "nbsphinx",
 ]
 
 intersphinx_mapping = {
@@ -55,3 +56,9 @@ html_theme = "furo"
 html_static_path = ["_static"]
 
 html_logo = "_static/logo.png"
+
+
+# -- Options for autodoc -----------------------------------------------------
+
+# This value controls how to represent typehints.
+autodoc_typehints = "description"

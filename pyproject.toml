@@ -45,6 +45,7 @@ all = [
 docs = [
     "furo",
     "matplotlib",
+    "nbsphinx",
     "numpydoc",
     "sphinx",
     "sphinxcontrib-katex",
