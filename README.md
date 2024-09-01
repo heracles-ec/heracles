@@ -6,9 +6,9 @@
 [![Tests](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml/badge.svg)](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml)
 [![Coverage](https://coveralls.io/repos/github/heracles-ec/heracles/badge.svg?branch=main)](https://coveralls.io/github/heracles-ec/heracles?branch=main)
 
-This is Heracles, a code for harmonic-space statistics on the sphere. Heracles
-can take catalogues of positions a function values on the sphere and turn them
-into wonderful things like angular power spectra and mixing matrices.
+This is _Heracles_, a code for harmonic-space statistics on the sphere.
+_Heracles_ can take catalogues of positions a function values on the sphere and
+turn them into wonderful things like angular power spectra and mixing matrices.
 
 To get started, read the [documentation](https://heracles.readthedocs.io).
 
