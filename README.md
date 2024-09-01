@@ -6,4 +6,36 @@
 [![Tests](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml/badge.svg)](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml)
 [![Coverage](https://coveralls.io/repos/github/heracles-ec/heracles/badge.svg?branch=main)](https://coveralls.io/github/heracles-ec/heracles?branch=main)
 
-The _Heracles_ code was developed in the _Euclid_ Science Ground Segment.
+This is Heracles, a code for harmonic-space statistics on the sphere. Heracles
+can take catalogues of positions a function values on the sphere and turn them
+into wonderful things like angular power spectra and mixing matrices.
+
+To get started, read the [documentation](https://heracles.readthedocs.io).
+
+🛰️ **Made in the Euclid Science Ground Segment**
+
+## Installation (latest)
+
+To install the latest released version of the package:
+
+```console
+$ pip install heracles
+```
+
+You should do this in a dedicated environment (conda, venv, etc.)
+
+## Installation (git main)
+
+To install the latest unreleased version from the git main branch:
+
+```console
+$ pip install git+https://github.com/heracles-ec/heracles.git
+```
+
+## Installation (develop)
+
+Clone the repository, cd into the local copy, then install in editable mode:
+
+```console
+$ pip install -e .
+```
