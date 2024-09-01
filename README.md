@@ -18,9 +18,7 @@ To get started, read the [documentation](https://heracles.readthedocs.io).
 
 To install the latest released version of the package:
 
-```console
-$ pip install heracles
-```
+    pip install heracles
 
 You should do this in a dedicated environment (conda, venv, etc.)
 
@@ -28,14 +26,10 @@ You should do this in a dedicated environment (conda, venv, etc.)
 
 To install the latest unreleased version from the git main branch:
 
-```console
-$ pip install git+https://github.com/heracles-ec/heracles.git
-```
+    pip install git+https://github.com/heracles-ec/heracles.git
 
 ## Installation (develop)
 
 Clone the repository, cd into the local copy, then install in editable mode:
 
-```console
-$ pip install -e .
-```
+    pip install -e .
