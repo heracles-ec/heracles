@@ -8,7 +8,6 @@ examples yourself, the source files are found on in the repository__.
 __ https://github.com/heracles-ec/heracles/blob/main/examples
 
 
-.. toctree::
-   :maxdepth: 1
+.. nbgallery::
 
    ../examples/example.ipynb
