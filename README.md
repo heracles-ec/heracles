@@ -3,6 +3,9 @@
 [![PyPI](https://img.shields.io/pypi/v/heracles)](https://pypi.org/project/heracles)
 [![Python](https://img.shields.io/pypi/pyversions/heracles)](https://www.python.org)
 [![Documentation](https://readthedocs.org/projects/heracles/badge/?version=latest)](https://heracles.readthedocs.io/en/latest/?badge=latest)
+[![arXiv](https://img.shields.io/badge/arXiv-2408.16903-red)](https://arxiv.org/abs/2408.16903)
+[![adsabs](https://img.shields.io/badge/ads-2024arXiv240816903E-blueviolet)](https://ui.adsabs.harvard.edu/abs/2024arXiv240816903E)
+[![doi](https://img.shields.io/badge/doi-10.48550/arXiv.2408.16903-blue)](https://doi.org/10.48550/arXiv.2408.16903)
 [![Tests](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml/badge.svg)](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml)
 [![Coverage](https://coveralls.io/repos/github/heracles-ec/heracles/badge.svg?branch=main)](https://coveralls.io/github/heracles-ec/heracles?branch=main)
 
