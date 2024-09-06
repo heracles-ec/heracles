@@ -308,7 +308,7 @@ def read_vmap(filename, nside=None, field=0, *, transform=False, lmax=None):
     vmap = hp.read_map(filename, field=field, dtype=float)
 
     # set unseen pixels to zero
-    vmap[vmap == hp.UNSEEN] = 0
+    vmap[vmap == hp.UNSEEN] = 0.0
 
     if nside is not None and nside != hp.get_nside(vmap):
         # vmap is provided at a different resolution
@@ -316,7 +316,10 @@ def read_vmap(filename, nside=None, field=0, *, transform=False, lmax=None):
         vmap = hp.ud_grade(vmap, nside)
 
     if transform:
+        nside = hp.get_nside(vmap)
         vmap = hp.map2alm(vmap, lmax=lmax, use_pixel_weights=True)
+        pw = hp.pixwin(nside, lmax=lmax)
+        hp.almxfl(vmap, 1 / pw, inplace=True)
 
     return vmap
 
