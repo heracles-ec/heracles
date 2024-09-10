@@ -47,6 +47,7 @@ __all__ = [
     "Visibility",
     "Weights",
     # io
+    "read_vmap",
     "read_alms",
     "read_cls",
     "read_maps",
@@ -107,6 +108,7 @@ from .fields import (
 )
 
 from .io import (
+    read_vmap,
     read_alms,
     read_cls,
     read_maps,

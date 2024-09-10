@@ -11,3 +11,4 @@ __ https://github.com/heracles-ec/heracles/blob/main/examples
 .. nbgallery::
 
    ../examples/example.ipynb
+   ../examples/discrete.ipynb

@@ -64,3 +64,27 @@ def download(
     finally:
         if not good and not keep:
             os.unlink(path)
+
+
+def get_example_data(progress: heracles.Progress | None = None) -> None:
+    """
+    Download the example catalogue and associated products.
+    """
+    download(
+        "catalog.fits",
+        "https://zenodo.org/records/13622599/files/catalog.fits?download=1&preview=1",
+        md5="e6c469425a6c072b4736aa6e5511bc28",
+        progress=progress,
+    )
+    download(
+        "vmap.fits.gz",
+        "https://zenodo.org/records/13622599/files/footprint.fits.gz?download=1&preview=1",
+        md5="f6d201bdf57a8e8a9a800ab1e7f1095f",
+        progress=progress,
+    )
+    download(
+        "nz.npz",
+        "https://zenodo.org/records/13622599/files/nz.npz?download=1&preview=1",
+        md5="57bbbce4e21ce34ddf460dac05363b37",
+        progress=progress,
+    )
