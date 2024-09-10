@@ -58,7 +58,7 @@ jobs:
           key: ${{ runner.os }}-data-${{ hashFiles('catalog.fits') }}
           restore-keys: |
             ${{ runner.os }}-data
-      - run: pip install jupyter nbconvert 
+      - run: pip install jupyter nbconvert matplotlib ducc0
       - run: jupyter nbconvert --to script examples/example.ipynb
       - run: cat examples/example.py
       - run: python examples/example.py
