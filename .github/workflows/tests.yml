@@ -59,7 +59,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-data
       - run: pip install jupyter nbconvert 
-      - run: jupyter nbconvert examples/example.ipynb
+      - run: jupyter nbconvert --to script examples/example.ipynb
       - run: cat examples/example.py
       - run: python examples/example.py
       
