@@ -1,2 +1,2 @@
 --prefer-binary
---only-binary healpy,numba,numpy
+--only-binary healpy,numba,numpy,ducc0

@@ -50,7 +50,19 @@ jobs:
       - run: pip install -c .github/test-constraints.txt '.[test]'
       - run: pytest --cov=heracles --cov-report=lcov
       - uses: coverallsapp/github-action@v2
-
+      - name: Cache data for Notebook tests
+        id: cache-data
+        uses: actions/cache@v4
+        with:
+          path: ./examples
+          key: ${{ runner.os }}-data-${{ hashFiles('catalog.fits') }}
+          restore-keys: |
+            ${{ runner.os }}-data
+      - run: pip install jupyter nbconvert 
+      - run: jupyter nbconvert examples/example.ipynb
+      - run: cat examples/example.py
+      - run: python examples/example.py
+      
   build:
     name: Build
     runs-on: ubuntu-latest
