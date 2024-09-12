@@ -58,7 +58,8 @@ jobs:
           key: ${{ runner.os }}-data-${{ github.run_number }}-${{ hashFiles('catalog.fits') }}
           restore-keys: |
             ${{ runner.os }}-data
-      - run: pip install jupyter matplotlib ducc0 pipx numpy
+      - run: pip install jupyter pipx
+      - run: pipx runpip install numpy matplotlib ducc0 healpy
       - run: pipx run jupyter execute examples/example.ipynb
       
   build:
