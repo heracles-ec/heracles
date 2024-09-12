@@ -59,7 +59,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-data
       - run: pip install jupyter matplotlib ducc0 pipx
-      - run: pipx jupyter execute examples/example.ipynb
+      - run: pipx run jupyter execute examples/example.ipynb
       
   build:
     name: Build
