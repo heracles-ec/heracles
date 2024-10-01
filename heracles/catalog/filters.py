@@ -60,7 +60,10 @@ class InvalidValueFilter:
 
 
 class FootprintFilter:
-    """Filter a catalogue using a footprint map."""
+    """Filter a catalogue using a footprint map.
+        This rempoves the pixels that are not in the footprint map.
+        Moreover, it removes the pixels which have NaN values in the
+        longitude and latitude columns."""
 
     def __init__(self, footprint, lon, lat):
         """Filter using the given footprint map and position columns."""
@@ -94,6 +97,7 @@ class FootprintFilter:
         _lon, _lat = page[lon], page[lat]
         good_entry = np.isfinite(_lon) & np.isfinite(_lat)
         _lon, _lat = _lon[good_entry], _lat[good_entry]
+        page.delete(np.where(~good_entry)[0])
         ipix = ang2pix(self._nside, _lon, _lat, lonlat=True)
         exclude = np.where(self._footprint[ipix] == 0)[0]
         page.delete(exclude)
