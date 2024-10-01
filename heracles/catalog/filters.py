@@ -61,9 +61,9 @@ class InvalidValueFilter:
 
 class FootprintFilter:
     """Filter a catalogue using a footprint map.
-        This rempoves the pixels that are not in the footprint map.
-        Moreover, it removes the pixels which have NaN values in the
-        longitude and latitude columns."""
+    This rempoves the pixels that are not in the footprint map.
+    Moreover, it removes the pixels which have NaN values in the
+    longitude and latitude columns."""
 
     def __init__(self, footprint, lon, lat):
         """Filter using the given footprint map and position columns."""
