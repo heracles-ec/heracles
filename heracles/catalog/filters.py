@@ -91,8 +91,9 @@ class FootprintFilter:
         from healpy import ang2pix
 
         lon, lat = self._lonlat
-        good_entry = np.isfinite(lon) & np.isfinite(lat)
-        lon, lat = lon[good_entry], lat[good_entry]
-        ipix = ang2pix(self._nside, page[lon], page[lat], lonlat=True)
+        _lon, _lat = page[lon], page[lat]
+        good_entry = np.isfinite(_lon) & np.isfinite(_lat)
+        _lon, _lat = _lon[good_entry], _lat[good_entry]
+        ipix = ang2pix(self._nside, _lon, _lat, lonlat=True)
         exclude = np.where(self._footprint[ipix] == 0)[0]
         page.delete(exclude)
