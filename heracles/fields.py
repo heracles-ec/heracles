@@ -256,7 +256,7 @@ class Positions(Field, spin=0):
 
         # keep track of the total number of galaxies
         ngal = 0
-        wmean, w2mean = 0.0, 0.0
+        wmean, var = 0.0, 0.0
 
         # map catalogue data asynchronously
         async for page in aiter_pages(catalog, progress):
@@ -268,7 +268,7 @@ class Positions(Field, spin=0):
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
-                w2mean += (w**2 - w2mean).sum() / ngal
+                var += (w**2 - var).sum() / ngal
 
                 # clean up to free unneeded memory
                 del page, lon, lat, w
@@ -305,11 +305,11 @@ class Positions(Field, spin=0):
             del vis
 
         # compute bias of positions, including weight variance
-        bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
+        bias = ngal / (4 * np.pi) * mapper.area**2 * (var / nbar**2)
 
         # set metadata of array
         update_metadata(pos, catalog, nbar=nbar, bias=bias,
-                        ngal=ngal, wmean=wmean, w2mean=w2mean)
+                        ngal=ngal, wmean=wmean, var=var)
 
         # return the position map
         return pos
@@ -375,7 +375,7 @@ class ScalarField(Field, spin=0):
         bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(val, catalog, 
+        update_metadata(val, catalog,
                         wbar=wbar, bias=bias,
                         ngal=ngal, wmean=wmean, var=var)
 
