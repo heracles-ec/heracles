@@ -308,7 +308,8 @@ class Positions(Field, spin=0):
         bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
 
         # set metadata of array
-        update_metadata(pos, catalog, nbar=nbar, bias=bias)
+        update_metadata(pos, catalog, nbar=nbar, bias=bias,
+                        ngal=ngal, wmean=wmean, w2mean=w2mean)
 
         # return the position map
         return pos
