@@ -205,6 +205,9 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / nbar**2),
+        'var': 1.0,
+        'wmean': 1.0,
+        'ngal': 4.0*npix,
     }
     np.testing.assert_array_equal(m, 0)
 
@@ -303,6 +306,9 @@ def test_scalar_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2),
+        "ngal": 4.0*npix,
+        "wmean": wbar,
+        "var": v2,
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -334,6 +340,9 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2),
+        "ngal": 4.0*npix,
+        "wmean": wbar,
+        "var": v2,
     }
     np.testing.assert_array_almost_equal(m, 0)
 
