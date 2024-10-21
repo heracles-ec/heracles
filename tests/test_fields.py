@@ -205,9 +205,9 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / nbar**2),
-        "var": 1.0,
+        "ngal": int(4.0 * npix),
         "wmean": 1.0,
-        "ngal": 4.0 * npix,
+        "var": 1.0,
     }
     np.testing.assert_array_equal(m, 0)
 
@@ -227,6 +227,9 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / nbar**2),
+        "ngal": int(4.0 * npix),
+        "wmean": 1.0,
+        "var": 1.0,
     }
     np.testing.assert_array_equal(m, 1.0)
 
@@ -250,6 +253,9 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / nbar**2),
+        "ngal": int(4.0 * npix),
+        "wmean": 1.0,
+        "var": 1.0,
     }
 
     # compute number count map with visibility map
@@ -268,6 +274,9 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / nbar**2),
+        "ngal": int(4.0 * npix),
+        "wmean": 1.0,
+        "var": 1.0,
     }
 
     # compute overdensity maps with given (incorrect) nbar
@@ -293,6 +302,7 @@ def test_scalar_field(mapper, catalog):
     v2 = ((w * v) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    v1 = w.sum()
     bias = (4 * np.pi / npix / npix) * v2
 
     assert m.shape == (npix,)
@@ -306,9 +316,9 @@ def test_scalar_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2),
-        "ngal": 4.0 * npix,
-        "wmean": wbar,
-        "var": v2,
+        "ngal": int(4.0 * npix),
+        "wmean": pytest.approx(v1 / (4.0 * npix)),
+        "var": v2 / (4.0 * npix),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -327,8 +337,8 @@ def test_complex_field(mapper, catalog):
     v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    v1 = w.sum()
     bias = (4 * np.pi / npix / npix) * v2 / 2
-
     assert m.shape == (2, npix)
     assert m.dtype.metadata == {
         "catalog": catalog.label,
@@ -340,9 +350,9 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "bias": pytest.approx(bias / wbar**2),
-        "ngal": 4.0 * npix,
-        "wmean": wbar,
-        "var": v2,
+        "ngal": int(4.0 * npix),
+        "wmean": v1 / (4.0 * npix),
+        "var": v2 / (4.0 * npix),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
