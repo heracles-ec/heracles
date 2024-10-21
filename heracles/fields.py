@@ -308,8 +308,9 @@ class Positions(Field, spin=0):
         bias = ngal / (4 * np.pi) * mapper.area**2 * (var / nbar**2)
 
         # set metadata of array
-        update_metadata(pos, catalog, nbar=nbar, bias=bias,
-                        ngal=ngal, wmean=wmean, var=var)
+        update_metadata(
+            pos, catalog, nbar=nbar, bias=bias, ngal=ngal, wmean=wmean, var=var
+        )
 
         # return the position map
         return pos
@@ -375,9 +376,9 @@ class ScalarField(Field, spin=0):
         bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(val, catalog,
-                        wbar=wbar, bias=bias,
-                        ngal=ngal, wmean=wmean, var=var)
+        update_metadata(
+            val, catalog, wbar=wbar, bias=bias, ngal=ngal, wmean=wmean, var=var
+        )
 
         # return the value map
         return val
@@ -447,9 +448,9 @@ class ComplexField(Field, spin=0):
         bias = 2 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(val, catalog, 
-                        wbar=wbar, bias=bias,
-                        ngal=ngal, wmean=wmean, var=var)
+        update_metadata(
+            val, catalog, wbar=wbar, bias=bias, ngal=ngal, wmean=wmean, var=var
+        )
 
         # return the shear map
         return val
