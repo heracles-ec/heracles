@@ -10,24 +10,27 @@ def nside():
 
 
 @pytest.fixture
+def lmax():
+    return 32
+
+
+@pytest.fixture
 def zbins():
     return {0: (0.0, 0.8), 1: (1.0, 1.2)}
 
 
 @pytest.fixture
-def mock_alms(rng, zbins):
+def mock_alms(rng, zbins, lmax):
     import numpy as np
 
-    lmax = 32
-
-    Nlm = (lmax + 1) * (lmax + 2) // 2
+    size = (lmax + 1) * (lmax + 2) // 2
 
     # names and spins
-    fields = {"P": 0, "G": 2}
+    fields = {"POS": 0, "SHE": 2}
 
     alms = {}
     for n, s in fields.items():
-        shape = (Nlm, 2) if s == 0 else (2, Nlm, 2)
+        shape = (size, 2) if s == 0 else (2, size, 2)
         for i in zbins:
             a = rng.standard_normal(shape) @ [1, 1j]
             a.dtype = np.dtype(a.dtype, metadata={"nside": 32, "spin": s})
@@ -85,151 +88,90 @@ def test_alm2cl_unequal_size(rng):
     np.testing.assert_allclose(cl, hp.alm2cl(alm, alm21, lmax_out=lmax2))
 
 
-def test_almkeys():
-    from heracles.twopoint import _almkeys
-
-    dtype = np.dtype(complex)
-    spin2_dtype = np.dtype(complex, metadata={"spin": 2})
-
-    alms = {
-        ("A", 1): np.zeros((), dtype=dtype),
-        ("B", 2): np.zeros((2,), dtype=dtype),
-        ("C", 3): np.zeros((2, 10), dtype=dtype),
-        ("D", 4): np.zeros((2, 3, 10), dtype=dtype),
-        ("E", 5): np.zeros((2, 10), dtype=spin2_dtype),
-        ("F", 6): np.zeros((2, 3, 10), dtype=spin2_dtype),
-    }
-
-    keys = list(_almkeys(alms))
-
-    assert keys == [
-        ("A", 1),
-        ("B", 2),
-        ("C_0", 3),
-        ("C_1", 3),
-        ("D_0_0", 4),
-        ("D_0_1", 4),
-        ("D_0_2", 4),
-        ("D_1_0", 4),
-        ("D_1_1", 4),
-        ("D_1_2", 4),
-        ("E_E", 5),
-        ("E_B", 5),
-        ("F_E_0", 6),
-        ("F_E_1", 6),
-        ("F_E_2", 6),
-        ("F_B_0", 6),
-        ("F_B_1", 6),
-        ("F_B_2", 6),
-    ]
-
-
-def test_angular_power_spectra(mock_alms):
-    from itertools import combinations_with_replacement
-
+def test_angular_power_spectra(mock_alms, lmax):
     from heracles.twopoint import angular_power_spectra
 
-    order = ["P", "G_E", "G_B"]
-
-    fields = []
-    for (k, i), alm in mock_alms.items():
-        if alm.dtype.metadata["spin"] == 0:
-            fields.append((k, i))
-        else:
-            fields.append((f"{k}_E", i))
-            fields.append((f"{k}_B", i))
+    # expected combinations of input alms and their shapes
+    comb = {
+        ("POS", "POS", 0, 0): (lmax + 1,),
+        ("POS", "POS", 0, 1): (lmax + 1,),
+        ("POS", "POS", 1, 1): (lmax + 1,),
+        ("POS", "SHE", 0, 0): (2, lmax + 1),
+        ("POS", "SHE", 0, 1): (2, lmax + 1),
+        ("POS", "SHE", 1, 0): (2, lmax + 1),
+        ("POS", "SHE", 1, 1): (2, lmax + 1),
+        ("SHE", "SHE", 0, 0): (3, lmax + 1),
+        ("SHE", "SHE", 0, 1): (4, lmax + 1),
+        ("SHE", "SHE", 1, 1): (3, lmax + 1),
+    }
 
     # alms cross themselves
-
-    comb = {
-        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for (k1, i1), (k2, i2) in combinations_with_replacement(fields, 2)
-    }
-
     cls = angular_power_spectra(mock_alms)
-
-    assert cls.keys() == comb
+    keys = set(cls.keys())
+    assert keys == comb.keys()
+    for key, cl in cls.items():
+        assert cl.shape == comb[key]
 
     # explicit cross
-
     cls = angular_power_spectra(mock_alms, mock_alms)
-
-    assert cls.keys() == comb
-
-    # explicit include
-
-    cls = angular_power_spectra(
-        mock_alms,
-        include=[("P", "P", ..., ...), ("P", "G_E", ..., ...)],
-    )
-
-    assert cls.keys() == {
-        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for k1, k2, i1, i2 in comb
-        if (k1, k2) in [("P", "P"), ("P", "G_E")]
-    }
-
-    cls = angular_power_spectra(mock_alms, include=[("P", "P", 0), ("P", "G_E", 1)])
-
-    assert cls.keys() == {
-        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for k1, k2, i1, i2 in comb
-        if (k1, k2, i1) in [("P", "P", 0), ("P", "G_E", 1)]
-    }
-
-    # explicit exclude
-
-    cls = angular_power_spectra(
-        mock_alms,
-        exclude=[("P", "P"), ("P", "G_E"), ("P", "G_B")],
-    )
-
-    assert cls.keys() == {
-        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for k1, k2, i1, i2 in comb
-        if (k1, k2) not in [("P", "P"), ("P", "G_E"), ("P", "G_B")]
-    }
-
-    cls = angular_power_spectra(mock_alms, exclude=[(..., ..., 1, ...)])
-
-    assert cls.keys() == {(k1, k2, i1, i2) for k1, k2, i1, i2 in comb if i1 != 1}
+    keys = set(cls.keys())
+    assert keys == comb.keys()
+    for key, cl in cls.items():
+        assert cl.shape == comb[key]
 
     # explicit cross with separate alms
-
     mock_alms1 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 0}
     mock_alms2 = {(k, i): alm for (k, i), alm in mock_alms.items() if i % 2 == 1}
-    fields1 = [(k, i) for (k, i) in fields if i % 2 == 0]
-    fields2 = [(k, i) for (k, i) in fields if i % 2 == 1]
 
     comb12 = {
-        (k1, k2, i1, i2) if order.index(k1) <= order.index(k2) else (k2, k1, i2, i1)
-        for k1, i1 in fields1
-        for k2, i2 in fields2
+        ("POS", "POS", 0, 1): (lmax + 1,),
+        ("POS", "SHE", 0, 1): (2, lmax + 1),
+        ("POS", "SHE", 1, 0): (2, lmax + 1),
+        ("SHE", "SHE", 0, 1): (4, lmax + 1),
     }
 
     cls = angular_power_spectra(mock_alms1, mock_alms2)
-
-    assert cls.keys() == comb12
+    keys = set(cls.keys())
+    assert keys == comb12.keys()
+    for key, cl in cls.items():
+        assert cl.shape == comb12[key]
 
 
 def test_debias_cls():
     from heracles.twopoint import debias_cls
 
     cls = {
-        0: np.zeros(100),
-        2: np.zeros(100, dtype=np.dtype(float, metadata={"bias": 4.56, "spin_2": 2})),
+        "a": np.zeros(100),
+        "b": np.zeros(100, dtype=[("CL", float)]),
+        "c": np.zeros(
+            (2, 100), dtype=np.dtype(float, metadata={"bias": 4.56, "spin_2": 2})
+        ),
+        "d": np.zeros(
+            (4, 3, 100), dtype=np.dtype(float, metadata={"spin_1": 2, "spin_2": 2})
+        ),
     }
 
     nbs = {
-        0: 1.23,
+        "a": 1.23,
+        "b": 1.23,
+        "d": 7.89,
     }
 
     debias_cls(cls, nbs, inplace=True)
 
-    assert np.all(cls[0] == -1.23)
+    np.testing.assert_array_equal(cls["a"], -1.23)
 
-    assert np.all(cls[2][:2] == 0.0)
-    assert np.all(cls[2][2:] == -4.56)
+    np.testing.assert_array_equal(cls["b"]["CL"], -1.23)
+
+    np.testing.assert_array_equal(cls["c"][:, :2], 0.0)
+    np.testing.assert_array_equal(cls["c"][:, 2:], -4.56)
+
+    np.testing.assert_array_equal(cls["d"][0, :, :2], 0.0)
+    np.testing.assert_array_equal(cls["d"][0, :, 2:], -7.89)
+    np.testing.assert_array_equal(cls["d"][1, :, :2], 0.0)
+    np.testing.assert_array_equal(cls["d"][1, :, 2:], -7.89)
+    np.testing.assert_array_equal(cls["d"][2], 0.0)
+    np.testing.assert_array_equal(cls["d"][3], 0.0)
 
 
 def test_debias_cls_healpix():
@@ -261,9 +203,9 @@ def test_debias_cls_healpix():
     }
 
     cls = {
-        1: np.zeros(100, dtype=np.dtype(float, metadata=md1)),
-        2: np.zeros(100, dtype=np.dtype(float, metadata=md2)),
-        3: np.zeros(100, dtype=np.dtype(float, metadata=md3)),
+        1: np.zeros((2, 100), dtype=np.dtype(float, metadata=md1)),
+        2: np.zeros((2, 100), dtype=np.dtype(float, metadata=md2)),
+        3: np.zeros((2, 100), dtype=np.dtype(float, metadata=md3)),
     }
 
     nbs = {
@@ -274,14 +216,17 @@ def test_debias_cls_healpix():
 
     debias_cls(cls, nbs, inplace=True)
 
-    assert np.all(cls[1][:2] == 0.0)
-    assert np.all(cls[1][2:] == -1.23 / pw0[2:] / pw2[2:])
+    np.testing.assert_array_equal(cls[1][:, :2], 0.0)
+    np.testing.assert_array_equal(cls[1][0, 2:], -1.23 / pw0[2:] / pw2[2:])
+    np.testing.assert_array_equal(cls[1][1, 2:], -1.23 / pw0[2:] / pw2[2:])
 
-    assert np.all(cls[2][:2] == 0.0)
-    assert np.all(cls[2][2:] == -4.56 / pw0[2:])
+    np.testing.assert_array_equal(cls[2][:, :2], 0.0)
+    np.testing.assert_array_equal(cls[2][0, 2:], -4.56 / pw0[2:])
+    np.testing.assert_array_equal(cls[2][1, 2:], -4.56 / pw0[2:])
 
-    assert np.all(cls[3][:2] == 0.0)
-    assert np.all(cls[3][2:] == -7.89 / pw0[2:])
+    np.testing.assert_array_equal(cls[3][:, :2], 0.0)
+    np.testing.assert_array_equal(cls[3][0, 2:], -7.89 / pw0[2:])
+    np.testing.assert_array_equal(cls[3][1, 2:], -7.89 / pw0[2:])
 
 
 @patch("convolvecl.mixmat_eb")
@@ -328,8 +273,8 @@ def test_mixing_matrices(mock, mock_eb, rng):
         call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 2)),
         call(cl, l1max=None, l2max=None, l3max=None, spin=(2, 0)),
     ]
-    assert mms["P", "G_E", 0, 1] is mock.return_value
-    assert mms["G_E", "P", 0, 1] is mock.return_value
+    assert mms["P", "G", 0, 1] is mock.return_value
+    assert mms["G", "P", 0, 1] is mock.return_value
 
     mock.reset_mock()
     mock_eb.reset_mock()
@@ -337,13 +282,11 @@ def test_mixing_matrices(mock, mock_eb, rng):
     # compute she-she
     cls = {("W", "W", 0, 1): cl}
     mms = mixing_matrices(fields, cls)
-    assert len(mms) == 3
+    assert len(mms) == 1
     assert mock.call_count == 0
     assert mock_eb.call_count == 1
     mock_eb.assert_called_with(cl, l1max=None, l2max=None, l3max=None, spin=(2, 2))
-    assert mms["G_E", "G_E", 0, 1] is mock_eb.return_value[0]
-    assert mms["G_B", "G_B", 0, 1] is mock_eb.return_value[1]
-    assert mms["G_E", "G_B", 0, 1] is mock_eb.return_value[2]
+    assert mms["G", "G", 0, 1] is mock_eb.return_value
 
     mock.reset_mock()
     mock_eb.reset_mock()
