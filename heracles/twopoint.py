@@ -28,11 +28,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .core import TocDict, toc_match, update_metadata
+from .core import TocDict, update_metadata
 from .progress import NoProgress, Progress
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping, MutableMapping
+    from collections.abc import Mapping, MutableMapping
 
     from numpy.typing import ArrayLike, NDArray
 
@@ -42,6 +42,15 @@ if TYPE_CHECKING:
 TwoPointKey = tuple[Any, Any, Any, Any]
 
 logger = logging.getLogger(__name__)
+
+
+def alm_has_eb(alm: NDArray[Any]) -> bool:
+    """
+    Returns true if *alm* has a non-zero spin weight and a leading axis of size
+    2, false otherwise.
+    """
+    md = alm.dtype.metadata or {}
+    return alm.ndim > 1 and alm.shape[0] == 2 and md.get("spin", 0) != 0
 
 
 def alm2lmax(alm, mmax=None):
@@ -126,12 +135,18 @@ def _debias_cl(
 
     # minimum and maximum angular mode for bias correction
     lmin = max(abs(spin1), abs(spin2))
-    lmax = len(cl) - 1
+    lmax = cl.shape[-1] - 1
 
-    # this will be subtracted from the cl
-    # modes up to lmin are ignored
-    bl = np.full(lmax + 1, bias)
-    bl[:lmin] = 0.0
+    # this is what will be subtracted from the cl
+    bl = np.zeros(cl.shape)
+    if lmin > 0 and cl.ndim > 1:
+        # spin-weighted fields:
+        # - only remove from l >= lmin
+        # - only remove from EE and BB
+        bl[:2, ..., lmin:] = bias
+    else:
+        # scalar fields: remove from everywhere
+        bl[...] = bias
 
     # handle HEALPix pseudo-convolution
     for i, s in (1, spin1), (2, spin2):
@@ -149,7 +164,7 @@ def _debias_cl(
                 else:
                     pw = None
                 if pw is not None:
-                    bl[lmin:] /= pw[lmin:]
+                    bl[..., lmin:] /= pw[lmin:]
 
     # remove bias
     if cl.dtype.names is None:
@@ -160,40 +175,6 @@ def _debias_cl(
     return cl
 
 
-def _almkeys(
-    alms: Mapping[tuple[Any, Any], NDArray[Any]],
-) -> Iterator[tuple[str, Any]]:
-    """
-    Iterate with multidimensional alms flattened into separate keys.
-    """
-    for (k, i), alm in alms.items():
-        md = alm.dtype.metadata or {}
-        if alm.ndim < 2:
-            yield (k, i)
-        else:
-            eb = alm.shape[0] == 2 and md.get("spin", 0) != 0
-            for j in np.ndindex(*alm.shape[:-1]):
-                parts = [str(k), "EB"[j[0]] if eb else str(j[0]), *map(str, j[1:])]
-                yield ("_".join(parts), i)
-
-
-def _getalm(
-    alms: Mapping[tuple[Any, Any], NDArray[Any]],
-    k: str,
-    i: Any,
-) -> tuple[NDArray[Any], Mapping[str, Any]]:
-    """
-    Get alm and metadata from a flattened key.
-    """
-    k0, *parts = k.split("_")
-    alm = alms[k0, i]
-    md: Mapping[str, Any] = alm.dtype.metadata or {}
-    if parts and parts[0] in "EB":
-        parts[0] = ("EB").index(parts[0])
-    j = tuple(map(int, parts))
-    return alm[j], md
-
-
 def angular_power_spectra(
     alms,
     alms2=None,
@@ -202,8 +183,6 @@ def angular_power_spectra(
     debias=True,
     bins=None,
     weights=None,
-    include=None,
-    exclude=None,
     out=None,
 ):
     """compute angular power spectra from a set of alms"""
@@ -218,11 +197,12 @@ def angular_power_spectra(
     logger.info("using LMAX = %s for cls", lmax)
 
     # collect all alm combinations for computing cls
+    # iteration happens over keys only, values are accessed later
     if alms2 is None:
-        pairs = combinations_with_replacement(_almkeys(alms), 2)
+        pairs = combinations_with_replacement(alms, 2)
         alms2 = alms
     else:
-        pairs = product(_almkeys(alms), _almkeys(alms2))
+        pairs = product(alms, alms2)
 
     # keep track of the twopoint combinations we have seen here
     twopoint_names = set()
@@ -248,23 +228,52 @@ def angular_power_spectra(
         else:
             swapped = False
 
-        # check if cl is skipped by explicit include or exclude list
-        if not toc_match((k1, k2, i1, i2), include, exclude):
-            continue
-
         logger.info("computing %s x %s cl for bins %s, %s", k1, k2, i1, i2)
 
         # retrieve alms from keys; make sure swap is respected
         # this is done only now because alms might lazy-load from file
         if swapped:
-            alm1, md1 = _getalm(alms2, k1, i1)
-            alm2, md2 = _getalm(alms, k2, i2)
+            alm1, alm2 = alms2[k1, i1], alms[k2, i2]
         else:
-            alm1, md1 = _getalm(alms, k1, i1)
-            alm2, md2 = _getalm(alms2, k2, i2)
+            alm1, alm2 = alms[k1, i1], alms2[k2, i2]
 
-        # compute the raw cl from the alms
-        cl = alm2cl(alm1, alm2, lmax=lmax)
+        # get metadata from alms
+        md1 = alm1.dtype.metadata or {}
+        md2 = alm2.dtype.metadata or {}
+
+        # compute the set of spectra from the pair of alms
+        if alm_has_eb(alm1) and alm_has_eb(alm2):
+            # spin-spin
+            cl = np.stack(
+                [
+                    alm2cl(alm1[0], alm2[0], lmax=lmax),  # EE
+                    alm2cl(alm1[1], alm2[1], lmax=lmax),  # BB
+                    alm2cl(alm1[0], alm2[1], lmax=lmax),  # EB
+                    alm2cl(alm1[1], alm2[0], lmax=lmax),  # BE
+                ]
+            )
+            # trim BE == EB for auto-correlation
+            if k1 == k2 and i1 == i2:
+                cl = np.copy(cl[:3])
+        elif alm_has_eb(alm1):
+            # spin-scalar
+            cl = np.stack(
+                [
+                    alm2cl(alm1[0], alm2, lmax=lmax),  # TE
+                    alm2cl(alm1[1], alm2, lmax=lmax),  # TB
+                ]
+            )
+        elif alm_has_eb(alm2):
+            # spin-scalar
+            cl = np.stack(
+                [
+                    alm2cl(alm1, alm2[0], lmax=lmax),  # ET
+                    alm2cl(alm1, alm2[1], lmax=lmax),  # BT
+                ]
+            )
+        else:
+            # scalar-scalar
+            cl = alm2cl(alm1, alm2, lmax=lmax)  # TT
 
         # collect metadata
         md = {}
@@ -391,36 +400,20 @@ def mixing_matrices(
 
                 # if any spin is zero, then there is no E/B decomposition
                 if spin1 == 0 or spin2 == 0:
-                    mm = mixmat(
-                        cl,
-                        l1max=l1max,
-                        l2max=l2max,
-                        l3max=l3max,
-                        spin=(spin1, spin2),
-                    )
-                    if bins is not None:
-                        mm = bin2pt(mm, bins, "MM", weights=weights)
-                    name1 = f1 if spin1 == 0 else f"{f1}_E"
-                    name2 = f2 if spin2 == 0 else f"{f2}_E"
-                    out[name1, name2, i1, i2] = mm
-                    del mm
+                    mixmat_or_mixmat_eb = mixmat
                 else:
-                    # E/B decomposition for mixing matrix
-                    mm_ee, mm_bb, mm_eb = mixmat_eb(
-                        cl,
-                        l1max=l1max,
-                        l2max=l2max,
-                        l3max=l3max,
-                        spin=(spin1, spin2),
-                    )
-                    if bins is not None:
-                        mm_ee = bin2pt(mm_ee, bins, "MM", weights=weights)
-                        mm_bb = bin2pt(mm_bb, bins, "MM", weights=weights)
-                        mm_eb = bin2pt(mm_eb, bins, "MM", weights=weights)
-                    out[f"{f1}_E", f"{f2}_E", i1, i2] = mm_ee
-                    out[f"{f1}_B", f"{f2}_B", i1, i2] = mm_bb
-                    out[f"{f1}_E", f"{f2}_B", i1, i2] = mm_eb
-                    del mm_ee, mm_bb, mm_eb
+                    mixmat_or_mixmat_eb = mixmat_eb
+                mm = mixmat_or_mixmat_eb(
+                    cl,
+                    l1max=l1max,
+                    l2max=l2max,
+                    l3max=l3max,
+                    spin=(spin1, spin2),
+                )
+                if bins is not None:
+                    mm = bin2pt(mm, bins, "MM", weights=weights)
+                out[f1, f2, i1, i2] = mm
+                del mm
 
     # return the toc dict of mixing matrices
     return out
