@@ -145,7 +145,7 @@ def binned(result, bins, weight=None):
     # compute the binned result axis by axis
     for i in np.ndindex(shape[:axis]):
         for j in np.ndindex(shape[axis + 1 :]):
-            k = np.s_[*i, :, *j]
+            k = (*i, slice(None), *j)
             out[k] = norm(np.bincount(index, w * result[k], m)[1:m], wb)
 
     # compute the binned ell

@@ -114,7 +114,7 @@ def test_binned(ndim, axis, weight, rng):
     else:
         w = weight
 
-    out_shape = np.s_[*shape[:axis], nbins - 1, *shape[axis + 1 :]]
+    out_shape = (*shape[:axis], nbins - 1, *shape[axis + 1 :])
 
     binned_data = np.zeros(out_shape)
     binned_ell = np.zeros(nbins - 1)
