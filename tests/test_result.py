@@ -126,8 +126,8 @@ def test_binned(ndim, axis, weight, rng):
         binned_ell[i] = np.average(ell[inbin], weights=w[inbin])
         for j in np.ndindex(*shape[:axis]):
             for k in np.ndindex(*shape[axis + 1 :]):
-                data_inbin = data[*j, inbin, *k]
-                binned_data[*j, i, *k] = np.average(data_inbin, weights=w[inbin])
+                data_inbin = data[(*j, inbin, *k)]
+                binned_data[(*j, i, *k)] = np.average(data_inbin, weights=w[inbin])
         binned_weight[i] = w[inbin].sum()
 
     np.testing.assert_array_almost_equal(result, binned_data)
