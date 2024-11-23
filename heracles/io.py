@@ -105,7 +105,7 @@ def _key_from_string(s: str) -> _DictKey:
     key = parts[0]
     key = key.replace("\\-", "-")
     key = key.replace("\0", "\\")
-    return int(key) if key.isdigit() else key
+    return int(key) if key.removeprefix("-").isdigit() else key
 
 
 def _get_next_extname(fits, prefix):

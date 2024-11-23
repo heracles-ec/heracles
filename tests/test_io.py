@@ -300,9 +300,11 @@ def test_write_read_cov(mock_cls, tmp_path):
     workdir = str(tmp_path)
 
     cov = {}
-    for k1, k2 in combinations_with_replacement(mock_cls, 2):
-        cl1, cl2 = mock_cls[k1], mock_cls[k2]
-        cov[k1, k2] = np.outer(cl1, cl2)
+    for (a1, b1, i1, j1), (a2, b2, i2, j2) in combinations_with_replacement(
+        mock_cls, 2
+    ):
+        cl1, cl2 = mock_cls[a1, b1, i1, j1], mock_cls[a2, b2, i2, j2]
+        cov[a1, b1, a2, b2, i1, j1, i2, j2] = np.outer(cl1, cl2)
 
     filename = "cov.fits"
 
