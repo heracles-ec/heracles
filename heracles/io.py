@@ -21,7 +21,7 @@
 import logging
 import os
 import re
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
@@ -76,25 +76,36 @@ def _string_from_key(key: _DictKey) -> str:
     """
     Return string representation for a given key.
     """
-    if isinstance(key, tuple):
-        names = list(map(_string_from_key, key))
-        c = ";" if any("," in name for name in names) else ","
-        return c.join(names)
-    return re.sub(r"\W+", "_", str(key))
+    # recursive expansion for sequences
+    if isinstance(key, Sequence) and not isinstance(key, str):
+        return "-".join(map(_string_from_key, key))
+
+    # get string representation of key
+    s = str(key)
+
+    # escape literal "\"
+    s = s.replace("\\", "\\\\")
+
+    # escape literal "-"
+    s = s.replace("-", "\\-")
+
+    # substitute non-FITS characters by tilde
+    s = re.sub(r"[^ -~]+", "~", s, flags=re.ASCII)
+
+    return s
 
 
 def _key_from_string(s: str) -> _DictKey:
     """
     Return key for a given string representation.
     """
-    keys = s.split(";")
-    if len(keys) > 1:
-        return tuple(map(_key_from_string, keys))
-    keys = keys[0].split(",")
-    if len(keys) > 1:
-        return tuple(map(_key_from_string, keys))
-    key = keys[0]
-    return int(key) if key.isdigit() else key
+    parts = re.split(r"(?<!\\)-", s.replace("\\\\", "\0"))
+    if len(parts) > 1:
+        return tuple(map(_key_from_string, parts))
+    key = parts[0]
+    key = key.replace("\\-", "-")
+    key = key.replace("\0", "\\")
+    return int(key) if key.removeprefix("-").isdigit() else key
 
 
 def _get_next_extname(fits, prefix):
