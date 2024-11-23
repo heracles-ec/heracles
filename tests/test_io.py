@@ -157,14 +157,19 @@ def test_string_from_key():
     assert _string_from_key(1) == "1"
     assert _string_from_key(("a",)) == "a"
     assert _string_from_key((1,)) == "1"
-    assert _string_from_key(("a", 1)) == "a,1"
-    assert _string_from_key(("a", "b", 1, 2)) == "a,b,1,2"
-    assert _string_from_key((("a", 1), "b")) == "a,1;b"
-    assert _string_from_key((("a", 1), ("b", 2))) == "a,1;b,2"
+    assert _string_from_key(("a", 1)) == "a-1"
+    assert _string_from_key(("a", "b", 1, 2)) == "a-b-1-2"
+
+    # flatten nested sequences
+    assert _string_from_key([("a", 1), "b"]) == "a-1-b"
+    assert _string_from_key([("a", 1), ("b", (2,))]) == "a-1-b-2"
 
     # test special chars
-    assert _string_from_key("a,b,c") == "a_b_c"
-    assert _string_from_key("!@#$%^&*()[]{};,.") == "_"
+    assert _string_from_key("a-b-c") == r"a\-b\-c"
+    assert _string_from_key(("a\\", 1)) == r"a\\-1"
+    assert _string_from_key(("a\\-", 1)) == r"a\\\--1"
+    assert _string_from_key(("a\\", -1)) == r"a\\-\-1"
+    assert _string_from_key("a€£") == "a~"
 
 
 def test_key_from_string():
@@ -172,10 +177,12 @@ def test_key_from_string():
 
     assert _key_from_string("a") == "a"
     assert _key_from_string("1") == 1
-    assert _key_from_string("a,1") == ("a", 1)
-    assert _key_from_string("a,b,1,2") == ("a", "b", 1, 2)
-    assert _key_from_string("a,1;b") == (("a", 1), "b")
-    assert _key_from_string("a,1;b,2") == (("a", 1), ("b", 2))
+    assert _key_from_string("a-1") == ("a", 1)
+    assert _key_from_string("a-b-1-2") == ("a", "b", 1, 2)
+    assert _key_from_string(r"a\-b\-c") == "a-b-c"
+    assert _key_from_string(r"a\\-1") == ("a\\", 1)
+    assert _key_from_string(r"a\\\-1") == "a\\-1"
+    assert _key_from_string(r"a\\-\-1") == ("a\\", -1)
 
 
 def test_write_read_maps(rng, tmp_path):
