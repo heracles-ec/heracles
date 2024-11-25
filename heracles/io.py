@@ -308,7 +308,7 @@ def _write_result(fits, ext, key, result):
             weight,
         ],
         names=[
-            "DATA",
+            "ARRAY",
             "ELL",
             "LOWER",
             "UPPER",
@@ -335,17 +335,18 @@ def _read_result(hdu):
     h = hdu.read_header()
 
     # the angular axis
-    if h["ELLAXIS"] != 1:
+    elldim = h["ELLAXIS"]
+    if elldim != 1:
         raise NotImplementedError("multiple angular axes are not supported")
-    axis = h["ELLAXIS1"]
+    axis = tuple(h[f"ELLAXIS{i}"] for i in range(1, elldim + 1))
 
     # get data array and move axis back to right position
-    result = np.moveaxis(data["DATA"], 0, axis)
+    result = np.moveaxis(data["ARRAY"], tuple(range(elldim)), axis)
 
     # construct result array with ancillary arrays and metadata
     return Result(
         result,
-        axis=axis,
+        axis=axis[0] if elldim == 1 else axis,
         ell=data["ELL"],
         lower=data["LOWER"],
         upper=data["UPPER"],
