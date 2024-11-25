@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .core import TocDict, update_metadata
+from .core import TocDict, toc_match, update_metadata
 from .progress import NoProgress, Progress
 from .result import Result, binned
 
@@ -181,6 +181,8 @@ def angular_power_spectra(
     debias=True,
     bins=None,
     weights=None,
+    include=None,
+    exclude=None,
     out=None,
 ):
     """compute angular power spectra from a set of alms"""
@@ -225,6 +227,10 @@ def angular_power_spectra(
             swapped = True
         else:
             swapped = False
+
+        # check if cl is skipped by explicit include or exclude list
+        if not toc_match((k1, k2, i1, i2), include, exclude):
+            continue
 
         logger.info("computing %s x %s cl for bins %s, %s", k1, k2, i1, i2)
 

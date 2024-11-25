@@ -137,6 +137,19 @@ def test_angular_power_spectra(mock_alms, lmax):
     for key, cl in cls.items():
         assert cl.shape == comb12[key]
 
+    # include and exclude
+    inc = object()
+    exc = object()
+    with patch("heracles.twopoint.toc_match") as mock_match:
+        mock_match.return_value = False
+        cls = angular_power_spectra(mock_alms1, mock_alms2, include=inc, exclude=exc)
+    assert len(cls) == 0
+    assert mock_match.call_count == len(comb12)
+    call_iter = iter(mock_match.call_args_list)
+    for a, i in mock_alms1:
+        for b, j in mock_alms2:
+            assert next(call_iter) == call((a, b, i, j), inc, exc)
+
 
 def test_debias_cls():
     from heracles.twopoint import debias_cls
