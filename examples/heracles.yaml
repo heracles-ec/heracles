@@ -22,17 +22,13 @@ catalogs:
 
 fields:
   POS: !positions
-    mapper: !healpix
-      nside: 2048
-      lmax: 2000
+    mapper: !healpix { nside: 2048, lmax: 2000 }
     columns:
       - "SHE_RA"
       - "SHE_DEC"
     mask: VIS
   SHE: !shears
-    mapper: !healpix
-      nside: 2048
-      lmax: 3000
+    mapper: !healpix { nside: 2048, lmax: 3000 }
     columns:
       - "SHE_RA"
       - "SHE_DEC"
@@ -41,13 +37,9 @@ fields:
       - "SHE_WEIGHT"
     mask: WHT
   VIS: !visibility
-    mapper: !healpix
-      nside: 4096
-      lmax: 6000
+    mapper: !healpix { nside: 4096, lmax: 6000 }
   WHT: !weights
-    mapper: !healpix
-      nside: 8192
-      lmax: 8000
+    mapper: !healpix { nside: 8192, lmax: 8000 }
     columns:
       - "SHE_RA"
       - "SHE_DEC"
