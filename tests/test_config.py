@@ -18,10 +18,10 @@ def load(text):
 
 
 @unittest.mock.patch("heracles.Positions")
-def test_field_construction(mock):
+def test_construct_field(mock):
     field = load(
         """
-        !heracles.Positions
+        !positions
         """
     )
     assert field is mock.return_value
@@ -29,7 +29,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions lon lat weight
+        !positions lon lat weight
         """
     )
     assert field is mock.return_value
@@ -37,7 +37,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions
+        !positions
           - lon
           - lat
         """
@@ -47,7 +47,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions
+        !positions
           mapper: xyz
         """
     )
@@ -56,7 +56,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions
+        !positions
           columns: lon lat
         """
     )
@@ -65,7 +65,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions
+        !positions
           columns:
             - lon
             - lat
@@ -77,7 +77,7 @@ def test_field_construction(mock):
 
     field = load(
         """
-        !heracles.Positions
+        !positions
           arg1: abc
           arg2: 2
           arg3:
@@ -91,18 +91,18 @@ def test_field_construction(mock):
 
 
 @pytest.mark.parametrize(
-    "field_type",
+    "tag, field",
     [
-        "heracles.Positions",
-        "heracles.Shears",
-        "heracles.Visibility",
-        "heracles.Weights",
+        ("!positions", "heracles.Positions"),
+        ("!shears", "heracles.Shears"),
+        ("!visibility", "heracles.Visibility"),
+        ("!weights", "heracles.Weights"),
     ],
 )
-def test_field_type(field_type):
-    with unittest.mock.patch(field_type) as mock:
-        field = load(f"!{field_type}")
-        assert field is mock.return_value
+def test_field(tag, field):
+    with unittest.mock.patch(field) as mock:
+        obj = load(tag)
+        assert obj is mock.return_value
         mock.assert_called_with(None)
 
 

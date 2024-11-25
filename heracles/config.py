@@ -76,7 +76,7 @@ def _construct_field(cls, loader, node):
     return cls(mapper, *columns, **kwargs)
 
 
-@YamlLoader.tag("!heracles.Positions")
+@YamlLoader.tag("!positions")
 def construct_positions(loader, node):
     """
     Construct :class:`heracles.Positions`.
@@ -84,7 +84,7 @@ def construct_positions(loader, node):
     return _construct_field(heracles.Positions, loader, node)
 
 
-@YamlLoader.tag("!heracles.Shears")
+@YamlLoader.tag("!shears")
 def construct_shears(loader, node):
     """
     Construct :class:`heracles.Shears`.
@@ -92,7 +92,7 @@ def construct_shears(loader, node):
     return _construct_field(heracles.Shears, loader, node)
 
 
-@YamlLoader.tag("!heracles.Visibility")
+@YamlLoader.tag("!visibility")
 def construct_visibility(loader, node):
     """
     Construct :class:`heracles.Visibility`.
@@ -100,7 +100,7 @@ def construct_visibility(loader, node):
     return _construct_field(heracles.Visibility, loader, node)
 
 
-@YamlLoader.tag("!heracles.Weights")
+@YamlLoader.tag("!weights")
 def construct_weights(loader, node):
     """
     Construct :class:`heracles.Weights`.
