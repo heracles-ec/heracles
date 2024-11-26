@@ -331,7 +331,11 @@ def test_complex_field(mapper, catalog):
     v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    v1 = w.sum()
     bias = (4 * np.pi / npix / npix) * v2 / 2
+    wmean = v1 / (4.0 * npix)
+    w2mean = v2 / (4.0 * npix)
+    variance = w2mean / wmean**2
 
     assert m.shape == (2, npix)
     assert m.dtype.metadata == {
@@ -343,6 +347,9 @@ def test_complex_field(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "fsky": 1.0,
+        "neff": 2*npix / np.pi,
+        "variance": pytest.approx(variance),
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)

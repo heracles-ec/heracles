@@ -379,7 +379,6 @@ class ScalarField(Field, spin=0):
         variance = var / wmean**2
         neff = ngal / (4 * np.pi * fsky)
         bias = fsky * variance / neff
-        #bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
         update_metadata(val, catalog, wbar=wbar,
@@ -453,12 +452,11 @@ class ComplexField(Field, spin=0):
         # bias from measured variance, for E/B decomposition
         variance = var / wmean**2
         neff = ngal / (2 * np.pi * fsky)  # should we include the factor of 2 here?
-        #bias = fsky * variance / neff
-        bias = 2 * np.pi * fsky**2 * (var / wmean**2) / ngal
+        bias = fsky * variance / neff
 
         # set metadata of array
         update_metadata(val, catalog, wbar=wbar,
-                        #variance=variance, neff=neff, fsky=fsky,
+                        variance=variance, neff=neff, fsky=fsky,
                         bias=bias)
 
         # return the shear map
