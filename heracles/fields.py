@@ -306,13 +306,12 @@ class Positions(Field, spin=0):
 
         # compute bias of positions, including weight variance
         variance = w2mean / wmean**2
-        neff = ngal / (4 * np.pi * fsky)
-        #bias = fsky * variance / neff
-        bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
+        neff = (npix * nbar) / (4 * np.pi * wmean)
+        bias = fsky * variance / neff
 
         # set metadata of array
         update_metadata(pos, catalog, nbar=nbar,
-                        #variance=variance, neff=neff, fsky=fsky,
+                        variance=variance, neff=neff, fsky=fsky,
                         bias=bias)
 
         # return the position map

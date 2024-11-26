@@ -204,9 +204,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        #"variance": 1.0,
-        #"neff": npix/np.pi,
-        #"fsky": 1.0,
+        "variance": 1.0,
+        "neff": npix/np.pi,
+        "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 0)
@@ -226,6 +226,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "variance": 1.0,
+        "neff": npix/np.pi,
+        "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 1.0)
@@ -249,6 +252,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "variance": 1.0,
+        "neff": npix/(np.pi * catalog.fsky),
+        "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -267,6 +273,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "variance": 1.0,
+        "neff": npix/(np.pi * catalog.fsky),
+        "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -277,7 +286,7 @@ def test_positions(mapper, catalog, vmap):
         m = coroutines.run(f(catalog))
 
     assert m.dtype.metadata["nbar"] == 2 * nbar
-    assert m.dtype.metadata["bias"] == pytest.approx(bias / (2 * nbar) ** 2)
+    assert m.dtype.metadata["bias"] == pytest.approx(2 * bias / (2 * nbar) ** 2)
 
 
 def test_scalar_field(mapper, catalog):
