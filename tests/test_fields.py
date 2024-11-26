@@ -205,7 +205,7 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "variance": 1.0,
-        "neff": npix/np.pi,
+        "neff": npix / np.pi,
         "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -227,7 +227,7 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "variance": 1.0,
-        "neff": npix/np.pi,
+        "neff": npix / np.pi,
         "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -253,7 +253,7 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "variance": 1.0,
-        "neff": npix/(np.pi * catalog.fsky),
+        "neff": npix / (np.pi * catalog.fsky),
         "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -274,7 +274,7 @@ def test_positions(mapper, catalog, vmap):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "variance": 1.0,
-        "neff": npix/(np.pi * catalog.fsky),
+        "neff": npix / (np.pi * catalog.fsky),
         "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -357,7 +357,7 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "fsky": 1.0,
-        "neff": 2*npix / np.pi,
+        "neff": 2 * npix / np.pi,
         "variance": pytest.approx(variance),
         "bias": pytest.approx(bias / wbar**2),
     }

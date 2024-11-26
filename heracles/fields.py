@@ -310,9 +310,9 @@ class Positions(Field, spin=0):
         bias = fsky * variance / neff
 
         # set metadata of array
-        update_metadata(pos, catalog, nbar=nbar,
-                        variance=variance, neff=neff, fsky=fsky,
-                        bias=bias)
+        update_metadata(
+            pos, catalog, nbar=nbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+        )
 
         # return the position map
         return pos
@@ -380,9 +380,9 @@ class ScalarField(Field, spin=0):
         bias = fsky * variance / neff
 
         # set metadata of array
-        update_metadata(val, catalog, wbar=wbar,
-                        variance=variance, neff=neff, fsky=fsky,
-                        bias=bias)
+        update_metadata(
+            val, catalog, wbar=wbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+        )
 
         # return the value map
         return val
@@ -454,9 +454,9 @@ class ComplexField(Field, spin=0):
         bias = fsky * variance / neff
 
         # set metadata of array
-        update_metadata(val, catalog, wbar=wbar,
-                        variance=variance, neff=neff, fsky=fsky,
-                        bias=bias)
+        update_metadata(
+            val, catalog, wbar=wbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+        )
 
         # return the shear map
         return val
