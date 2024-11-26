@@ -305,12 +305,15 @@ class Positions(Field, spin=0):
             del vis
 
         # compute bias of positions, including weight variance
+        variance = w2mean / wmean**2
+        neff = ngal / (4 * np.pi * fsky)
+        #bias = fsky * variance / neff
         bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
 
         # set metadata of array
-        update_metadata(
-            pos, catalog, nbar=nbar, bias=bias, ngal=ngal, wmean=wmean, w2mean=w2mean
-        )
+        update_metadata(pos, catalog, nbar=nbar,
+                        #variance=variance, neff=neff, fsky=fsky,
+                        bias=bias)
 
         # return the position map
         return pos
@@ -373,12 +376,15 @@ class ScalarField(Field, spin=0):
         val /= wbar
 
         # compute bias from variance (per object)
-        bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
+        variance = var / wmean**2
+        neff = ngal / (4 * np.pi * fsky)
+        bias = fsky * variance / neff
+        #bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, bias=bias, ngal=ngal, wmean=wmean, var=var
-        )
+        update_metadata(val, catalog, wbar=wbar,
+                        variance=variance, neff=neff, fsky=fsky,
+                        bias=bias)
 
         # return the value map
         return val
@@ -445,12 +451,15 @@ class ComplexField(Field, spin=0):
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
+        variance = var / wmean**2
+        neff = ngal / (2 * np.pi * fsky)  # should we include the factor of 2 here?
+        #bias = fsky * variance / neff
         bias = 2 * np.pi * fsky**2 * (var / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, bias=bias, ngal=ngal, wmean=wmean, var=var
-        )
+        update_metadata(val, catalog, wbar=wbar,
+                        #variance=variance, neff=neff, fsky=fsky,
+                        bias=bias)
 
         # return the shear map
         return val
