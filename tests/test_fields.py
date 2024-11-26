@@ -207,7 +207,7 @@ def test_positions(mapper, catalog, vmap):
         "bias": pytest.approx(bias / nbar**2),
         "ngal": int(4.0 * npix),
         "wmean": 1.0,
-        "var": 1.0,
+        "w2mean": 1.0,
     }
     np.testing.assert_array_equal(m, 0)
 
@@ -229,7 +229,7 @@ def test_positions(mapper, catalog, vmap):
         "bias": pytest.approx(bias / nbar**2),
         "ngal": int(4.0 * npix),
         "wmean": 1.0,
-        "var": 1.0,
+        "w2mean": 1.0,
     }
     np.testing.assert_array_equal(m, 1.0)
 
@@ -255,7 +255,7 @@ def test_positions(mapper, catalog, vmap):
         "bias": pytest.approx(bias / nbar**2),
         "ngal": int(4.0 * npix),
         "wmean": 1.0,
-        "var": 1.0,
+        "w2mean": 1.0,
     }
 
     # compute number count map with visibility map
@@ -276,7 +276,7 @@ def test_positions(mapper, catalog, vmap):
         "bias": pytest.approx(bias / nbar**2),
         "ngal": int(4.0 * npix),
         "wmean": 1.0,
-        "var": 1.0,
+        "w2mean": 1.0,
     }
 
     # compute overdensity maps with given (incorrect) nbar
@@ -318,7 +318,7 @@ def test_scalar_field(mapper, catalog):
         "bias": pytest.approx(bias / wbar**2),
         "ngal": int(4.0 * npix),
         "wmean": pytest.approx(v1 / (4.0 * npix)),
-        "var": v2 / (4.0 * npix),
+        "w2mean": v2 / (4.0 * npix),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -352,7 +352,7 @@ def test_complex_field(mapper, catalog):
         "bias": pytest.approx(bias / wbar**2),
         "ngal": int(4.0 * npix),
         "wmean": v1 / (4.0 * npix),
-        "var": v2 / (4.0 * npix),
+        "w2mean": v2 / (4.0 * npix),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
