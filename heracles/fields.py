@@ -305,8 +305,8 @@ class Positions(Field, spin=0):
             del vis
 
         # compute bias of positions, including weight variance
-        variance = w2mean / wmean**2
-        neff = (npix * nbar) / (4 * np.pi * wmean)
+        variance = 1.0
+        neff = (nbar / mapper.area)**2 / (ngal / (4 * np.pi * fsky)) / w2mean
         bias = fsky * variance / neff
 
         # set metadata of array
