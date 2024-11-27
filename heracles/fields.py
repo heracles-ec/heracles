@@ -305,10 +305,14 @@ class Positions(Field, spin=0):
             del vis
 
         # compute bias of positions, including weight variance
-        bias = ngal / (4 * np.pi) * mapper.area**2 * (w2mean / nbar**2)
+        musq = 1.0
+        dens = (nbar / mapper.area) ** 2 / (ngal / (4 * np.pi * fsky)) / w2mean
+        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(pos, catalog, nbar=nbar, bias=bias)
+        update_metadata(
+            pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky, bias=bias
+        )
 
         # return the position map
         return pos
@@ -338,7 +342,7 @@ class ScalarField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, var = 0.0, 0.0
+        wmean, w2mean, var = 0.0, 0.0, 0.0
 
         # go through pages in catalogue and map values
         async for page in aiter_pages(catalog, progress):
@@ -354,6 +358,7 @@ class ScalarField(Field, spin=0):
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
                 var += (v**2 - var).sum() / ngal
 
                 del lon, lat, v, w
@@ -371,10 +376,15 @@ class ScalarField(Field, spin=0):
         val /= wbar
 
         # compute bias from variance (per object)
-        bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
+        musq = var / w2mean
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
+        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(val, catalog, wbar=wbar, bias=bias)
+        update_metadata(
+            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
+        )
 
         # return the value map
         return val
@@ -409,7 +419,7 @@ class ComplexField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, var = 0.0, 0.0
+        wmean, w2mean, var = 0.0, 0.0, 0.0
 
         # go through pages in catalogue and get the shear values,
         async for page in aiter_pages(catalog, progress):
@@ -425,6 +435,7 @@ class ComplexField(Field, spin=0):
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
                 var += (re**2 + im**2 - var).sum() / ngal
 
                 del lon, lat, re, im, w
@@ -441,10 +452,15 @@ class ComplexField(Field, spin=0):
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
-        bias = 2 * np.pi * fsky**2 * (var / wmean**2) / ngal
+        musq = var / w2mean
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
+        bias = (1 / 2) * fsky * musq / dens
 
         # set metadata of array
-        update_metadata(val, catalog, wbar=wbar, bias=bias)
+        update_metadata(
+            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
+        )
 
         # return the shear map
         return val
@@ -541,10 +557,15 @@ class Weights(Field, spin=0):
         wht /= wbar
 
         # bias from weights
-        bias = 4 * np.pi * fsky**2 * (w2mean / wmean**2) / ngal
+        musq = 1.0
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
+        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(wht, catalog, wbar=wbar, bias=bias)
+        update_metadata(
+            wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
+        )
 
         # return the weight map
         return wht

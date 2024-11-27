@@ -204,6 +204,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / np.pi),
+        "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 0)
@@ -223,6 +226,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / np.pi),
+        "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
     np.testing.assert_array_equal(m, 1.0)
@@ -246,6 +252,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / (np.pi * catalog.fsky)),
+        "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -264,6 +273,9 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / (np.pi * catalog.fsky)),
+        "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
 
@@ -287,9 +299,17 @@ def test_scalar_field(mapper, catalog):
 
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
+    v1 = w.sum()
     v2 = ((w * v) ** 2).sum()
+    v3 = (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    wmean = v1 / (4.0 * npix)
+    w2mean = v3 / (4.0 * npix)
+    var = v2 / (4.0 * npix)
+    musq = var / w2mean
+    deff = w2mean / wmean**2
+    dens = npix / np.pi / deff
     bias = (4 * np.pi / npix / npix) * v2
 
     assert m.shape == (npix,)
@@ -302,6 +322,9 @@ def test_scalar_field(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": pytest.approx(musq),
+        "dens": pytest.approx(dens),
+        "fsky": 1.0,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
@@ -318,9 +341,17 @@ def test_complex_field(mapper, catalog):
     w = next(iter(catalog))["w"]
     re = next(iter(catalog))["g1"]
     im = next(iter(catalog))["g2"]
+    v1 = w.sum()
     v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
+    v3 = (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
+    wmean = v1 / (4.0 * npix)
+    w2mean = v3 / (4.0 * npix)
+    var = v2 / (4.0 * npix)
+    musq = var / w2mean
+    deff = w2mean / wmean**2
+    dens = npix / np.pi / deff
     bias = (4 * np.pi / npix / npix) * v2 / 2
 
     assert m.shape == (2, npix)
@@ -333,6 +364,9 @@ def test_complex_field(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "fsky": 1.0,
+        "dens": pytest.approx(dens),
+        "musq": pytest.approx(musq),
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
@@ -351,6 +385,11 @@ def test_weights(mapper, catalog):
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
     bias = (4 * np.pi / npix / npix) * v2
+    v1 = w.sum()
+    wmean = v1 / (4.0 * npix)
+    w2mean = v2 / (4.0 * npix)
+    deff = w2mean / wmean**2
+    dens = npix / np.pi / deff
 
     assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
@@ -362,6 +401,9 @@ def test_weights(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
+        "musq": 1.0,
+        "dens": pytest.approx(dens),
+        "fsky": 1.0,
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, w / wbar)
