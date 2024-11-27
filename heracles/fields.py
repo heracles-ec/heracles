@@ -560,7 +560,6 @@ class Weights(Field, spin=0):
         musq = w2mean / wmean**2  # 1.0
         dens = ngal / (4 * np.pi * fsky)
         bias = fsky * musq / dens
-        # bias = 4 * np.pi * fsky**2 * (w2mean / wmean**2) / ngal
 
         # set metadata of array
         update_metadata(
