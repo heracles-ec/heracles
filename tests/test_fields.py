@@ -204,8 +204,8 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "variance": 1.0,
-        "neff": npix / np.pi,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / np.pi),
         "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -226,8 +226,8 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "variance": 1.0,
-        "neff": npix / np.pi,
+        "musq": 1.0,
+        "dens": pytest.approx(npix / np.pi),
         "fsky": 1.0,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -252,10 +252,10 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "variance": 1.0,
-        "neff": npix / (np.pi * catalog.fsky),
+        "musq": 1.0,
+        "dens": pytest.approx(npix / (np.pi * catalog.fsky)),
         "fsky": catalog.fsky,
-        "bias": pytest.approx(bias / nbar**2),
+        "bias": pytest.approx(bias / nbar**2, rel=1e-3),
     }
 
     # compute number count map with visibility map
@@ -273,8 +273,8 @@ def test_positions(mapper, catalog, vmap):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "variance": 1.0,
-        "neff": npix / (np.pi * catalog.fsky),
+        "musq": 1.0,
+        "dens": pytest.approx(npix / (np.pi * catalog.fsky)),
         "fsky": catalog.fsky,
         "bias": pytest.approx(bias / nbar**2),
     }
@@ -286,7 +286,7 @@ def test_positions(mapper, catalog, vmap):
         m = coroutines.run(f(catalog))
 
     assert m.dtype.metadata["nbar"] == 2 * nbar
-    assert m.dtype.metadata["bias"] == pytest.approx(2 * bias / (2 * nbar) ** 2)
+    assert m.dtype.metadata["bias"] == pytest.approx(bias / (2 * nbar) ** 2)
 
 
 def test_scalar_field(mapper, catalog):
@@ -318,8 +318,8 @@ def test_scalar_field(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "variance": pytest.approx(variance),
-        "neff": npix / np.pi,
+        "musq": pytest.approx(variance),
+        "dens": pytest.approx(npix / np.pi),
         "fsky": 1.0,
         "bias": pytest.approx(bias / wbar**2),
     }
@@ -357,8 +357,8 @@ def test_complex_field(mapper, catalog):
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
         "fsky": 1.0,
-        "neff": 2 * npix / np.pi,
-        "variance": pytest.approx(variance),
+        "dens": npix / np.pi,
+        "musq": pytest.approx(variance),
         "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)

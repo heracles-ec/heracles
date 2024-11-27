@@ -305,13 +305,13 @@ class Positions(Field, spin=0):
             del vis
 
         # compute bias of positions, including weight variance
-        variance = 1.0
-        neff = (nbar / mapper.area)**2 / (ngal / (4 * np.pi * fsky)) / w2mean
-        bias = fsky * variance / neff
+        musq = 1.0
+        dens = (nbar / mapper.area)**2 / (ngal / (4 * np.pi * fsky)) / w2mean
+        bias = fsky * musq / dens
 
         # set metadata of array
         update_metadata(
-            pos, catalog, nbar=nbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+            pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky, bias=bias
         )
 
         # return the position map
@@ -375,14 +375,16 @@ class ScalarField(Field, spin=0):
         val /= wbar
 
         # compute bias from variance (per object)
-        variance = var / w2mean
-        deff = w2mean / wmean**2
-        neff = ngal / (4 * np.pi * fsky) / deff
-        bias = fsky * variance / neff
+        musq = var / wmean**2
+        dens = ngal / (4 * np.pi * fsky)
+        #variance = var / w2mean
+        #deff = w2mean / wmean**2
+        #neff = ngal / (4 * np.pi * fsky) / deff
+        bias = fsky * musq / dens
 
         # set metadata of array
         update_metadata(
-            val, catalog, wbar=wbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
         )
 
         # return the value map
@@ -450,14 +452,16 @@ class ComplexField(Field, spin=0):
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
-        variance = var / w2mean
-        deff = w2mean / wmean**2
-        neff = ngal / (2 * np.pi * fsky) / deff
-        bias = fsky * variance / neff / 2
+        musq = var / wmean**2
+        dens = ngal / (4 * np.pi * fsky)  # should we include the factor of 2 here?
+        #variance = var / w2mean
+        #deff = w2mean / wmean**2
+        #neff = ngal / (2 * np.pi * fsky) / deff
+        bias = (1/2) * fsky * musq / dens 
 
         # set metadata of array
         update_metadata(
-            val, catalog, wbar=wbar, variance=variance, neff=neff, fsky=fsky, bias=bias
+            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
         )
 
         # return the shear map
