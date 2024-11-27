@@ -306,7 +306,7 @@ class Positions(Field, spin=0):
 
         # compute bias of positions, including weight variance
         musq = 1.0
-        dens = (nbar / mapper.area)**2 / (ngal / (4 * np.pi * fsky)) / w2mean
+        dens = (nbar / mapper.area) ** 2 / (ngal / (4 * np.pi * fsky)) / w2mean
         bias = fsky * musq / dens
 
         # set metadata of array
@@ -377,9 +377,9 @@ class ScalarField(Field, spin=0):
         # compute bias from variance (per object)
         musq = var / wmean**2
         dens = ngal / (4 * np.pi * fsky)
-        #variance = var / w2mean
-        #deff = w2mean / wmean**2
-        #neff = ngal / (4 * np.pi * fsky) / deff
+        # variance = var / w2mean
+        # deff = w2mean / wmean**2
+        # neff = ngal / (4 * np.pi * fsky) / deff
         bias = fsky * musq / dens
 
         # set metadata of array
@@ -453,11 +453,11 @@ class ComplexField(Field, spin=0):
 
         # bias from measured variance, for E/B decomposition
         musq = var / wmean**2
-        dens = ngal / (4 * np.pi * fsky)  # should we include the factor of 2 here?
-        #variance = var / w2mean
-        #deff = w2mean / wmean**2
-        #neff = ngal / (2 * np.pi * fsky) / deff
-        bias = (1/2) * fsky * musq / dens 
+        dens = ngal / (4 * np.pi * fsky)
+        # variance = var / w2mean
+        # deff = w2mean / wmean**2
+        # neff = ngal / (2 * np.pi * fsky) / deff
+        bias = (1 / 2) * fsky * musq / dens
 
         # set metadata of array
         update_metadata(
@@ -559,10 +559,15 @@ class Weights(Field, spin=0):
         wht /= wbar
 
         # bias from weights
-        bias = 4 * np.pi * fsky**2 * (w2mean / wmean**2) / ngal
+        musq = w2mean / wmean**2  # 1.0
+        dens = ngal / (4 * np.pi * fsky)
+        bias = fsky * musq / dens
+        # bias = 4 * np.pi * fsky**2 * (w2mean / wmean**2) / ngal
 
         # set metadata of array
-        update_metadata(wht, catalog, wbar=wbar, bias=bias)
+        update_metadata(
+            wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
+        )
 
         # return the weight map
         return wht
