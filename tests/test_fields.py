@@ -300,7 +300,7 @@ def test_scalar_field(mapper, catalog):
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
     v1 = w.sum()
-    v2 = (w ** 2).sum()
+    v2 = (w**2).sum()
     v3 = ((w * v) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
@@ -343,7 +343,7 @@ def test_complex_field(mapper, catalog):
     re = next(iter(catalog))["g1"]
     im = next(iter(catalog))["g2"]
     v1 = w.sum()
-    v2 = (w ** 2).sum()
+    v2 = (w**2).sum()
     v3 = ((w * re) ** 2 + (w * im) ** 2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
