@@ -450,9 +450,10 @@ class ComplexField(Field, spin=0):
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
-        variance = var / wmean**2
-        neff = ngal / (2 * np.pi * fsky)  # should we include the factor of 2 here?
-        bias = fsky * variance / neff
+        variance = var / w2mean
+        deff = w2mean / wmean**2
+        neff = ngal / (2 * np.pi * fsky) / deff
+        bias = fsky * variance / neff / 2
 
         # set metadata of array
         update_metadata(
