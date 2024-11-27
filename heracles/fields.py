@@ -456,6 +456,7 @@ class ComplexField(Field, spin=0):
         deff = w2mean / wmean**2
         dens = ngal / (4 * np.pi * fsky) / deff
         bias = (1 / 2) * fsky * musq / dens
+
         # set metadata of array
         update_metadata(
             val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
