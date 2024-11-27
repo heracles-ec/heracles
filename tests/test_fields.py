@@ -300,18 +300,17 @@ def test_scalar_field(mapper, catalog):
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
     v1 = w.sum()
-    v2 = (w**2).sum()
-    v3 = ((w * v) ** 2).sum()
+    v2 = ((w * v) ** 2).sum()
+    v3 = (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
     wmean = v1 / (4.0 * npix)
-    w2mean = v2 / (4.0 * npix)
-    var = v3 / (4.0 * npix)
+    w2mean = v3 / (4.0 * npix)
+    var = v2 / (4.0 * npix)
     musq = var / w2mean
     deff = w2mean / wmean**2
     dens = npix / np.pi / deff
-    bias = (4 * np.pi / npix / npix) * v3
-    bias = bias / wbar**2
+    bias = (4 * np.pi / npix / npix) * v2
 
     assert m.shape == (npix,)
     assert m.dtype.metadata == {
@@ -326,7 +325,7 @@ def test_scalar_field(mapper, catalog):
         "musq": pytest.approx(musq),
         "dens": pytest.approx(dens),
         "fsky": 1.0,
-        "bias": pytest.approx(bias),
+        "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
@@ -343,18 +342,17 @@ def test_complex_field(mapper, catalog):
     re = next(iter(catalog))["g1"]
     im = next(iter(catalog))["g2"]
     v1 = w.sum()
-    v2 = (w**2).sum()
-    v3 = ((w * re) ** 2 + (w * im) ** 2).sum()
+    v2 = ((w * re) ** 2 + (w * im) ** 2).sum()
+    v3 = (w**2).sum()
     w = w.reshape(w.size // 4, 4).sum(axis=-1)
     wbar = w.mean()
     wmean = v1 / (4.0 * npix)
-    w2mean = v2 / (4.0 * npix)
-    var = v3 / (4.0 * npix)
+    w2mean = v3 / (4.0 * npix)
+    var = v2 / (4.0 * npix)
     musq = var / w2mean
     deff = w2mean / wmean**2
     dens = npix / np.pi / deff
-    bias = (4 * np.pi / npix / npix) * v3 / 2
-    bias = bias / wbar**2
+    bias = (4 * np.pi / npix / npix) * v2 / 2
 
     assert m.shape == (2, npix)
     assert m.dtype.metadata == {
@@ -369,7 +367,7 @@ def test_complex_field(mapper, catalog):
         "fsky": 1.0,
         "dens": pytest.approx(dens),
         "musq": pytest.approx(musq),
-        "bias": pytest.approx(bias),
+        "bias": pytest.approx(bias / wbar**2),
     }
     np.testing.assert_array_almost_equal(m, 0)
 
