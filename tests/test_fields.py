@@ -255,7 +255,7 @@ def test_positions(mapper, catalog, vmap):
         "musq": 1.0,
         "dens": pytest.approx(npix / (np.pi * catalog.fsky)),
         "fsky": catalog.fsky,
-        "bias": pytest.approx(bias / nbar**2, rel=1e-3),
+        "bias": pytest.approx(bias / nbar**2),
     }
 
     # compute number count map with visibility map
