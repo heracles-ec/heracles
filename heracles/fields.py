@@ -342,7 +342,7 @@ class ScalarField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, var = 0.0, 0.0
+        wmean, w2mean, var = 0.0, 0.0, 0.0
 
         # go through pages in catalogue and map values
         async for page in aiter_pages(catalog, progress):
@@ -358,6 +358,7 @@ class ScalarField(Field, spin=0):
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
                 var += (v**2 - var).sum() / ngal
 
                 del lon, lat, v, w
@@ -375,11 +376,9 @@ class ScalarField(Field, spin=0):
         val /= wbar
 
         # compute bias from variance (per object)
-        musq = var / wmean**2
-        dens = ngal / (4 * np.pi * fsky)
-        # variance = var / w2mean
-        # deff = w2mean / wmean**2
-        # neff = ngal / (4 * np.pi * fsky) / deff
+        musq = var / w2mean
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
         bias = fsky * musq / dens
 
         # set metadata of array
@@ -420,7 +419,7 @@ class ComplexField(Field, spin=0):
 
         # total weighted variance from online algorithm
         ngal = 0
-        wmean, var = 0.0, 0.0
+        wmean, w2mean, var = 0.0, 0.0, 0.0
 
         # go through pages in catalogue and get the shear values,
         async for page in aiter_pages(catalog, progress):
@@ -436,6 +435,7 @@ class ComplexField(Field, spin=0):
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
+                w2mean += (w**2 - w2mean).sum() / ngal
                 var += (re**2 + im**2 - var).sum() / ngal
 
                 del lon, lat, re, im, w
@@ -452,13 +452,10 @@ class ComplexField(Field, spin=0):
         val /= wbar
 
         # bias from measured variance, for E/B decomposition
-        musq = var / wmean**2
-        dens = ngal / (4 * np.pi * fsky)
-        # variance = var / w2mean
-        # deff = w2mean / wmean**2
-        # neff = ngal / (2 * np.pi * fsky) / deff
+        musq = var / w2mean
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
         bias = (1 / 2) * fsky * musq / dens
-
         # set metadata of array
         update_metadata(
             val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
