@@ -375,8 +375,9 @@ class ScalarField(Field, spin=0):
         val /= wbar
 
         # compute bias from variance (per object)
-        variance = var / wmean**2
-        neff = ngal / (4 * np.pi * fsky)
+        variance = var / w2mean
+        deff = w2mean / wmean**2
+        neff = ngal / (4 * np.pi * fsky) / deff
         bias = fsky * variance / neff
 
         # set metadata of array
