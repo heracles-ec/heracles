@@ -390,7 +390,8 @@ def test_weights(mapper, catalog):
     v1 = w.sum()
     wmean = v1 / (4.0 * npix)
     w2mean = v2 / (4.0 * npix)
-    musq = w2mean / wmean**2
+    deff = w2mean / wmean**2
+    dens = npix / np.pi / deff
 
     assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
@@ -402,8 +403,8 @@ def test_weights(mapper, catalog):
         "nside": mapper.nside,
         "lmax": mapper.lmax,
         "deconv": mapper.deconvolve,
-        "musq": pytest.approx(musq),
-        "dens": pytest.approx(npix / np.pi),
+        "musq": 1.0,
+        "dens": pytest.approx(dens),
         "fsky": 1.0,
         "bias": pytest.approx(bias / wbar**2),
     }

@@ -557,8 +557,9 @@ class Weights(Field, spin=0):
         wht /= wbar
 
         # bias from weights
-        musq = w2mean / wmean**2  # 1.0
-        dens = ngal / (4 * np.pi * fsky)
+        musq = 1.0
+        deff = w2mean / wmean**2
+        dens = ngal / (4 * np.pi * fsky) / deff
         bias = fsky * musq / dens
 
         # set metadata of array
