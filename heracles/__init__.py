@@ -47,15 +47,13 @@ __all__ = [
     "Visibility",
     "Weights",
     # io
+    "read",
     "read_vmap",
     "read_alms",
-    "read_cls",
     "read_maps",
-    "read_mms",
+    "write",
     "write_alms",
-    "write_cls",
     "write_maps",
-    "write_mms",
     # mapper
     "Mapper",
     # mapping
@@ -64,13 +62,13 @@ __all__ = [
     # progress
     "NoProgress",
     "Progress",
+    # result
+    "Result",
+    "binned",
     # twopoint
     "angular_power_spectra",
     "debias_cls",
     "mixing_matrices",
-    "bin2pt",
-    "binned_cls",
-    "binned_mms",
 ]
 
 try:
@@ -108,15 +106,13 @@ from .fields import (
 )
 
 from .io import (
+    read,
     read_vmap,
     read_alms,
-    read_cls,
     read_maps,
-    read_mms,
+    write,
     write_alms,
-    write_cls,
     write_maps,
-    write_mms,
 )
 
 from .mapper import (
@@ -133,11 +129,13 @@ from .progress import (
     Progress,
 )
 
+from .result import (
+    Result,
+    binned,
+)
+
 from .twopoint import (
     angular_power_spectra,
     debias_cls,
     mixing_matrices,
-    bin2pt,
-    binned_cls,
-    binned_mms,
 )

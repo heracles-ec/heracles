@@ -1,5 +1,7 @@
 import pytest
 
+import heracles
+
 
 @pytest.fixture
 def zbins():
@@ -32,39 +34,69 @@ def mock_alms(rng, zbins):
 def mock_cls(rng):
     import numpy as np
 
-    cl = rng.random(101)
-    cl.dtype = np.dtype(
-        cl.dtype,
+    cl00 = rng.random(101)
+    cl00.dtype = np.dtype(
+        cl00.dtype,
         metadata={
             "catalog_1": "cat-a.fits",
             "nside_1": 32,
+            "spin_1": 0,
             "catalog_2": "cat-b.fits",
             "nside_2": 64,
+            "spin_2": 0,
+        },
+    )
+
+    cl02 = rng.random((2, 101))
+    cl02.dtype = np.dtype(
+        cl02.dtype,
+        metadata={
+            "catalog_1": "cat-a.fits",
+            "nside_1": 32,
+            "spin_1": 0,
+            "catalog_2": "cat-b.fits",
+            "nside_2": 64,
+            "spin_2": 2,
+        },
+    )
+
+    cl22 = rng.random((3, 101))
+    cl22.dtype = np.dtype(
+        cl22.dtype,
+        metadata={
+            "catalog_1": "cat-a.fits",
+            "nside_1": 32,
+            "spin_1": 2,
+            "catalog_2": "cat-b.fits",
+            "nside_2": 64,
+            "spin_2": 2,
+        },
+    )
+
+    cl22x = rng.random((4, 101))
+    cl22x.dtype = np.dtype(
+        cl22x.dtype,
+        metadata={
+            "catalog_1": "cat-a.fits",
+            "nside_1": 32,
+            "spin_1": 2,
+            "catalog_2": "cat-b.fits",
+            "nside_2": 64,
+            "spin_2": 2,
         },
     )
 
     return {
-        ("P", "P", 0, 0): cl,
-        ("P", "G_E", 0, 0): cl,
-        ("P", "G_B", 0, 0): cl,
-        ("G_E", "G_E", 0, 0): cl,
-        ("G_B", "G_B", 0, 0): cl,
-        ("G_E", "G_B", 0, 0): cl,
-        ("P", "P", 0, 1): cl,
-        ("P", "G_E", 0, 1): cl,
-        ("P", "G_B", 0, 1): cl,
-        ("G_E", "G_E", 0, 1): cl,
-        ("G_B", "G_B", 0, 1): cl,
-        ("G_E", "G_B", 0, 1): cl,
-        ("P", "G_E", 1, 0): cl,
-        ("P", "G_B", 1, 0): cl,
-        ("G_E", "G_B", 1, 0): cl,
-        ("P", "P", 1, 1): cl,
-        ("P", "G_E", 1, 1): cl,
-        ("P", "G_B", 1, 1): cl,
-        ("G_E", "G_E", 1, 1): cl,
-        ("G_B", "G_B", 1, 1): cl,
-        ("G_E", "G_B", 1, 1): cl,
+        ("POS", "POS", 0, 0): cl00,
+        ("POS", "SHE", 0, 0): cl02,
+        ("SHE", "SHE", 0, 0): cl22,
+        ("POS", "POS", 0, 1): cl00,
+        ("POS", "SHE", 0, 1): cl02,
+        ("SHE", "SHE", 0, 1): cl22x,
+        ("POS", "SHE", 1, 0): cl02,
+        ("POS", "POS", 1, 1): cl00,
+        ("POS", "SHE", 1, 1): cl02,
+        ("SHE", "SHE", 1, 1): cl22,
     }
 
 
@@ -240,54 +272,54 @@ def test_write_read_alms(mock_alms, tmp_path):
 def test_write_read_cls(mock_cls, tmp_path):
     import numpy as np
 
-    from heracles.io import read_cls, write_cls
+    path = tmp_path / "test.fits"
 
-    filename = "test.fits"
-    workdir = str(tmp_path)
+    assert not path.exists()
 
-    write_cls(filename, mock_cls, workdir=workdir)
+    heracles.write(path, mock_cls)
 
-    assert (tmp_path / filename).exists()
+    assert path.exists()
 
-    cls = read_cls(filename, workdir=workdir)
+    cls = heracles.read(path)
 
     assert list(cls.keys()) == list(mock_cls.keys())
     for key in mock_cls:
         assert key in cls
-        cl = cls[key]
-        assert cl.dtype.names == ("L", "CL", "LMIN", "LMAX", "W")
-        np.testing.assert_array_equal(cl["L"], np.arange(len(mock_cls[key])))
-        np.testing.assert_array_equal(cl["CL"], mock_cls[key])
-        assert cl.dtype.metadata == mock_cls[key].dtype.metadata
+        cl, mock_cl = cls[key], mock_cls[key]
+        assert cl.axis == cl.ndim - 1
+        lmax = mock_cl.shape[-1] - 1
+        np.testing.assert_array_equal(cl, mock_cl)
+        np.testing.assert_array_equal(cl.ell, np.arange(lmax + 1))
+        assert cl.dtype.metadata == mock_cl.dtype.metadata
 
 
 def test_write_read_mms(rng, tmp_path):
     import numpy as np
 
-    from heracles.io import read_mms, write_mms
-
-    filename = "test.fits"
-    workdir = str(tmp_path)
+    path = tmp_path / "test.fits"
 
     mms = {
-        ("P", "P", 0, 1): rng.standard_normal((10, 10)),
-        ("P", "G_E", 1, 2): rng.standard_normal((20, 5)),
-        ("G_E", "G_E", 2, 3): rng.standard_normal((10, 5, 2)),
+        ("POS", "POS", 0, 1): heracles.Result(rng.standard_normal((10, 10)), axis=0),
+        ("POS", "SHE", 1, 2): heracles.Result(rng.standard_normal((20, 5)), axis=0),
+        ("SHE", "SHE", 2, 3): heracles.Result(rng.standard_normal((10, 5, 2)), axis=1),
     }
 
-    write_mms(filename, mms, workdir=workdir)
+    assert not path.exists()
 
-    assert (tmp_path / filename).exists()
+    heracles.write(path, mms)
 
-    mms_ = read_mms(filename, workdir=workdir)
+    assert path.exists()
+
+    mms_ = heracles.read(path)
 
     assert mms_.keys() == mms.keys()
     for key in mms:
         assert key in mms_
         mm = mms_[key]
-        assert mm.dtype.names == ("L", "MM", "LMIN", "LMAX", "W")
-        np.testing.assert_array_equal(mm["L"], np.arange(len(mms[key])))
-        np.testing.assert_array_equal(mm["MM"], mms[key])
+        assert mm.axis == mm.ndim - 2
+        lmax = mm.shape[-2] - 1
+        np.testing.assert_array_equal(mm, mms[key])
+        np.testing.assert_array_equal(mm.ell, np.arange(lmax + 1))
 
 
 def test_write_read_cov(mock_cls, tmp_path):
