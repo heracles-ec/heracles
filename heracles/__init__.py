@@ -32,6 +32,8 @@ __all__ = [
     "FitsCatalog",
     "FootprintFilter",
     "InvalidValueFilter",
+    # config
+    "load_config",
     # core
     "TocDict",
     "toc_filter",
@@ -87,6 +89,10 @@ from .catalog import (
     FitsCatalog,
     FootprintFilter,
     InvalidValueFilter,
+)
+
+from .config import (
+    load_config,
 )
 
 from .core import (

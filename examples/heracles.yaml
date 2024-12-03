@@ -1,0 +1,46 @@
+# Example configuration file for Heracles.
+
+# Although we call this `configuration', it could be more correctly
+# characterised as `serialization' of the data that Heracles needs to run, in
+# the form of a YAML file.  The entire configuration is free-form and returned
+# as a namespace by `heracles.load_config()`.  However, certain sections such
+# as `catalogs` and `fields` are understood and used by the Heracles CLI.
+
+catalogs:
+  1: !selection # construct a base catalogue and give it a name (&cat)
+    catalog: !catalog/fits &cat catalog.fits
+    selection: "TOM_BIN_ID==1"
+    visibility: vmap.1.fits
+  2: !selection # reuse the same base catalogue (*cat)
+    catalog: *cat
+    selection: "TOM_BIN_ID==2"
+    visibility: vmap.2.fits
+  3: !selection
+    catalog: *cat
+    selection: "TOM_BIN_ID==3"
+    visibility: vmap.3.fits
+
+fields:
+  POS: !positions
+    mapper: !healpix { nside: 2048, lmax: 2000 }
+    columns:
+      - "SHE_RA"
+      - "SHE_DEC"
+    mask: VIS
+  SHE: !shears
+    mapper: !healpix { nside: 2048, lmax: 3000 }
+    columns:
+      - "SHE_RA"
+      - "SHE_DEC"
+      - "SHE_E1_CAL"
+      - "-SHE_E2_CAL"
+      - "SHE_WEIGHT"
+    mask: WHT
+  VIS: !visibility
+    mapper: !healpix { nside: 4096, lmax: 6000 }
+  WHT: !weights
+    mapper: !healpix { nside: 8192, lmax: 8000 }
+    columns:
+      - "SHE_RA"
+      - "SHE_DEC"
+      - "SHE_WEIGHT"
