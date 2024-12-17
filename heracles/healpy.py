@@ -48,7 +48,7 @@ def _nativebyteorder(fn):
         newargs = []
         for arr in args:
             if arr.dtype.byteorder != "=":
-                arr = arr.newbyteorder("=").byteswap()
+                arr = arr.view(arr.dtype.newbyteorder('=')).byteswap()
             newargs.append(arr)
         return fn(*newargs)
 
