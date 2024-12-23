@@ -82,8 +82,7 @@ class ProgressLogging:
     Progress bar without GUI interface.
     """
 
-    def __
-init__(self, label: str, *, box: List["ProgressLogging"] = None) -> None:
+    def __init__(self, label: str, *, box: List["ProgressLogging"] = None) -> None:
         self.label = label
         self.current = 0
         self.total = 1  # Default to 1 to avoid division by zero
