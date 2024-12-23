@@ -28,6 +28,8 @@ with external_dependency_explainer:
     import ipywidgets as widgets
     from IPython.display import display
 
+import sys
+from typing import List
 
 class Progress:
     """
@@ -79,13 +81,16 @@ class ProgressLogging:
     """
     Progress bar without GUI interface.
     """
-    def __init__(self, label: str, *, box: List["ProgressLogging"] = None) -> None:
+
+    def __
+init__(self, label: str, *, box: List["ProgressLogging"] = None) -> None:
         self.label = label
         self.current = 0
         self.total = 1  # Default to 1 to avoid division by zero
         self.box = box if box is not None else []
         self.line_offset = len(self.box)  # Track which line to overwrite
         sys.stdout.write("\n")
+
     def __enter__(self) -> "ProgressLogging":
         # Add this instance to the box if it's not already there
         if self not in self.box:
@@ -93,8 +98,10 @@ class ProgressLogging:
         self._display_box()
         #Ensure the cursor ends at a new line after the progress bars
         return self
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self._display_box()
+
     def update(self, current: int | None = None, total: int | None = None) -> None:
         # Update progress values
         if current is not None:
@@ -103,9 +110,11 @@ class ProgressLogging:
             self.total = total
         # Refresh the entire display box
         self._display_box()
+
     def task(self, label: str) -> "ProgressLogging":
         # Create a new task tied to the same box
         return self.__class__(label, box=self.box)
+
     def _display_box(self) -> None:
         """
         Redraw the progress bars in the terminal for all tasks in the box.
