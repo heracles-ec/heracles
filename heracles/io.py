@@ -214,6 +214,7 @@ def _write_map(fits, ext, key, m, *, names=None):
 
 def _read_map(hdu):
     """read HEALPix map from FITS table"""
+    from numpy.lib.recfunctions import structured_to_unstructured
 
     # read the map from the extension
     m = hdu.read()
@@ -221,7 +222,7 @@ def _read_map(hdu):
     # turn the structured array of columns into an unstructured array
     # transpose so that columns become rows (as that is how maps are)
     # then squeeze out degenerate axes
-    m = np.squeeze(np.lib.recfunctions.structured_to_unstructured(m).T)
+    m = np.squeeze(structured_to_unstructured(m).T)
 
     # read and attach metadata
     m.dtype = np.dtype(m.dtype, metadata=_read_metadata(hdu))
