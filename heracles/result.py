@@ -79,8 +79,13 @@ class Result(np.ndarray):
         self.upper = getattr(obj, "upper", None)
         self.weight = getattr(obj, "weight", None)
 
-    def __array_wrap__(self, context=None, return_scalar=False):
-        return super().__array_wrap__(context, return_scalar).view(np.ndarray)
+    def __array_wrap__(self, arr, context=None, return_scalar=False):
+        out = super().__array_wrap__(arr, context)
+        if out is self or type(self) is not Result:
+            return out
+        if return_scalar:
+            return out.item()
+        return out.view(np.ndarray)
 
 
 def binned(result, bins, weight=None):
