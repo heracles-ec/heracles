@@ -94,7 +94,16 @@ class CovMatrix(np.ndarray):
     two-point covariance matrix.
     """
 
-    __slots__ = ("ell_1", "ell_2", "lower_1", "lower_2", "upper_1", "upper_2", "weight")
+    __slots__ = (
+        "axis",
+        "ell_1",
+        "ell_2",
+        "lower_1",
+        "lower_2",
+        "upper_1",
+        "upper_2",
+        "weight",
+    )
 
     def __new__(
         cov,
@@ -102,6 +111,7 @@ class CovMatrix(np.ndarray):
         ell_1: NDArray[Any] | None = None,
         ell_2: NDArray[Any] | None = None,
         *,
+        axis: (int, int) | None = None,
         lower_1: NDArray[Any] | None = None,
         lower_2: NDArray[Any] | None = None,
         upper_1: NDArray[Any] | None = None,
@@ -122,6 +132,7 @@ class CovMatrix(np.ndarray):
     def __array_finalize__(self, obj: NDArray[Any] | None) -> None:
         if obj is None:
             return
+        self.axis = getattr(obj, "axis", None)
         self.ell_1 = getattr(obj, "ell_1", None)
         self.ell_2 = getattr(obj, "ell_2", None)
         self.lower_1 = getattr(obj, "lower_1", None)

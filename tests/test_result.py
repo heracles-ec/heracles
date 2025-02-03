@@ -139,7 +139,7 @@ def test_covmatrix(rng):
     assert view.lower_2 is ellmin_2
     assert view.upper_2 is ellmax_2
     assert view.weight is weight
-    assert view.axis == 0
+    assert view.axis == (-2, -1)
 
 
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
