@@ -87,6 +87,55 @@ class Result(np.ndarray):
             return out.item()
         return out.view(np.ndarray)
 
+class CovMatrix(np.ndarray):
+    """
+    NumPy :class:`~numpy.ndarray` subclass with extra properties for
+    two-point covariance matrix.
+    """
+
+    __slots__ = ("ell_1", "ell_2", "lower_1", "lower_2", "upper_1", "upper_2", "weight")
+
+    def __new__(
+        cov,
+        arr: NDArray[Any],
+        ell_1: NDArray[Any] | None = None,
+        ell_2: NDArray[Any] | None = None,
+        *,
+        lower_1: NDArray[Any] | None = None,
+        lower_2: NDArray[Any] | None = None,
+        upper_1: NDArray[Any] | None = None,
+        upper_2: NDArray[Any] | None = None,
+        weight: NDArray[Any] | None = None,
+    ) -> Self:
+        obj = np.asarray(arr).view(cov)
+        obj.axis = (-2, -1)
+        obj.ell_1 = ell_1
+        obj.ell_2 = ell_2
+        obj.lower_1 = lower_1
+        obj.lower_2 = lower_2
+        obj.upper_1 = upper_1
+        obj.upper_2 = upper_2
+        obj.weight = weight
+        return obj
+
+    def __array_finalize__(self, obj: NDArray[Any] | None) -> None:
+        if obj is None:
+            return
+        self.ell_1 = getattr(obj, "ell_1", None)
+        self.ell_2 = getattr(obj, "ell_2", None)
+        self.lower_1 = getattr(obj, "lower_1", None)
+        self.lower_2 = getattr(obj, "lower_2", None)
+        self.upper_1 = getattr(obj, "upper_1", None)
+        self.upper_2 = getattr(obj, "upper_2", None)
+        self.weight = getattr(obj, "weight", None)
+
+    def __array_wrap__(self, arr, context=None, return_scalar=False):
+        out = super().__array_wrap__(arr, context)
+        if out is self or type(self) is not Result:
+            return out
+        if return_scalar:
+            return out.item()
+        return out.view(np.ndarray)
 
 def binned(result, bins, weight=None):
     """
