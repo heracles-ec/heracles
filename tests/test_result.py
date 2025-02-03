@@ -82,6 +82,7 @@ def test_result(rng):
     with pytest.raises(ValueError, match="axis 1 is out of bounds"):
         heracles.Result([], axis=1)
 
+
 def test_covmatrix(rng):
     lmax1 = 30
     lmax2 = 200
@@ -94,12 +95,16 @@ def test_covmatrix(rng):
     weight = rng.random((lmax1 + 1, lmax2 + 1))
 
     arr = rng.random((lmax1 + 1, lmax2 + 1))
-    obj = heracles.CovMatrix(arr, ell_1, ell_2,
-                          lower_1=ellmin_1,
-                          upper_1=ellmax_1,
-                          lower_1=ellmin_2,
-                          upper_1=ellmax_2,
-                          weight=weight)
+    obj = heracles.CovMatrix(
+        arr,
+        ell_1,
+        ell_2,
+        lower_1=ellmin_1,
+        upper_1=ellmax_1,
+        lower_2=ellmin_2,
+        upper_2=ellmax_2,
+        weight=weight,
+    )
     np.testing.assert_array_equal(obj, arr)
     assert type(obj) is heracles.CovMatrix
     assert obj.ell_1 is ell_1
@@ -135,6 +140,7 @@ def test_covmatrix(rng):
     assert view.upper_2 is ellmax_2
     assert view.weight is weight
     assert view.axis == 0
+
 
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
 @pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (3, 1)])

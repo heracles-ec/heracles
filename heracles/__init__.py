@@ -64,8 +64,7 @@ __all__ = [
     "Progress",
     # result
     "Result",
-    "CovMatrix"
-    "binned",
+    "CovMatrix" "binned",
     # twopoint
     "angular_power_spectra",
     "debias_cls",

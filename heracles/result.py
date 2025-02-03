@@ -87,6 +87,7 @@ class Result(np.ndarray):
             return out.item()
         return out.view(np.ndarray)
 
+
 class CovMatrix(np.ndarray):
     """
     NumPy :class:`~numpy.ndarray` subclass with extra properties for
@@ -136,6 +137,7 @@ class CovMatrix(np.ndarray):
         if return_scalar:
             return out.item()
         return out.view(np.ndarray)
+
 
 def binned(result, bins, weight=None):
     """
