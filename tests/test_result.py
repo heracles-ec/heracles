@@ -82,6 +82,59 @@ def test_result(rng):
     with pytest.raises(ValueError, match="axis 1 is out of bounds"):
         heracles.Result([], axis=1)
 
+def test_covmatrix(rng):
+    lmax1 = 30
+    lmax2 = 200
+    ell_1 = np.arange(lmax1 + 1)
+    ell_2 = np.linspace(0, lmax2, num=21)
+    ellmin_1 = ell_1
+    ellmax_1 = ell_1 + 1
+    ellmin_2 = ell_2
+    ellmax_2 = ell_2 + 10
+    weight = rng.random((lmax1 + 1, lmax2 + 1))
+
+    arr = rng.random((lmax1 + 1, lmax2 + 1))
+    obj = heracles.CovMatrix(arr, ell_1, ell_2,
+                          lower_1=ellmin_1,
+                          upper_1=ellmax_1,
+                          lower_1=ellmin_2,
+                          upper_1=ellmax_2,
+                          weight=weight)
+    np.testing.assert_array_equal(obj, arr)
+    assert type(obj) is heracles.CovMatrix
+    assert obj.ell_1 is ell_1
+    assert obj.ell_2 is ell_2
+    assert obj.lower_1 is ellmin_1
+    assert obj.upper_1 is ellmax_1
+    assert obj.lower_2 is ellmin_2
+    assert obj.upper_2 is ellmax_2
+    assert obj.weight is weight
+    assert obj.axis == (-2, -1)
+
+    copy = obj.copy()
+    copy[:] += 1.0
+    np.testing.assert_array_equal(copy, arr + 1.0)
+    assert type(copy) is heracles.CovMatrix
+    assert copy.ell_1 is ell_1
+    assert copy.ell_2 is ell_2
+    assert copy.lower_1 is ellmin_1
+    assert copy.upper_1 is ellmax_1
+    assert copy.lower_2 is ellmin_2
+    assert copy.upper_2 is ellmax_2
+    assert copy.weight is weight
+    assert copy.axis == (-2, -1)
+
+    view = obj.view(heracles.CovMatrix)
+    np.testing.assert_array_equal(view, arr)
+    assert type(view) is heracles.CovMatrix
+    assert view.ell_1 is ell_1
+    assert view.ell_2 is ell_2
+    assert view.lower_1 is ellmin_1
+    assert view.upper_1 is ellmax_1
+    assert view.lower_2 is ellmin_2
+    assert view.upper_2 is ellmax_2
+    assert view.weight is weight
+    assert view.axis == 0
 
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
 @pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (3, 1)])
