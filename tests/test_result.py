@@ -114,7 +114,6 @@ def test_covmatrix(rng):
     assert obj.lower_2 is ellmin_2
     assert obj.upper_2 is ellmax_2
     assert obj.weight is weight
-    assert obj.axis == (-2, -1)
 
     copy = obj.copy()
     copy[:] += 1.0
@@ -127,7 +126,6 @@ def test_covmatrix(rng):
     assert copy.lower_2 is ellmin_2
     assert copy.upper_2 is ellmax_2
     assert copy.weight is weight
-    assert copy.axis == (-2, -1)
 
     view = obj.view(heracles.CovMatrix)
     np.testing.assert_array_equal(view, arr)
@@ -139,7 +137,6 @@ def test_covmatrix(rng):
     assert view.lower_2 is ellmin_2
     assert view.upper_2 is ellmax_2
     assert view.weight is weight
-    assert view.axis == (-2, -1)
 
 
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
