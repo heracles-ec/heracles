@@ -102,7 +102,8 @@ class CovMatrix(np.ndarray):
         "lower_2",
         "upper_1",
         "upper_2",
-        "weight",
+        "weight_1",
+        "weight_2",
     )
 
     def __new__(
@@ -115,7 +116,8 @@ class CovMatrix(np.ndarray):
         lower_2: NDArray[Any] | None = None,
         upper_1: NDArray[Any] | None = None,
         upper_2: NDArray[Any] | None = None,
-        weight: NDArray[Any] | None = None,
+        weight_1: NDArray[Any] | None = None,
+        weight_2: NDArray[Any] | None = None,
     ) -> Self:
         obj = np.asarray(arr).view(cov)
         obj.ell_1 = ell_1
@@ -124,7 +126,8 @@ class CovMatrix(np.ndarray):
         obj.lower_2 = lower_2
         obj.upper_1 = upper_1
         obj.upper_2 = upper_2
-        obj.weight = weight
+        obj.weight_1 = weight_1
+        obj.weight_2 = weight_2
         return obj
 
     def __array_finalize__(self, obj: NDArray[Any] | None) -> None:
@@ -136,7 +139,8 @@ class CovMatrix(np.ndarray):
         self.lower_2 = getattr(obj, "lower_2", None)
         self.upper_1 = getattr(obj, "upper_1", None)
         self.upper_2 = getattr(obj, "upper_2", None)
-        self.weight = getattr(obj, "weight", None)
+        self.weight_1 = getattr(obj, "weight_1", None)
+        self.weight_2 = getattr(obj, "weight_2", None)
 
     def __array_wrap__(self, arr, context=None, return_scalar=False):
         out = super().__array_wrap__(arr, context)
