@@ -107,7 +107,7 @@ class CovMatrix(np.ndarray):
     )
 
     def __new__(
-        cov,
+        cls,
         arr: NDArray[Any],
         ell_1: NDArray[Any] | None = None,
         ell_2: NDArray[Any] | None = None,
@@ -119,7 +119,7 @@ class CovMatrix(np.ndarray):
         weight_1: NDArray[Any] | None = None,
         weight_2: NDArray[Any] | None = None,
     ) -> Self:
-        obj = np.asarray(arr).view(cov)
+        obj = np.asarray(arr).view(cls)
         obj.ell_1 = ell_1
         obj.ell_2 = ell_2
         obj.lower_1 = lower_1
