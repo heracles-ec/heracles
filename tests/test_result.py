@@ -83,6 +83,67 @@ def test_result(rng):
         heracles.Result([], axis=1)
 
 
+def test_covmatrix(rng):
+    lmax1 = 30
+    lmax2 = 200
+    ell_1 = np.arange(lmax1 + 1)
+    ell_2 = np.linspace(0, lmax2, num=21)
+    ellmin_1 = ell_1
+    ellmax_1 = ell_1 + 1
+    ellmin_2 = ell_2
+    ellmax_2 = ell_2 + 10
+    weight_1 = rng.random((lmax1 + 1, lmax2 + 1))
+    weight_2 = rng.random((lmax1 + 1, lmax2 + 1))
+
+    arr = rng.random((lmax1 + 1, lmax2 + 1))
+    obj = heracles.CovMatrix(
+        arr,
+        ell_1,
+        ell_2,
+        lower_1=ellmin_1,
+        upper_1=ellmax_1,
+        lower_2=ellmin_2,
+        upper_2=ellmax_2,
+        weight_1=weight_1,
+        weight_2=weight_2,
+    )
+    np.testing.assert_array_equal(obj, arr)
+    assert type(obj) is heracles.CovMatrix
+    assert obj.ell_1 is ell_1
+    assert obj.ell_2 is ell_2
+    assert obj.lower_1 is ellmin_1
+    assert obj.upper_1 is ellmax_1
+    assert obj.lower_2 is ellmin_2
+    assert obj.upper_2 is ellmax_2
+    assert obj.weight_1 is weight_1
+    assert obj.weight_2 is weight_2
+
+    copy = obj.copy()
+    copy[:] += 1.0
+    np.testing.assert_array_equal(copy, arr + 1.0)
+    assert type(copy) is heracles.CovMatrix
+    assert copy.ell_1 is ell_1
+    assert copy.ell_2 is ell_2
+    assert copy.lower_1 is ellmin_1
+    assert copy.upper_1 is ellmax_1
+    assert copy.lower_2 is ellmin_2
+    assert copy.upper_2 is ellmax_2
+    assert copy.weight_1 is weight_1
+    assert copy.weight_2 is weight_2
+
+    view = obj.view(heracles.CovMatrix)
+    np.testing.assert_array_equal(view, arr)
+    assert type(view) is heracles.CovMatrix
+    assert view.ell_1 is ell_1
+    assert view.ell_2 is ell_2
+    assert view.lower_1 is ellmin_1
+    assert view.upper_1 is ellmax_1
+    assert view.lower_2 is ellmin_2
+    assert view.upper_2 is ellmax_2
+    assert view.weight_1 is weight_1
+    assert view.weight_2 is weight_2
+
+
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
 @pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (3, 1)])
 def test_binned(ndim, axis, weight, rng):
