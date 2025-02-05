@@ -27,14 +27,48 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-try:
-    from numpy.lib.array_utils import normalize_axis_index
-except ModuleNotFoundError:
-    from numpy.core.multiarray import normalize_axis_index
-
 if TYPE_CHECKING:
     from typing import Any, Self
     from numpy.typing import NDArray
+
+
+def normalize_result_axis(axis, result, ell):
+    """Return an axis tuple for a result."""
+    try:
+        from numpy.lib.array_utils import normalize_axis_tuple
+    except ModuleNotFoundError:
+        from numpy.lib.stride_tricks import normalize_axis_tuple
+
+    if axis is None:
+        if result.ndim == 0:
+            axis = ()
+        elif isinstance(ell, tuple):
+            axis = tuple(range(-len(ell), 0))
+        else:
+            axis = -1
+    return normalize_axis_tuple(axis, result.ndim, "axis")
+
+
+def get_result_array(result, name):
+    """Return a normalised version of the array *name* from *result*."""
+
+    arr = getattr(result, name, None)
+    axis = normalize_result_axis(getattr(result, "axis", None), result, arr)
+    if arr is None:
+        if name == "ell":
+            arr = tuple(np.arange(result.shape[i]) for i in axis)
+        elif name == "lower":
+            arr = get_result_array(result, "ell")
+        elif name == "upper":
+            _lower = get_result_array(result, "lower")
+            arr = tuple(np.append(lo[1:], lo[-1] + 1) for lo in _lower)
+        elif name == "weight":
+            arr = tuple(np.ones(result.shape[i]) for i in axis)
+        else:
+            raise ValueError(f"cannot make default for array {name!r}")
+    if isinstance(arr, tuple):
+        return arr
+    return (arr,) * len(axis)
 
 
 class Result(np.ndarray):
@@ -48,22 +82,15 @@ class Result(np.ndarray):
     def __new__(
         cls,
         arr: NDArray[Any],
-        ell: NDArray[Any] | None = None,
+        ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
         *,
-        axis: int | None = None,
-        lower: NDArray[Any] | None = None,
-        upper: NDArray[Any] | None = None,
-        weight: NDArray[Any] | None = None,
+        axis: int | tuple[int, ...] | None = None,
+        lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
+        upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
+        weight: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
     ) -> Self:
         obj = np.asarray(arr).view(cls)
-        if axis is None:
-            if obj.ndim == 0:
-                axis = None
-            else:
-                axis = obj.ndim - 1
-        else:
-            axis = normalize_axis_index(axis, ndim=obj.ndim)
-        obj.axis = axis
+        obj.axis = normalize_result_axis(axis, obj, ell)
         obj.ell = ell
         obj.lower = lower
         obj.upper = upper
@@ -172,8 +199,12 @@ def binned(result, bins, weight=None):
     # support for subclasses (Result) is important here
     result = np.asanyarray(result)
 
+    # multi-binning not implemented yet
+    if len(result.axis) != 1:
+        raise NotImplementedError("only 1D binning is supported")
+
     # shape of the data
-    axis = getattr(result, "axis", result.ndim - 1)
+    axis = getattr(result, "axis", (result.ndim - 1,))[0]
     shape = result.shape
     n = shape[axis]
 

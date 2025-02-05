@@ -286,7 +286,7 @@ def test_write_read_cls(mock_cls, tmp_path):
     for key in mock_cls:
         assert key in cls
         cl, mock_cl = cls[key], mock_cls[key]
-        assert cl.axis == cl.ndim - 1
+        assert cl.axis == (cl.ndim - 1,)
         lmax = mock_cl.shape[-1] - 1
         np.testing.assert_array_equal(cl, mock_cl)
         np.testing.assert_array_equal(cl.ell, np.arange(lmax + 1))
@@ -316,7 +316,7 @@ def test_write_read_mms(rng, tmp_path):
     for key in mms:
         assert key in mms_
         mm = mms_[key]
-        assert mm.axis == mm.ndim - 2
+        assert mm.axis == (mm.ndim - 2,)
         lmax = mm.shape[-2] - 1
         np.testing.assert_array_equal(mm, mms[key])
         np.testing.assert_array_equal(mm.ell, np.arange(lmax + 1))
