@@ -303,12 +303,9 @@ def _write_result(fits, ext, key, result):
     weight = _prepare_result_array(get_result_array(result, "weight"), order, nrows)
 
     # construct the result header
+    kw_ellaxis = str(axis).replace(" ", "")
     header = [
-        dict(name="LAXIS", value=len(axis), comment="number of angular axes"),
-    ]
-    header += [
-        dict(name=f"LAXIS{i+1}", value=j, comment=f"index of angular axis {i+1}")
-        for i, j in enumerate(axis)
+        dict(name="ELLAXIS", value=kw_ellaxis, comment="angular axis indices"),
     ]
 
     # write the result as columnar data
@@ -340,12 +337,14 @@ def _read_result(hdu):
     Read a result array from FITS.
     """
 
+    from ast import literal_eval
+
     # read columnar data from extension
     data = hdu.read()
     h = hdu.read_header()
 
     # the angular axis
-    axis = tuple(h[f"LAXIS{i+1}"] for i in range(h["LAXIS"]))
+    axis = literal_eval(h["ELLAXIS"])
 
     # get data array and move axis back to right position
     arr = np.moveaxis(data["ARRAY"], tuple(range(len(axis))), axis)
@@ -358,28 +357,28 @@ def _read_result(hdu):
     if _ell.ndim == 1:
         ell = _ell
     else:
-        ell = tuple(_ell[: arr.shape[j], i] for i, j in enumerate(order))
+        ell = tuple(_ell[: arr.shape[axis[i]], i] for i in order)
 
     # get lower bounds
     _lower = data["LOWER"]
     if _lower.ndim == 1:
         lower = _lower
     else:
-        lower = tuple(_lower[: arr.shape[j], i] for i, j in enumerate(order))
+        lower = tuple(_lower[: arr.shape[axis[i]], i] for i in order)
 
     # get upper bounds
     _upper = data["UPPER"]
     if _upper.ndim == 1:
         upper = _upper
     else:
-        upper = tuple(_upper[: arr.shape[j], i] for i, j in enumerate(order))
+        upper = tuple(_upper[: arr.shape[axis[i]], i] for i in order)
 
     # get weights
     _weight = data["WEIGHT"]
     if _weight.ndim == 1:
         weight = _weight
     else:
-        weight = tuple(_weight[: arr.shape[j], i] for i, j in enumerate(order))
+        weight = tuple(_weight[: arr.shape[axis[i]], i] for i in order)
 
     # construct result array with ancillary arrays and metadata
     return Result(
@@ -605,87 +604,6 @@ def read(path):
     logger.info("done with %d results", len(results))
 
     return results
-
-
-def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=None):
-    """write a set of covariance matrices to FITS file
-
-    If the output file exists, the new estimates will be appended, unless the
-    ``clobber`` parameter is set to ``True``.
-
-    """
-
-    logger.info("writing %d covariances to %s", len(cov), filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # if new or overwriting, create an empty FITS with primary HDU
-    if not os.path.isfile(path) or clobber:
-        with fitsio.FITS(path, mode="rw", clobber=True) as fits:
-            fits.write(None)
-
-    # reopen FITS for writing data
-    with fitsio.FITS(path, mode="rw", clobber=False) as fits:
-        for key, mat in cov.items():
-            # skip if not selected
-            if not toc_match(key, include=include, exclude=exclude):
-                continue
-
-            logger.info("writing covariance matrix %s", key)
-
-            # extension name
-            ext = _get_next_extname(fits, "COV")
-
-            # write the covariance matrix as an image
-            fits.write_image(mat, extname=ext)
-
-            # write the key
-            _write_key(fits[ext], key)
-
-            # write the WCS
-            fits[ext].write_key("WCSAXES", 2)
-            fits[ext].write_key("CNAME1", "L_1")
-            fits[ext].write_key("CNAME2", "L_2")
-            fits[ext].write_key("CTYPE1", " ")
-            fits[ext].write_key("CTYPE2", " ")
-            fits[ext].write_key("CUNIT1", " ")
-            fits[ext].write_key("CUNIT2", " ")
-
-            # write the metadata
-            _write_metadata(fits[ext], mat.dtype.metadata)
-
-    logger.info("done with %d covariance(s)", len(cov))
-
-
-def read_cov(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of covariances matrices from a FITS file"""
-
-    logger.info("reading covariance matrices from %s", filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # the returned set of covariances
-    cov = TocDict()
-
-    # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, "COV", include=include, exclude=exclude):
-        logger.info("reading covariance matrix %s", key)
-
-        # read the covariance matrix from the extension
-        mat = hdu.read()
-
-        # read and attach metadata
-        mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(hdu))
-
-        # store in set
-        cov[key] = mat
-
-    logger.info("done with %d covariance(s)", len(cov))
-
-    # return the toc dict of covariances
-    return cov
 
 
 class TocFits(MutableMapping):

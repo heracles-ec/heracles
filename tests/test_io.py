@@ -327,28 +327,32 @@ def test_write_read_cov(mock_cls, tmp_path):
 
     import numpy as np
 
-    from heracles.io import read_cov, write_cov
-
-    workdir = str(tmp_path)
-
     cov = {}
     for (a1, b1, i1, j1), (a2, b2, i2, j2) in combinations_with_replacement(
         mock_cls, 2
     ):
         cl1, cl2 = mock_cls[a1, b1, i1, j1], mock_cls[a2, b2, i2, j2]
-        cov[a1, b1, a2, b2, i1, j1, i2, j2] = np.outer(cl1, cl2)
+        c = cl1[..., None, : cl1.shape[-1] // 2, None] * cl2[..., None, :]
+        cov[a1, b1, a2, b2, i1, j1, i2, j2] = heracles.Result(c, axis=(-2, -1))
 
-    filename = "cov.fits"
+    path = tmp_path / "cov.fits"
 
-    write_cov(filename, cov, workdir=workdir)
+    heracles.write(path, cov)
 
-    assert (tmp_path / filename).exists()
+    assert path.exists()
 
-    cov_ = read_cov(filename, workdir=workdir)
+    cov_ = heracles.read(path)
 
     assert cov_.keys() == cov.keys()
     for key in cov:
-        np.testing.assert_array_equal(cov_[key], cov[key])
+        assert key in cov_
+        c = cov_[key]
+        assert c.axis == (c.ndim - 2, c.ndim - 1)
+        lmax1 = c.shape[-2] - 1
+        lmax2 = c.shape[-1] - 1
+        np.testing.assert_array_equal(c, cov[key])
+        np.testing.assert_array_equal(c.ell[0], np.arange(lmax1 + 1))
+        np.testing.assert_array_equal(c.ell[1], np.arange(lmax2 + 1))
 
 
 def test_read_vmap_partial(mock_vmap_fields, mock_vmap_partial, nside):
