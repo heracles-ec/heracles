@@ -23,7 +23,6 @@ import os
 import re
 from collections.abc import MutableMapping, Sequence
 from pathlib import Path
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Union
 from warnings import warn
 from weakref import WeakValueDictionary
@@ -554,11 +553,8 @@ def read(path):
     return results
 
 
-class TocFits(MutableMapping):
-    """A FITS-backed TocDict."""
-
-    tag = "EXT"
-    """Tag for FITS extensions."""
+class FitsDict(MutableMapping):
+    """A FITS-backed mapping."""
 
     @staticmethod
     def reader(hdu):
@@ -566,23 +562,17 @@ class TocFits(MutableMapping):
         return hdu.read()
 
     @staticmethod
-    def writer(fits, ext, key, data):
+    def writer(fits, ext, data):
         """Write data to FITS extension."""
         if data.dtype.names is None:
             msg = "data must be structured array"
             raise TypeError(msg)
         fits.write_table(data, extname=ext)
-        _write_key(fits[ext], key)
 
     @property
     def fits(self):
         """Return an opened FITS context manager."""
         return fitsio.FITS(self.path, mode="rw", clobber=False)
-
-    @property
-    def toc(self):
-        """Return a view of the FITS table of contents."""
-        return MappingProxyType(self._toc)
 
     def __init__(self, path, *, clobber=False):
         self.path = Path(path)
@@ -592,40 +582,39 @@ class TocFits(MutableMapping):
             with fitsio.FITS(self.path, mode="rw", clobber=True) as fits:
                 fits.write(None)
 
-        # create a dictionary of existing data
-        self._toc = TocDict(
-            {key: hdu.get_extname() for key, hdu in _iterfits(self.path, self.tag)},
-        )
-
         # set up a weakly-referenced cache for extension data
         self._cache = WeakValueDictionary()
 
-    def __len__(self):
-        return len(self._toc)
-
     def __iter__(self):
-        return iter(self._toc)
+        with fitsio.FITS(self.path) as fits:
+            for hdu in fits:
+                # skip extensions with no data
+                if not hdu.has_data():
+                    continue
+                # get extension name, skip if empty (= no key)
+                ext = hdu.get_extname()
+                if not ext:
+                    continue
+                # decode extension name into key, skip if empty
+                key = _key_from_string(ext)
+                if not key:
+                    continue
+                yield key
+
+    def __len__(self):
+        n = 0
+        for _ in iter(self):
+            n += 1
+        return n
 
     def __contains__(self, key):
-        if not isinstance(key, tuple):
-            key = (key,)
-        return key in self._toc
+        ext = _string_from_key(key)
+        with fitsio.FITS(self.path) as fits:
+            return ext in fits
 
     def __getitem__(self, key):
-        ext = self._toc[key]
-
-        # if a TocDict is returned, we have the result of a selection
-        if isinstance(ext, TocDict):
-            # make a new instance and copy attributes
-            selected = object.__new__(self.__class__)
-            selected.path = self.path
-            # shared cache since both instances read the same file
-            selected._cache = self._cache
-            # the new toc contains the result of the selection
-            selected._toc = ext
-            return selected
-
         # a specific extension was requested, fetch data
+        ext = _string_from_key(key)
         data = self._cache.get(ext)
         if data is None:
             with self.fits as fits:
@@ -634,22 +623,9 @@ class TocFits(MutableMapping):
         return data
 
     def __setitem__(self, key, value):
-        # keys are always tuples
-        if not isinstance(key, tuple):
-            key = (key,)
-
+        ext = _string_from_key(key)
         with self.fits as fits:
-            # check if an extension with the given key already exists
-            # otherwise, get the first free extension with the given tag
-            if key in self._toc:
-                ext = self._toc[key]
-            else:
-                ext = _get_next_extname(fits, self.tag)
-
-            # write data using the class writer, and update ToC as necessary
-            self.writer(fits, ext, key, value)
-            if key not in self._toc:
-                self._toc[key] = ext
+            self.writer(fits, ext, value)
 
     def __delitem__(self, key):
         # fitsio does not support deletion of extensions
@@ -657,17 +633,15 @@ class TocFits(MutableMapping):
         raise NotImplementedError(msg)
 
 
-class MapFits(TocFits):
+class MapFits(FitsDict):
     """FITS-backed mapping for maps."""
 
-    tag = "MAP"
     reader = staticmethod(_read_map)
     writer = staticmethod(_write_map)
 
 
-class AlmFits(TocFits):
+class AlmFits(FitsDict):
     """FITS-backed mapping for alms."""
 
-    tag = "ALM"
     reader = staticmethod(_read_complex)
     writer = staticmethod(_write_complex)
