@@ -64,7 +64,6 @@ __all__ = [
     "Progress",
     # result
     "Result",
-    "CovMatrix",
     "binned",
     # twopoint
     "angular_power_spectra",
@@ -132,7 +131,6 @@ from .progress import (
 
 from .result import (
     Result,
-    CovMatrix,
     binned,
 )
 
