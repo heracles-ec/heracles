@@ -221,7 +221,7 @@ def test_write_read_maps(rng, tmp_path):
     import healpy as hp
     import numpy as np
 
-    from heracles.io import read_maps, write_maps
+    path = tmp_path / "maps.fits"
 
     nside = 4
     npix = 12 * nside**2
@@ -240,9 +240,9 @@ def test_write_read_maps(rng, tmp_path):
         ("G", 3): g,
     }
 
-    write_maps("maps.fits", maps, workdir=str(tmp_path))
-    assert (tmp_path / "maps.fits").exists()
-    maps_r = read_maps("maps.fits", workdir=str(tmp_path))
+    heracles.write_maps(path, maps)
+    assert path.exists()
+    maps_r = heracles.read_maps(path)
 
     assert maps.keys() == maps_r.keys()
     for key in maps:
@@ -250,18 +250,18 @@ def test_write_read_maps(rng, tmp_path):
         assert maps[key].dtype.metadata == maps_r[key].dtype.metadata
 
     # make sure map can be read by healpy
-    m = hp.read_map(tmp_path / "maps.fits", hdu="MAP0")
+    m = hp.read_map(path, hdu="P-1")
     np.testing.assert_array_equal(maps["P", 1], m)
 
 
 def test_write_read_alms(mock_alms, tmp_path):
     import numpy as np
 
-    from heracles.io import read_alms, write_alms
+    path = tmp_path / "alms.fits"
 
-    write_alms("alms.fits", mock_alms, workdir=str(tmp_path))
-    assert (tmp_path / "alms.fits").exists()
-    alms = read_alms("alms.fits", workdir=str(tmp_path))
+    heracles.write_alms(path, mock_alms)
+    assert path.exists()
+    alms = heracles.read_alms(path)
 
     assert alms.keys() == mock_alms.keys()
     for key in mock_alms:
