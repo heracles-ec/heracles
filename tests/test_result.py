@@ -13,6 +13,7 @@ def test_result(rng):
     obj = heracles.Result(arr)
     np.testing.assert_array_equal(obj, arr)
     assert type(obj) is heracles.Result
+    assert obj.array is arr
     assert obj.axis == (0,)
     assert obj.ell is None
     assert obj.lower is None
@@ -21,12 +22,7 @@ def test_result(rng):
 
     sliced = obj[1:]
     np.testing.assert_array_equal(sliced, arr[1:])
-    assert type(sliced) is heracles.Result
-    assert sliced.axis == (0,)
-    assert sliced.ell is None
-    assert sliced.lower is None
-    assert sliced.upper is None
-    assert sliced.weight is None
+    assert type(sliced) is np.ndarray
 
     ell = np.arange(lmax + 1)
     ellmin = ell
@@ -35,6 +31,7 @@ def test_result(rng):
     obj = heracles.Result(arr, ell, lower=ellmin, upper=ellmax, weight=weight)
     np.testing.assert_array_equal(obj, arr)
     assert type(obj) is heracles.Result
+    assert obj.array is arr
     assert obj.axis == (0,)
     assert obj.ell is ell
     assert obj.lower is ellmin
@@ -43,44 +40,21 @@ def test_result(rng):
 
     sliced = obj[1:]
     np.testing.assert_array_equal(sliced, arr[1:])
-    assert type(sliced) is heracles.Result
-    assert sliced.axis == (0,)
-    assert sliced.ell is ell
-    assert sliced.lower is ellmin
-    assert sliced.upper is ellmax
-    assert sliced.weight is weight
+    assert type(sliced) is np.ndarray
 
     arr = rng.random((lmax + 1, 100))
     obj = heracles.Result(arr, ell, lower=ellmin, upper=ellmax, weight=weight, axis=0)
     np.testing.assert_array_equal(obj, arr)
     assert type(obj) is heracles.Result
+    assert obj.array is arr
     assert obj.ell is ell
     assert obj.lower is ellmin
     assert obj.upper is ellmax
     assert obj.weight is weight
     assert obj.axis == (0,)
 
-    copy = obj.copy()
-    copy[:] += 1.0
-    np.testing.assert_array_equal(copy, arr + 1.0)
-    assert type(copy) is heracles.Result
-    assert copy.ell is ell
-    assert copy.lower is ellmin
-    assert copy.upper is ellmax
-    assert copy.weight is weight
-    assert copy.axis == (0,)
-
-    view = obj.view(heracles.Result)
-    np.testing.assert_array_equal(view, arr)
-    assert type(view) is heracles.Result
-    assert view.ell is ell
-    assert view.lower is ellmin
-    assert view.upper is ellmax
-    assert view.weight is weight
-    assert view.axis == (0,)
-
     with pytest.raises(ValueError, match="axis 1 is out of bounds"):
-        heracles.Result([], axis=1)
+        heracles.Result(np.array([]), axis=1)
 
 
 def test_result_2d(rng):

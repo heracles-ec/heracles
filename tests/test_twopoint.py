@@ -275,7 +275,7 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
     assert mock.call_count == 1
     assert mock_eb.call_count == 0
     mock.assert_called_with(cl, l1max=None, l2max=None, l3max=None, spin=(0, 0))
-    assert mms["POS", "POS", 0, 1].base is mock.return_value
+    assert mms["POS", "POS", 0, 1].array is mock.return_value
     assert mms["POS", "POS", 0, 1].axis == (0,)
 
     mock.reset_mock()
@@ -291,9 +291,9 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
         call(cl, l1max=None, l2max=None, l3max=None, spin=(0, 2)),
         call(cl, l1max=None, l2max=None, l3max=None, spin=(2, 0)),
     ]
-    assert mms["POS", "SHE", 0, 1].base is mock.return_value
+    assert mms["POS", "SHE", 0, 1].array is mock.return_value
     assert mms["POS", "SHE", 0, 1].axis == (0,)
-    assert mms["SHE", "POS", 0, 1].base is mock.return_value
+    assert mms["SHE", "POS", 0, 1].array is mock.return_value
     assert mms["SHE", "POS", 0, 1].axis == (0,)
 
     mock.reset_mock()
@@ -306,7 +306,7 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
     assert mock.call_count == 0
     assert mock_eb.call_count == 1
     mock_eb.assert_called_with(cl, l1max=None, l2max=None, l3max=None, spin=(2, 2))
-    assert mms["SHE", "SHE", 0, 1].base is mock_eb.return_value
+    assert mms["SHE", "SHE", 0, 1].array is mock_eb.return_value
     assert mms["SHE", "SHE", 0, 1].axis == (1,)
 
     mock.reset_mock()

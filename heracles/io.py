@@ -290,11 +290,11 @@ def _write_result(fits, ext, key, result):
     # get axis in new order
     axis = tuple(_axis[i] for i in order)
 
-    # get data & move ell axes to front, largest first
-    data = np.moveaxis(result, axis, tuple(range(len(axis))))
+    # get array & move ell axes to front, largest first
+    arr = np.moveaxis(result, axis, tuple(range(len(axis))))
 
     # length of largest axis will be the number of rows
-    nrows = data.shape[0]
+    nrows = arr.shape[0]
 
     # get data arrays
     ell = _prepare_result_array(get_result_array(result, "ell"), order, nrows)
@@ -311,7 +311,7 @@ def _write_result(fits, ext, key, result):
     # write the result as columnar data
     fits.write_table(
         [
-            data,
+            arr,
             ell,
             lower,
             upper,
