@@ -27,14 +27,48 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-try:
-    from numpy.lib.array_utils import normalize_axis_index
-except ModuleNotFoundError:
-    from numpy.core.multiarray import normalize_axis_index
-
 if TYPE_CHECKING:
     from typing import Any, Self
     from numpy.typing import NDArray
+
+
+def normalize_result_axis(axis, result, ell):
+    """Return an axis tuple for a result."""
+    try:
+        from numpy.lib.array_utils import normalize_axis_tuple
+    except ModuleNotFoundError:
+        from numpy.lib.stride_tricks import normalize_axis_tuple
+
+    if axis is None:
+        if result.ndim == 0:
+            axis = ()
+        elif isinstance(ell, tuple):
+            axis = tuple(range(-len(ell), 0))
+        else:
+            axis = -1
+    return normalize_axis_tuple(axis, result.ndim, "axis")
+
+
+def get_result_array(result, name):
+    """Return a normalised version of the array *name* from *result*."""
+
+    arr = getattr(result, name, None)
+    axis = normalize_result_axis(getattr(result, "axis", None), result, arr)
+    if arr is None:
+        if name == "ell":
+            arr = tuple(np.arange(result.shape[i]) for i in axis)
+        elif name == "lower":
+            arr = get_result_array(result, "ell")
+        elif name == "upper":
+            _lower = get_result_array(result, "lower")
+            arr = tuple(np.append(lo[1:], lo[-1] + 1) for lo in _lower)
+        elif name == "weight":
+            arr = tuple(np.ones(result.shape[i]) for i in axis)
+        else:
+            raise ValueError(f"cannot make default for array {name!r}")
+    if isinstance(arr, tuple):
+        return arr
+    return (arr,) * len(axis)
 
 
 class Result(np.ndarray):
@@ -48,22 +82,15 @@ class Result(np.ndarray):
     def __new__(
         cls,
         arr: NDArray[Any],
-        ell: NDArray[Any] | None = None,
+        ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
         *,
-        axis: int | None = None,
-        lower: NDArray[Any] | None = None,
-        upper: NDArray[Any] | None = None,
-        weight: NDArray[Any] | None = None,
+        axis: int | tuple[int, ...] | None = None,
+        lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
+        upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
+        weight: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
     ) -> Self:
         obj = np.asarray(arr).view(cls)
-        if axis is None:
-            if obj.ndim == 0:
-                axis = None
-            else:
-                axis = obj.ndim - 1
-        else:
-            axis = normalize_axis_index(axis, ndim=obj.ndim)
-        obj.axis = axis
+        obj.axis = normalize_result_axis(axis, obj, ell)
         obj.ell = ell
         obj.lower = lower
         obj.upper = upper
@@ -78,69 +105,6 @@ class Result(np.ndarray):
         self.lower = getattr(obj, "lower", None)
         self.upper = getattr(obj, "upper", None)
         self.weight = getattr(obj, "weight", None)
-
-    def __array_wrap__(self, arr, context=None, return_scalar=False):
-        out = super().__array_wrap__(arr, context)
-        if out is self or type(self) is not Result:
-            return out
-        if return_scalar:
-            return out.item()
-        return out.view(np.ndarray)
-
-
-class CovMatrix(np.ndarray):
-    """
-    NumPy :class:`~numpy.ndarray` subclass with extra properties for
-    two-point covariance matrix.
-    """
-
-    __slots__ = (
-        "axis",
-        "ell_1",
-        "ell_2",
-        "lower_1",
-        "lower_2",
-        "upper_1",
-        "upper_2",
-        "weight_1",
-        "weight_2",
-    )
-
-    def __new__(
-        cls,
-        arr: NDArray[Any],
-        ell_1: NDArray[Any] | None = None,
-        ell_2: NDArray[Any] | None = None,
-        *,
-        lower_1: NDArray[Any] | None = None,
-        lower_2: NDArray[Any] | None = None,
-        upper_1: NDArray[Any] | None = None,
-        upper_2: NDArray[Any] | None = None,
-        weight_1: NDArray[Any] | None = None,
-        weight_2: NDArray[Any] | None = None,
-    ) -> Self:
-        obj = np.asarray(arr).view(cls)
-        obj.ell_1 = ell_1
-        obj.ell_2 = ell_2
-        obj.lower_1 = lower_1
-        obj.lower_2 = lower_2
-        obj.upper_1 = upper_1
-        obj.upper_2 = upper_2
-        obj.weight_1 = weight_1
-        obj.weight_2 = weight_2
-        return obj
-
-    def __array_finalize__(self, obj: NDArray[Any] | None) -> None:
-        if obj is None:
-            return
-        self.ell_1 = getattr(obj, "ell_1", None)
-        self.ell_2 = getattr(obj, "ell_2", None)
-        self.lower_1 = getattr(obj, "lower_1", None)
-        self.lower_2 = getattr(obj, "lower_2", None)
-        self.upper_1 = getattr(obj, "upper_1", None)
-        self.upper_2 = getattr(obj, "upper_2", None)
-        self.weight_1 = getattr(obj, "weight_1", None)
-        self.weight_2 = getattr(obj, "weight_2", None)
 
     def __array_wrap__(self, arr, context=None, return_scalar=False):
         out = super().__array_wrap__(arr, context)
@@ -172,8 +136,12 @@ def binned(result, bins, weight=None):
     # support for subclasses (Result) is important here
     result = np.asanyarray(result)
 
+    # multi-binning not implemented yet
+    if len(result.axis) != 1:
+        raise NotImplementedError("only 1D binning is supported")
+
     # shape of the data
-    axis = getattr(result, "axis", result.ndim - 1)
+    axis = getattr(result, "axis", (result.ndim - 1,))[0]
     shape = result.shape
     n = shape[axis]
 

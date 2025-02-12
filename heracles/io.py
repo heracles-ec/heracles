@@ -265,39 +265,48 @@ def _read_complex(hdu):
     return arr
 
 
+def _prepare_result_array(arr, order, size):
+    """Prepare result array for writing."""
+
+    if len(order) == 1:
+        return arr[0]
+    return np.transpose([np.pad(arr[i], (0, size - arr[i].size)) for i in order])
+
+
 def _write_result(fits, ext, key, result):
     """
     Write a result array to FITS.
     """
 
-    # keep ndarray subclasses or we would lose all Result attributes
-    result = np.asanyarray(result)
+    from heracles.result import normalize_result_axis, get_result_array
 
-    # get ell axis
-    axis = getattr(result, "axis", result.ndim - 1)
+    # original unsorted ell and axis
+    _ell = getattr(result, "ell", None)
+    _axis = normalize_result_axis(getattr(result, "axis", None), result, _ell)
 
-    # get data & move ell axis to front
-    data = np.moveaxis(result, axis, 0)
+    # get decreasing order of ell axes in terms of dimension size
+    order = np.argsort([result.shape[i] for i in _axis])[::-1]
 
-    # get ell values or create default
-    ell = getattr(result, "ell", None)
-    if ell is None:
-        ell = np.arange(data.shape[0])
+    # get axis in new order
+    axis = tuple(_axis[i] for i in order)
 
-    # get lower bounds or create default
-    lower = getattr(result, "lower", None)
-    if lower is None:
-        lower = ell
+    # get data & move ell axes to front, largest first
+    data = np.moveaxis(result, axis, tuple(range(len(axis))))
 
-    # get upper array bounds or create default
-    upper = getattr(result, "upper", None)
-    if upper is None:
-        upper = np.append(ell[1:], ell[-1] + 1)
+    # length of largest axis will be the number of rows
+    nrows = data.shape[0]
 
-    # get weight array or create default
-    weight = getattr(result, "weight", None)
-    if weight is None:
-        weight = np.ones(data.shape[0])
+    # get data arrays
+    ell = _prepare_result_array(get_result_array(result, "ell"), order, nrows)
+    lower = _prepare_result_array(get_result_array(result, "lower"), order, nrows)
+    upper = _prepare_result_array(get_result_array(result, "upper"), order, nrows)
+    weight = _prepare_result_array(get_result_array(result, "weight"), order, nrows)
+
+    # construct the result header
+    kw_ellaxis = str(axis).replace(" ", "")
+    header = [
+        dict(name="ELLAXIS", value=kw_ellaxis, comment="angular axis indices"),
+    ]
 
     # write the result as columnar data
     fits.write_table(
@@ -316,10 +325,7 @@ def _write_result(fits, ext, key, result):
             "WEIGHT",
         ],
         extname=ext,
-        header=[
-            dict(name="ELLAXIS", value=1, comment="number of angular axes"),
-            dict(name="ELLAXIS1", value=axis, comment="index of angular axis 1"),
-        ],
+        header=header,
     )
 
     # write the metadata
@@ -331,28 +337,58 @@ def _read_result(hdu):
     Read a result array from FITS.
     """
 
+    from ast import literal_eval
+
     # read columnar data from extension
     data = hdu.read()
     h = hdu.read_header()
 
     # the angular axis
-    elldim = h["ELLAXIS"]
-    if elldim != 1:
-        raise NotImplementedError("multiple angular axes are not supported")
-    axis = tuple(h[f"ELLAXIS{i}"] for i in range(1, elldim + 1))
+    axis = literal_eval(h["ELLAXIS"])
 
     # get data array and move axis back to right position
-    result = np.moveaxis(data["ARRAY"], tuple(range(elldim)), axis)
+    arr = np.moveaxis(data["ARRAY"], tuple(range(len(axis))), axis)
+
+    # sort ell axes into natural order
+    order = np.argsort(axis)
+
+    # get ells
+    _ell = data["ELL"]
+    if _ell.ndim == 1:
+        ell = _ell
+    else:
+        ell = tuple(_ell[: arr.shape[axis[i]], i] for i in order)
+
+    # get lower bounds
+    _lower = data["LOWER"]
+    if _lower.ndim == 1:
+        lower = _lower
+    else:
+        lower = tuple(_lower[: arr.shape[axis[i]], i] for i in order)
+
+    # get upper bounds
+    _upper = data["UPPER"]
+    if _upper.ndim == 1:
+        upper = _upper
+    else:
+        upper = tuple(_upper[: arr.shape[axis[i]], i] for i in order)
+
+    # get weights
+    _weight = data["WEIGHT"]
+    if _weight.ndim == 1:
+        weight = _weight
+    else:
+        weight = tuple(_weight[: arr.shape[axis[i]], i] for i in order)
 
     # construct result array with ancillary arrays and metadata
     return Result(
-        result,
-        axis=axis[0] if elldim == 1 else axis,
-        ell=data["ELL"],
-        lower=data["LOWER"],
-        upper=data["UPPER"],
-        weight=data["WEIGHT"],
-    ).view(np.dtype(result.dtype, metadata=_read_metadata(hdu)))
+        arr.view(np.dtype(arr.dtype, metadata=_read_metadata(hdu))),
+        axis=tuple(axis[i] for i in order),
+        ell=ell,
+        lower=lower,
+        upper=upper,
+        weight=weight,
+    )
 
 
 def read_vmap(filename, nside=None, field=0, *, transform=False, lmax=None):
@@ -568,87 +604,6 @@ def read(path):
     logger.info("done with %d results", len(results))
 
     return results
-
-
-def write_cov(filename, cov, clobber=False, workdir=".", include=None, exclude=None):
-    """write a set of covariance matrices to FITS file
-
-    If the output file exists, the new estimates will be appended, unless the
-    ``clobber`` parameter is set to ``True``.
-
-    """
-
-    logger.info("writing %d covariances to %s", len(cov), filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # if new or overwriting, create an empty FITS with primary HDU
-    if not os.path.isfile(path) or clobber:
-        with fitsio.FITS(path, mode="rw", clobber=True) as fits:
-            fits.write(None)
-
-    # reopen FITS for writing data
-    with fitsio.FITS(path, mode="rw", clobber=False) as fits:
-        for key, mat in cov.items():
-            # skip if not selected
-            if not toc_match(key, include=include, exclude=exclude):
-                continue
-
-            logger.info("writing covariance matrix %s", key)
-
-            # extension name
-            ext = _get_next_extname(fits, "COV")
-
-            # write the covariance matrix as an image
-            fits.write_image(mat, extname=ext)
-
-            # write the key
-            _write_key(fits[ext], key)
-
-            # write the WCS
-            fits[ext].write_key("WCSAXES", 2)
-            fits[ext].write_key("CNAME1", "L_1")
-            fits[ext].write_key("CNAME2", "L_2")
-            fits[ext].write_key("CTYPE1", " ")
-            fits[ext].write_key("CTYPE2", " ")
-            fits[ext].write_key("CUNIT1", " ")
-            fits[ext].write_key("CUNIT2", " ")
-
-            # write the metadata
-            _write_metadata(fits[ext], mat.dtype.metadata)
-
-    logger.info("done with %d covariance(s)", len(cov))
-
-
-def read_cov(filename, workdir=".", *, include=None, exclude=None):
-    """read a set of covariances matrices from a FITS file"""
-
-    logger.info("reading covariance matrices from %s", filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
-
-    # the returned set of covariances
-    cov = TocDict()
-
-    # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, "COV", include=include, exclude=exclude):
-        logger.info("reading covariance matrix %s", key)
-
-        # read the covariance matrix from the extension
-        mat = hdu.read()
-
-        # read and attach metadata
-        mat.dtype = np.dtype(mat.dtype, metadata=_read_metadata(hdu))
-
-        # store in set
-        cov[key] = mat
-
-    logger.info("done with %d covariance(s)", len(cov))
-
-    # return the toc dict of covariances
-    return cov
 
 
 class TocFits(MutableMapping):
