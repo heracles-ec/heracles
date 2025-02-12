@@ -30,7 +30,7 @@ from weakref import WeakValueDictionary
 import fitsio
 import numpy as np
 
-from .core import TocDict, toc_match
+from .core import toc_match
 from .result import Result
 
 if TYPE_CHECKING:
