@@ -281,9 +281,6 @@ def angular_power_spectra(
             # scalar-scalar
             cl = alm2cl(alm1, alm2, lmax=lmax)  # TT
 
-        # wrap in result array type
-        cl = Result(cl, axis=-1)
-
         # collect metadata
         md = {}
         bias = None
@@ -305,12 +302,16 @@ def angular_power_spectra(
         if debias and bias is not None:
             _debias_cl(cl, bias, md, inplace=True)
 
+        # write metadata for this spectrum
+        update_metadata(cl, **md)
+
+        # wrap in result array type
+        # do this before binned() so it picks up the correct ell axes
+        cl = Result(cl, axis=-1)
+
         # if bins are given, apply the binning
         if bins is not None:
             cl = binned(cl, bins, weights)
-
-        # write metadata for this spectrum
-        update_metadata(cl, **md)
 
         # add cl to the set
         cls[k1, k2, i1, i2] = cl

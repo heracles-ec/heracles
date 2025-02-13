@@ -22,14 +22,15 @@ Module for the result array type.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from typing import Any, Self
-    from numpy.typing import NDArray
+    from typing import Any
+    from numpy.typing import NDArray, DTypeLike
 
 
 def normalize_result_axis(axis, result, ell):
@@ -71,48 +72,47 @@ def get_result_array(result, name):
     return (arr,) * len(axis)
 
 
-class Result(np.ndarray):
+@dataclass(frozen=True, repr=False)
+class Result:
     """
-    NumPy :class:`~numpy.ndarray` subclass with extra properties for
-    two-point results and beyond.
+    Container for results.
     """
 
-    __slots__ = ("axis", "ell", "lower", "upper", "weight")
+    array: NDArray[Any]
+    ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
+    axis: int | tuple[int, ...] | None = None
+    lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
+    upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
+    weight: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
 
-    def __new__(
-        cls,
-        arr: NDArray[Any],
-        ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
-        *,
-        axis: int | tuple[int, ...] | None = None,
-        lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
-        upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
-        weight: NDArray[Any] | tuple[NDArray[Any], ...] | None = None,
-    ) -> Self:
-        obj = np.asarray(arr).view(cls)
-        obj.axis = normalize_result_axis(axis, obj, ell)
-        obj.ell = ell
-        obj.lower = lower
-        obj.upper = upper
-        obj.weight = weight
-        return obj
+    def __post_init__(self) -> None:
+        axis = normalize_result_axis(self.axis, self.array, self.ell)
+        object.__setattr__(self, "axis", axis)
 
-    def __array_finalize__(self, obj: NDArray[Any] | None) -> None:
-        if obj is None:
-            return
-        self.axis = getattr(obj, "axis", None)
-        self.ell = getattr(obj, "ell", None)
-        self.lower = getattr(obj, "lower", None)
-        self.upper = getattr(obj, "upper", None)
-        self.weight = getattr(obj, "weight", None)
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(axis={self.axis!r})"
 
-    def __array_wrap__(self, arr, context=None, return_scalar=False):
-        out = super().__array_wrap__(arr, context)
-        if out is self or type(self) is not Result:
-            return out
-        if return_scalar:
-            return out.item()
-        return out.view(np.ndarray)
+    def __array__(self, dtype=None, *, copy=None) -> NDArray[Any]:
+        if copy is not None:
+            # copy being set means NumPy v2, so it's safe to pass it on
+            return self.array.__array__(dtype, copy=copy)
+        # NumPy v1 might not know about copy
+        return self.array.__array__(dtype)
+
+    def __getitem__(self, key):
+        return self.array[key]
+
+    @property
+    def ndim(self) -> int:
+        return self.array.ndim
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        return self.array.shape
+
+    @property
+    def dtype(self) -> DTypeLike:
+        return self.array.dtype
 
 
 def binned(result, bins, weight=None):
@@ -132,16 +132,11 @@ def binned(result, bins, weight=None):
     bins = np.reshape(bins, -1)
     m = bins.size
 
-    # convert result to ndarray or subclass
-    # support for subclasses (Result) is important here
-    result = np.asanyarray(result)
-
-    # multi-binning not implemented yet
-    if len(result.axis) != 1:
-        raise NotImplementedError("only 1D binning is supported")
-
     # shape of the data
     axis = getattr(result, "axis", (result.ndim - 1,))[0]
+    if len(result.axis) != 1:
+        # multi-binning not implemented yet
+        raise NotImplementedError("only 1D binning is supported")
     shape = result.shape
     n = shape[axis]
 
@@ -176,7 +171,7 @@ def binned(result, bins, weight=None):
     wb = np.bincount(index, weights=w, minlength=m)[1:m]
 
     # create an empty binned output array
-    out = Result(np.empty(shape[:axis] + (m - 1,) + shape[axis + 1 :]), axis=axis)
+    out = np.empty(shape[:axis] + (m - 1,) + shape[axis + 1 :])
 
     # compute the binned result axis by axis
     for i in np.ndindex(shape[:axis]):
@@ -185,14 +180,14 @@ def binned(result, bins, weight=None):
             out[k] = norm(np.bincount(index, w * result[k], m)[1:m], wb)
 
     # compute the binned ell
-    out.ell = norm(np.bincount(index, w * ell, m)[1:m], wb)
+    ell = norm(np.bincount(index, w * ell, m)[1:m], wb)
 
-    # set bin edges
-    out.lower = bins[:-1]
-    out.upper = bins[1:]
-
-    # set the binned weight
-    out.weight = wb
-
-    # all done
-    return out
+    # construct the result
+    return Result(
+        out,
+        ell=ell,
+        axis=axis,
+        lower=bins[:-1],
+        upper=bins[1:],
+        weight=wb,
+    )
