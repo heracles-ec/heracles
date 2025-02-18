@@ -37,6 +37,8 @@ __all__ = [
     "toc_filter",
     "toc_match",
     "update_metadata",
+    "key_to_str",
+    "key_from_str",
     # fields
     "ComplexField",
     "Field",
@@ -92,6 +94,8 @@ from .core import (
     toc_filter,
     toc_match,
     update_metadata,
+    key_to_str,
+    key_from_str,
 )
 
 from .fields import (
