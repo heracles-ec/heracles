@@ -27,6 +27,7 @@ dependencies = [
     "healpy",
     "numba",
     "numpy",
+    "tomli; python_version<'3.11'",
 ]
 description = "Harmonic-space statistics on the sphere"
 dynamic = [
