@@ -2,6 +2,41 @@ import numpy as np
 import pytest
 
 
+def test_key_to_string():
+    from heracles.core import key_to_str
+
+    assert key_to_str("a") == "a"
+    assert key_to_str(1) == "1"
+    assert key_to_str(("a",)) == "a"
+    assert key_to_str((1,)) == "1"
+    assert key_to_str(("a", 1)) == "a-1"
+    assert key_to_str(("a", "b", 1, 2)) == "a-b-1-2"
+
+    # flatten nested sequences
+    assert key_to_str([("a", 1), "b"]) == "a-1-b"
+    assert key_to_str([("a", 1), ("b", (2,))]) == "a-1-b-2"
+
+    # test special chars
+    assert key_to_str("a-b-c") == r"a\-b\-c"
+    assert key_to_str(("a\\", 1)) == r"a\\-1"
+    assert key_to_str(("a\\-", 1)) == r"a\\\--1"
+    assert key_to_str(("a\\", -1)) == r"a\\-\-1"
+    assert key_to_str("a€£") == "a~"
+
+
+def test_string_to_key():
+    from heracles.io import key_from_str
+
+    assert key_from_str("a") == "a"
+    assert key_from_str("1") == 1
+    assert key_from_str("a-1") == ("a", 1)
+    assert key_from_str("a-b-1-2") == ("a", "b", 1, 2)
+    assert key_from_str(r"a\-b\-c") == "a-b-c"
+    assert key_from_str(r"a\\-1") == ("a\\", 1)
+    assert key_from_str(r"a\\\-1") == "a\\-1"
+    assert key_from_str(r"a\\-\-1") == ("a\\", -1)
+
+
 def test_toc_match():
     from heracles.core import toc_match
 

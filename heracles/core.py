@@ -22,13 +22,54 @@ Module for common core functionality.
 
 from __future__ import annotations
 
+import re
 from collections import UserDict
 from collections.abc import Mapping, Sequence
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 
 T = TypeVar("T")
+
+if TYPE_CHECKING:
+    # type for valid keys
+    Key = str | int | tuple["Key", ...]
+
+
+def key_to_str(key: Key) -> str:
+    """
+    Return string representation for a given key.
+    """
+    # recursive expansion for sequences
+    if isinstance(key, Sequence) and not isinstance(key, str):
+        return "-".join(map(key_to_str, key))
+
+    # get string representation of key
+    s = str(key)
+
+    # escape literal "\"
+    s = s.replace("\\", "\\\\")
+
+    # escape literal "-"
+    s = s.replace("-", "\\-")
+
+    # substitute non-FITS characters by tilde
+    s = re.sub(r"[^ -~]+", "~", s, flags=re.ASCII)
+
+    return s
+
+
+def key_from_str(s: str) -> Key:
+    """
+    Return key for a given string representation.
+    """
+    parts = re.split(r"(?<!\\)-", s.replace("\\\\", "\0"))
+    if len(parts) > 1:
+        return tuple(map(key_from_str, parts))
+    key = parts[0]
+    key = key.replace("\\-", "-")
+    key = key.replace("\0", "\\")
+    return int(key) if key.removeprefix("-").isdigit() else key
 
 
 def toc_match(key, include=None, exclude=None):

@@ -21,21 +21,17 @@
 import logging
 import os
 import re
-from collections.abc import MutableMapping, Sequence
+from collections.abc import MutableMapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Union
 from warnings import warn
 from weakref import WeakValueDictionary
 
 import fitsio
 import numpy as np
 
-from .core import TocDict, toc_match
+from .core import TocDict, toc_match, key_to_str, key_from_str
 from .result import Result
-
-if TYPE_CHECKING:
-    from typing import TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -67,45 +63,6 @@ _METADATA_COMMENTS = {
     "wbar_2": "mean weight of second field",
     "bias": "additive bias of spectrum",
 }
-
-# type for valid keys
-_DictKey: "TypeAlias" = Union[str, int, tuple["_DictKey", ...]]
-
-
-def _string_from_key(key: _DictKey) -> str:
-    """
-    Return string representation for a given key.
-    """
-    # recursive expansion for sequences
-    if isinstance(key, Sequence) and not isinstance(key, str):
-        return "-".join(map(_string_from_key, key))
-
-    # get string representation of key
-    s = str(key)
-
-    # escape literal "\"
-    s = s.replace("\\", "\\\\")
-
-    # escape literal "-"
-    s = s.replace("-", "\\-")
-
-    # substitute non-FITS characters by tilde
-    s = re.sub(r"[^ -~]+", "~", s, flags=re.ASCII)
-
-    return s
-
-
-def _key_from_string(s: str) -> _DictKey:
-    """
-    Return key for a given string representation.
-    """
-    parts = re.split(r"(?<!\\)-", s.replace("\\\\", "\0"))
-    if len(parts) > 1:
-        return tuple(map(_key_from_string, parts))
-    key = parts[0]
-    key = key.replace("\\-", "-")
-    key = key.replace("\0", "\\")
-    return int(key) if key.removeprefix("-").isdigit() else key
 
 
 def _get_next_extname(fits, prefix):
@@ -154,7 +111,7 @@ def _read_metadata(hdu):
 
 def _write_key(hdu, key):
     """write dictionary key to FITS HDU"""
-    hdu.write_key("DICTKEY", _string_from_key(key), "dictionary key of this extension")
+    hdu.write_key("DICTKEY", key_to_str(key), "dictionary key of this extension")
 
 
 def _read_key(hdu):
@@ -163,7 +120,7 @@ def _read_key(hdu):
     s = h.get("DICTKEY")
     if s is None:
         return None
-    return _key_from_string(s)
+    return key_from_str(s)
 
 
 def _write_map(fits, ext, key, m, *, names=None):
@@ -569,7 +526,7 @@ def write(path, results, *, clobber=False):
             logger.info("writing result %s", key)
 
             # extension name
-            ext = _string_from_key(key)
+            ext = key_to_str(key)
 
             # write the data in structured format
             _write_result(fits, ext, key, result)
@@ -595,7 +552,7 @@ def read(path):
             ext = hdu.get_extname()
             if not ext:
                 continue
-            key = _key_from_string(ext)
+            key = key_from_str(ext)
             if not key:
                 continue
             logger.info("reading result %s", key)

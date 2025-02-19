@@ -13,6 +13,7 @@ repos:
     rev: v0.24.2
     hooks:
       - id: toml-sort-fix
+        exclude: ^examples/
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
