@@ -20,17 +20,15 @@
 
 import logging
 import os
-import re
 from collections.abc import MutableMapping
 from pathlib import Path
-from types import MappingProxyType
 from warnings import warn
 from weakref import WeakValueDictionary
 
 import fitsio
 import numpy as np
 
-from .core import TocDict, toc_match, key_to_str, key_from_str
+from .core import toc_match, key_to_str, key_from_str
 from .result import Result
 
 logger = logging.getLogger(__name__)
@@ -65,32 +63,6 @@ _METADATA_COMMENTS = {
 }
 
 
-def _get_next_extname(fits, prefix):
-    """
-    Return the next available extension name starting with *prefix*.
-    """
-    n = 0
-    while (extname := f"{prefix}{n}") in fits:
-        n += 1
-    return extname
-
-
-def _iterfits(path, tag, include=None, exclude=None):
-    """
-    Iterate over HDUs that correspond to *tag* and have valid keys.
-    """
-    with fitsio.FITS(path) as fits:
-        for hdu in fits:
-            if not re.match(f"^{tag}\\d+$", hdu.get_extname()):
-                continue
-            key = _read_key(hdu)
-            if key is None:
-                continue
-            if not toc_match(key, include=include, exclude=exclude):
-                continue
-            yield key, hdu
-
-
 def _write_metadata(hdu, metadata):
     """write array metadata to FITS HDU"""
     md = metadata or {}
@@ -109,21 +81,7 @@ def _read_metadata(hdu):
     return md
 
 
-def _write_key(hdu, key):
-    """write dictionary key to FITS HDU"""
-    hdu.write_key("DICTKEY", key_to_str(key), "dictionary key of this extension")
-
-
-def _read_key(hdu):
-    """read dictionary key from FITS HDU"""
-    h = hdu.read_header()
-    s = h.get("DICTKEY")
-    if s is None:
-        return None
-    return key_from_str(s)
-
-
-def _write_map(fits, ext, key, m, *, names=None):
+def _write_map(fits, ext, m, *, names=None):
     """write HEALPix map to FITS table"""
 
     import healpy as hp
@@ -138,9 +96,6 @@ def _write_map(fits, ext, key, m, *, names=None):
 
     # write the data
     fits.write_table(cols, names=names, extname=ext)
-
-    # write the key
-    _write_key(fits[ext], key)
 
     # HEALPix metadata
     npix = np.shape(m)[-1]
@@ -187,7 +142,7 @@ def _read_map(hdu):
     return m
 
 
-def _write_complex(fits, ext, key, arr):
+def _write_complex(fits, ext, arr):
     """write complex-valued data to FITS table"""
     # deal with extra dimensions by moving last axis to first
     if arr.ndim > 1:
@@ -195,9 +150,6 @@ def _write_complex(fits, ext, key, arr):
 
     # write the data
     fits.write_table([arr.real, arr.imag], names=["real", "imag"], extname=ext)
-
-    # write the key
-    _write_key(fits[ext], key)
 
     # write the metadata
     _write_metadata(fits[ext], arr.dtype.metadata)
@@ -230,7 +182,7 @@ def _prepare_result_array(arr, order, size):
     return np.transpose([np.pad(arr[i], (0, size - arr[i].size)) for i in order])
 
 
-def _write_result(fits, ext, key, result):
+def _write_result(fits, ext, result):
     """
     Write a result array to FITS.
     """
@@ -372,15 +324,7 @@ def read_vmap(filename, nside=None, field=0, *, transform=False, lmax=None):
     return vmap
 
 
-def write_maps(
-    filename,
-    maps,
-    *,
-    clobber=False,
-    workdir=".",
-    include=None,
-    exclude=None,
-):
+def write_maps(path, maps, *, clobber=False):
     """write a set of maps to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -388,10 +332,7 @@ def write_maps(
 
     """
 
-    logger.info("writing %d maps to %s", len(maps), filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
+    logger.info("writing %d maps to %s", len(maps), path)
 
     # if new or overwriting, create an empty FITS with primary HDU
     if not os.path.isfile(path) or clobber:
@@ -401,36 +342,44 @@ def write_maps(
     # reopen FITS for writing data
     with fitsio.FITS(path, mode="rw", clobber=False) as fits:
         for key, m in maps.items():
-            # skip if not selected
-            if not toc_match(key, include=include, exclude=exclude):
-                continue
-
             logger.info("writing map %s", key)
 
             # extension name
-            ext = _get_next_extname(fits, "MAP")
+            ext = key_to_str(key)
 
             # write the map in HEALPix FITS format
-            _write_map(fits, ext, key, m)
+            _write_map(fits, ext, m)
 
     logger.info("done with %d maps", len(maps))
 
 
-def read_maps(filename, workdir=".", *, include=None, exclude=None):
+def read_maps(path, *, include=None, exclude=None):
     """read a set of maps from a FITS file"""
 
-    logger.info("reading maps from %s", filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
+    logger.info("reading maps from %s", path)
 
     # the returned set of maps
-    maps = TocDict()
+    maps = {}
 
-    # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, "MAP", include=include, exclude=exclude):
-        logger.info("reading map %s", key)
-        maps[key] = _read_map(hdu)
+    # read all HDUs in file into dict keys
+    with fitsio.FITS(path) as fits:
+        for hdu in fits:
+            # skip extensions with no data
+            if not hdu.has_data():
+                continue
+            # get extension name, skip if empty (= no key)
+            ext = hdu.get_extname()
+            if not ext:
+                continue
+            # decode extension name into key, skip if empty
+            key = key_from_str(ext)
+            if not key:
+                continue
+            # match key against explicit include and exclude
+            if not toc_match(key, include=include, exclude=exclude):
+                continue
+            logger.info("reading map %s", key)
+            maps[key] = _read_map(hdu)
 
     logger.info("done with %d maps", len(maps))
 
@@ -438,15 +387,7 @@ def read_maps(filename, workdir=".", *, include=None, exclude=None):
     return maps
 
 
-def write_alms(
-    filename,
-    alms,
-    *,
-    clobber=False,
-    workdir=".",
-    include=None,
-    exclude=None,
-):
+def write_alms(path, alms, *, clobber=False):
     """write a set of alms to FITS file
 
     If the output file exists, the new estimates will be appended, unless the
@@ -454,10 +395,7 @@ def write_alms(
 
     """
 
-    logger.info("writing %d alms to %s", len(alms), filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
+    logger.info("writing %d alms to %s", len(alms), path)
 
     # if new or overwriting, create an empty FITS with primary HDU
     if not os.path.isfile(path) or clobber:
@@ -467,36 +405,44 @@ def write_alms(
     # reopen FITS for writing data
     with fitsio.FITS(path, mode="rw", clobber=False) as fits:
         for key, alm in alms.items():
-            # skip if not selected
-            if not toc_match(key, include=include, exclude=exclude):
-                continue
-
             logger.info("writing alm %s", key)
 
             # extension name
-            ext = _get_next_extname(fits, "ALM")
+            ext = key_to_str(key)
 
             # write the alm as structured data with metadata
-            _write_complex(fits, ext, key, alm)
+            _write_complex(fits, ext, alm)
 
     logger.info("done with %d alms", len(alms))
 
 
-def read_alms(filename, workdir=".", *, include=None, exclude=None):
+def read_alms(path, *, include=None, exclude=None):
     """read a set of alms from a FITS file"""
 
-    logger.info("reading alms from %s", filename)
-
-    # full path to FITS file
-    path = os.path.join(workdir, filename)
+    logger.info("reading alms from %s", path)
 
     # the returned set of alms
-    alms = TocDict()
+    alms = {}
 
-    # iterate over valid HDUs in the file
-    for key, hdu in _iterfits(path, "ALM", include=include, exclude=exclude):
-        logger.info("reading alm %s", key)
-        alms[key] = _read_complex(hdu)
+    # read all HDUs in file into dict keys
+    with fitsio.FITS(path) as fits:
+        for hdu in fits:
+            # skip extensions with no data
+            if not hdu.has_data():
+                continue
+            # get extension name, skip if empty (= no key)
+            ext = hdu.get_extname()
+            if not ext:
+                continue
+            # decode extension name into key, skip if empty
+            key = key_from_str(ext)
+            if not key:
+                continue
+            # match key against explicit include and exclude
+            if not toc_match(key, include=include, exclude=exclude):
+                continue
+            logger.info("reading alm %s", key)
+            alms[key] = _read_complex(hdu)
 
     logger.info("done with %d alms", len(alms))
 
@@ -529,7 +475,7 @@ def write(path, results, *, clobber=False):
             ext = key_to_str(key)
 
             # write the data in structured format
-            _write_result(fits, ext, key, result)
+            _write_result(fits, ext, result)
 
     logger.info("done with %d results", len(results))
 
@@ -563,11 +509,8 @@ def read(path):
     return results
 
 
-class TocFits(MutableMapping):
-    """A FITS-backed TocDict."""
-
-    tag = "EXT"
-    """Tag for FITS extensions."""
+class FitsDict(MutableMapping):
+    """A FITS-backed mapping."""
 
     @staticmethod
     def reader(hdu):
@@ -575,23 +518,17 @@ class TocFits(MutableMapping):
         return hdu.read()
 
     @staticmethod
-    def writer(fits, ext, key, data):
+    def writer(fits, ext, data):
         """Write data to FITS extension."""
         if data.dtype.names is None:
             msg = "data must be structured array"
             raise TypeError(msg)
         fits.write_table(data, extname=ext)
-        _write_key(fits[ext], key)
 
     @property
     def fits(self):
         """Return an opened FITS context manager."""
         return fitsio.FITS(self.path, mode="rw", clobber=False)
-
-    @property
-    def toc(self):
-        """Return a view of the FITS table of contents."""
-        return MappingProxyType(self._toc)
 
     def __init__(self, path, *, clobber=False):
         self.path = Path(path)
@@ -601,40 +538,39 @@ class TocFits(MutableMapping):
             with fitsio.FITS(self.path, mode="rw", clobber=True) as fits:
                 fits.write(None)
 
-        # create a dictionary of existing data
-        self._toc = TocDict(
-            {key: hdu.get_extname() for key, hdu in _iterfits(self.path, self.tag)},
-        )
-
         # set up a weakly-referenced cache for extension data
         self._cache = WeakValueDictionary()
 
-    def __len__(self):
-        return len(self._toc)
-
     def __iter__(self):
-        return iter(self._toc)
+        with fitsio.FITS(self.path) as fits:
+            for hdu in fits:
+                # skip extensions with no data
+                if not hdu.has_data():
+                    continue
+                # get extension name, skip if empty (= no key)
+                ext = hdu.get_extname()
+                if not ext:
+                    continue
+                # decode extension name into key, skip if empty
+                key = key_from_str(ext)
+                if not key:
+                    continue
+                yield key
+
+    def __len__(self):
+        n = 0
+        for _ in iter(self):
+            n += 1
+        return n
 
     def __contains__(self, key):
-        if not isinstance(key, tuple):
-            key = (key,)
-        return key in self._toc
+        ext = key_to_str(key)
+        with fitsio.FITS(self.path) as fits:
+            return ext in fits
 
     def __getitem__(self, key):
-        ext = self._toc[key]
-
-        # if a TocDict is returned, we have the result of a selection
-        if isinstance(ext, TocDict):
-            # make a new instance and copy attributes
-            selected = object.__new__(self.__class__)
-            selected.path = self.path
-            # shared cache since both instances read the same file
-            selected._cache = self._cache
-            # the new toc contains the result of the selection
-            selected._toc = ext
-            return selected
-
         # a specific extension was requested, fetch data
+        ext = key_to_str(key)
         data = self._cache.get(ext)
         if data is None:
             with self.fits as fits:
@@ -643,22 +579,9 @@ class TocFits(MutableMapping):
         return data
 
     def __setitem__(self, key, value):
-        # keys are always tuples
-        if not isinstance(key, tuple):
-            key = (key,)
-
+        ext = key_to_str(key)
         with self.fits as fits:
-            # check if an extension with the given key already exists
-            # otherwise, get the first free extension with the given tag
-            if key in self._toc:
-                ext = self._toc[key]
-            else:
-                ext = _get_next_extname(fits, self.tag)
-
-            # write data using the class writer, and update ToC as necessary
-            self.writer(fits, ext, key, value)
-            if key not in self._toc:
-                self._toc[key] = ext
+            self.writer(fits, ext, value)
 
     def __delitem__(self, key):
         # fitsio does not support deletion of extensions
@@ -666,17 +589,15 @@ class TocFits(MutableMapping):
         raise NotImplementedError(msg)
 
 
-class MapFits(TocFits):
+class MapFits(FitsDict):
     """FITS-backed mapping for maps."""
 
-    tag = "MAP"
     reader = staticmethod(_read_map)
     writer = staticmethod(_write_map)
 
 
-class AlmFits(TocFits):
+class AlmFits(FitsDict):
     """FITS-backed mapping for alms."""
 
-    tag = "ALM"
     reader = staticmethod(_read_complex)
     writer = staticmethod(_write_complex)
