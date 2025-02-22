@@ -221,7 +221,7 @@ def test_write_read_maps(rng, tmp_path):
     import healpy as hp
     import numpy as np
 
-    from heracles.io import read_maps, write_maps
+    path = tmp_path / "maps.fits"
 
     nside = 4
     npix = 12 * nside**2
@@ -240,9 +240,9 @@ def test_write_read_maps(rng, tmp_path):
         ("G", 3): g,
     }
 
-    write_maps("maps.fits", maps, workdir=str(tmp_path))
-    assert (tmp_path / "maps.fits").exists()
-    maps_r = read_maps("maps.fits", workdir=str(tmp_path))
+    heracles.write_maps(path, maps)
+    assert path.exists()
+    maps_r = heracles.read_maps(path)
 
     assert maps.keys() == maps_r.keys()
     for key in maps:
@@ -250,18 +250,18 @@ def test_write_read_maps(rng, tmp_path):
         assert maps[key].dtype.metadata == maps_r[key].dtype.metadata
 
     # make sure map can be read by healpy
-    m = hp.read_map(tmp_path / "maps.fits", hdu="MAP0")
+    m = hp.read_map(path, hdu="P-1")
     np.testing.assert_array_equal(maps["P", 1], m)
 
 
 def test_write_read_alms(mock_alms, tmp_path):
     import numpy as np
 
-    from heracles.io import read_alms, write_alms
+    path = tmp_path / "alms.fits"
 
-    write_alms("alms.fits", mock_alms, workdir=str(tmp_path))
-    assert (tmp_path / "alms.fits").exists()
-    alms = read_alms("alms.fits", workdir=str(tmp_path))
+    heracles.write_alms(path, mock_alms)
+    assert path.exists()
+    alms = heracles.read_alms(path)
 
     assert alms.keys() == mock_alms.keys()
     for key in mock_alms:
@@ -403,114 +403,70 @@ def test_read_vmap(mock_vmap_fields, mock_vmap, nside):
     assert (vmap == vmapud).all()
 
 
-def test_tocfits(tmp_path):
+def test_fits_dict(tmp_path):
     import fitsio
     import numpy as np
 
-    from heracles.io import TocFits
-
-    class TestFits(TocFits):
-        tag = "TEST"
+    from heracles.io import FitsDict
 
     path = tmp_path / "test.fits"
 
     assert not path.exists()
 
-    tocfits = TestFits(path, clobber=True)
+    data = FitsDict(path, clobber=True)
 
     assert path.exists()
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 1
 
-    assert len(tocfits) == 0
-    assert list(tocfits) == []
-    assert tocfits.toc == {}
+    assert len(data) == 0
+    assert list(data) == []
 
     data12 = np.zeros(5, dtype=[("X", float), ("Y", int)])
     data22 = np.ones(5, dtype=[("X", float), ("Y", int)])
     data21 = np.full(5, 2, dtype=[("X", float), ("Y", int)])
 
-    tocfits[1, 2] = data12
+    data[1, 2] = data12
+
+    assert (1, 2) in data
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 2
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
+        np.testing.assert_array_equal(fits["1-2"].read(), data12)
 
-    assert len(tocfits) == 1
-    assert list(tocfits) == [(1, 2)]
-    assert tocfits.toc == {(1, 2): "TEST0"}
-    np.testing.assert_array_equal(tocfits[1, 2], data12)
+    assert len(data) == 1
+    assert list(data) == [(1, 2)]
+    np.testing.assert_array_equal(data[1, 2], data12)
 
-    tocfits[2, 2] = data22
+    data[2, 2] = data22
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 3
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
-        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
+        np.testing.assert_array_equal(fits["1-2"].read(), data12)
+        np.testing.assert_array_equal(fits["2-2"].read(), data22)
 
-    assert len(tocfits) == 2
-    assert list(tocfits) == [(1, 2), (2, 2)]
-    assert tocfits.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
-    np.testing.assert_array_equal(tocfits[1, 2], data12)
-    np.testing.assert_array_equal(tocfits[2, 2], data22)
+    assert len(data) == 2
+    assert list(data) == [(1, 2), (2, 2)]
+    np.testing.assert_array_equal(data[1, 2], data12)
+    np.testing.assert_array_equal(data[2, 2], data22)
 
     with pytest.raises(NotImplementedError):
-        del tocfits[1, 2]
+        del data[1, 2]
 
-    del tocfits
+    del data
 
-    tocfits2 = TestFits(path, clobber=False)
+    data2 = FitsDict(path, clobber=False)
 
-    assert len(tocfits2) == 2
-    assert list(tocfits2) == [(1, 2), (2, 2)]
-    assert tocfits2.toc == {(1, 2): "TEST0", (2, 2): "TEST1"}
-    np.testing.assert_array_equal(tocfits2[1, 2], data12)
-    np.testing.assert_array_equal(tocfits2[2, 2], data22)
+    assert len(data2) == 2
+    assert list(data2) == [(1, 2), (2, 2)]
+    np.testing.assert_array_equal(data2[1, 2], data12)
+    np.testing.assert_array_equal(data2[2, 2], data22)
 
-    tocfits2[2, 1] = data21
+    data2[2, 1] = data21
 
     with fitsio.FITS(path) as fits:
         assert len(fits) == 4
-        np.testing.assert_array_equal(fits["TEST0"].read(), data12)
-        np.testing.assert_array_equal(fits["TEST1"].read(), data22)
-        np.testing.assert_array_equal(fits["TEST2"].read(), data21)
-
-
-def test_tocfits_is_lazy(tmp_path):
-    import fitsio
-
-    from heracles.io import TocFits
-
-    path = tmp_path / "bad.fits"
-
-    # test keys(), values(), and items() are not eagerly reading data
-    tocfits = TocFits(path, clobber=True)
-
-    # manually enter some non-existent rows into the ToC
-    assert tocfits._toc == {}
-    tocfits._toc[0,] = "BAD0"
-    tocfits._toc[1,] = "BAD1"
-    tocfits._toc[2,] = "BAD2"
-
-    # these should not error
-    tocfits.keys()
-    tocfits.values()
-    tocfits.items()
-
-    # contains and iteration are lazy
-    assert 0 in tocfits
-    assert list(tocfits) == [(0,), (1,), (2,)]
-
-    # subselection should work fine
-    selected = tocfits[...]
-    assert isinstance(selected, TocFits)
-    assert len(selected) == 3
-
-    # make sure nothing is in the FITS
-    with fitsio.FITS(path, "r") as fits:
-        assert len(fits) == 1
-
-    # make sure there are errors when acualising the generators
-    with pytest.raises(OSError):
-        list(tocfits.values())
+        np.testing.assert_array_equal(fits["1-2"].read(), data12)
+        np.testing.assert_array_equal(fits["2-2"].read(), data22)
+        np.testing.assert_array_equal(fits["2-1"].read(), data21)
