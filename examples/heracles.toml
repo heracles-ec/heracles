@@ -1,25 +1,25 @@
 # example config file for Heracles
 
 [[catalogs]]
-fields = ["POS", "VIS"]
+source = "pos_catalog.fits"
 label = "position catalogue"
+fields = ["POS", "VIS"]
 selections = [
     {key = 1, selection = "POS_TOM_BIN_ID==1", visibility = "visibility.1.fits"},
     {key = 2, selection = "POS_TOM_BIN_ID==2", visibility = "visibility.2.fits"},
     {key = 3, selection = "POS_TOM_BIN_ID==3", visibility = "visibility.3.fits"},
 ]
-source = "pos_catalog.fits"
 
 [[catalogs]]
-fields = ["SHE", "WHT"]
+source = "she_catalog.fits"
 label = "shear catalogue"
+fields = ["SHE", "WHT"]
+visibility = "coverage.fits" # global visibility for this catalogue
 selections = [
     {key = 1, selection = "TOM_BIN_ID==1"},
     {key = 2, selection = "TOM_BIN_ID==2"},
     {key = 3, selection = "TOM_BIN_ID==3"},
 ]
-source = "she_catalog.fits"
-visibility = "coverage.fits" # global visibility for this catalogue
 
 [[fields]]
 key = "POS"

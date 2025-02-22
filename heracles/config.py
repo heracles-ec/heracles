@@ -90,7 +90,7 @@ class CatalogConfig(NamedTuple):
     fields: list[str]
     label: str | None
     visibility: str | None
-    selections: list[SelectionConfig] | None
+    selections: list[SelectionConfig]
 
 
 class TwoPointConfig(NamedTuple):
@@ -158,13 +158,10 @@ def _load_catalog(config: Mapping[str, Any]) -> CatalogConfig:
     if visibility is not None and not isinstance(visibility, str):
         raise ValueError(f"visibility: expected str, got {type(visibility)}")
 
-    _selections = config.pop("selections", None)
-    if _selections is not None:
-        if not isinstance(_selections, list):
-            raise ValueError(f"selections: expected list, got {type(_selections)}")
-        selections = list(map(_load_selection, _selections))
-    else:
-        selections = None
+    _selections = config.pop("selections", [])
+    if not isinstance(_selections, list):
+        raise ValueError(f"selections: expected list, got {type(_selections)}")
+    selections = list(map(_load_selection, _selections))
 
     # check unknown options
     if config:
@@ -354,7 +351,7 @@ def _load_twopoint(config: Mapping[str, Any]) -> tuple[TwoPointKey, TwoPointConf
     )
 
 
-def load_config(config: Mapping[str, Any]) -> Config:
+def load(config: Mapping[str, Any]) -> Config:
     """Load configuration from a dictionary."""
     # make a copy so that we can pop entries
     config = dict(config)

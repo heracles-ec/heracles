@@ -72,7 +72,7 @@ def test_catalog_config():
     assert config.source == "catalog.fits"
     assert config.fields == ["A", "B"]
     assert config.label is None
-    assert config.selections is None
+    assert config.selections == []
     assert config.visibility is None
 
     # test with invalid source
@@ -99,7 +99,7 @@ def test_catalog_config():
     assert config.source == "catalog.fits"
     assert config.fields == ["A", "B"]
     assert config.label == "my label"
-    assert config.selections is None
+    assert config.selections == []
     assert config.visibility is None
 
     # test with invalid label
@@ -154,7 +154,7 @@ def test_catalog_config():
     assert config.source == "catalog.fits"
     assert config.fields == ["A", "B"]
     assert config.label is None
-    assert config.selections is None
+    assert config.selections == []
     assert config.visibility == "vmap.fits"
 
     # test with invalid visibility
@@ -365,8 +365,8 @@ def test_load_twopoint():
         heracles.config._load_twopoint({"key": "x", "unknown": 0})
 
 
-def test_load_config():
-    config = heracles.config.load_config({})
+def test_load():
+    config = heracles.config.load({})
     assert config.catalogs == []
     assert config.fields == {}
     assert config.spectra == {}

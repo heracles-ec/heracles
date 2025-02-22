@@ -88,7 +88,6 @@ from .catalog import (
     FootprintFilter,
     InvalidValueFilter,
 )
-
 from .core import (
     TocDict,
     toc_filter,
