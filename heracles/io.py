@@ -493,6 +493,7 @@ def read_alms(path, *, include=None, exclude=None):
     # return the dictionary of alms
     return alms
 
+
 def dict2mat(cls, cov):
     Clkeys = list(cls.keys())
     ncls = len(Clkeys)
@@ -507,9 +508,9 @@ def dict2mat(cls, cov):
             covkey = (A, B, C, D, nA, nB, nC, nD)
             size_i = nells[i]
             size_j = nells[j]
-            full_cov[
-                i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j
-            ] = cov[covkey]
+            full_cov[i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j] = (
+                cov[covkey]
+            )
             if i != j:
                 full_cov[
                     j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i
@@ -540,25 +541,26 @@ def mat2dict(cls, cov):
                 ]
     return Cl_cov_dict
 
+
 def split_comps(covkey, ncls1, ncls2):
     a1, b1, a2, b2, i1, j1, i2, j2 = covkey
     if ncls1 == 1:
-        f1 = [('POS', 'POS')]
+        f1 = [("POS", "POS")]
     elif ncls1 == 2:
-        f1 = [('POS', 'G_E'), ('POS', 'G_B')]
+        f1 = [("POS", "G_E"), ("POS", "G_B")]
     elif ncls1 == 3:
-        f1 = [('G_E', 'G_E'), ('G_B', 'G_B'), ('G_E', 'G_B')]
+        f1 = [("G_E", "G_E"), ("G_B", "G_B"), ("G_E", "G_B")]
     elif ncls2 == 4:
-        f1 = [('G_E', 'G_E'), ('G_B', 'G_B'), ('G_E', 'G_B'), ('G_B', 'G_E')]
+        f1 = [("G_E", "G_E"), ("G_B", "G_B"), ("G_E", "G_B"), ("G_B", "G_E")]
 
     if ncls2 == 1:
-        f2 = [('POS', 'POS')]
+        f2 = [("POS", "POS")]
     elif ncls2 == 2:
-        f2 = [('POS', 'G_E'), ('POS', 'G_B')]
+        f2 = [("POS", "G_E"), ("POS", "G_B")]
     elif ncls2 == 3:
-        f2 = [('G_E', 'G_E'), ('G_B', 'G_B'), ('G_E', 'G_B')]
+        f2 = [("G_E", "G_E"), ("G_B", "G_B"), ("G_E", "G_B")]
     elif ncls2 == 4:
-        f2 = [('G_E', 'G_E'), ('G_B', 'G_B'), ('G_E', 'G_B'), ('G_B', 'G_E')]
+        f2 = [("G_E", "G_E"), ("G_B", "G_B"), ("G_E", "G_B"), ("G_B", "G_E")]
 
     covkeys = {}
     for i in range(ncls1):
@@ -571,14 +573,15 @@ def split_comps(covkey, ncls1, ncls2):
                 _a2, _b2 = "G_E", "G_B"
                 i2, j2 = j2, i2
             _covkey = _a1, _b1, _a2, _b2, i1, j1, i2, j2
-            covkeys[(i,j)] = _covkey
+            covkeys[(i, j)] = _covkey
     return covkeys, f1, f2
+
 
 def cov2spinblocks(cls, cov):
     _covs = {}
     cls_keys = list(cls.keys())
     for i in range(0, len(cls_keys)):
-        for j in range(i, len(cls_keys)): 
+        for j in range(i, len(cls_keys)):
             k1 = cls_keys[i]
             k2 = cls_keys[j]
             ell1 = cls[k1].ell
@@ -599,15 +602,16 @@ def cov2spinblocks(cls, cov):
             covkeys, comps1, comps2 = split_comps(covkey, ncls1, ncls2)
             # Save comps in dtype metadata
             dt = np.dtype(
-                float, 
+                float,
                 metadata={
-                    "fields1": comps1, 
+                    "fields1": comps1,
                     "fields2": comps2,
-                    })
+                },
+            )
             _cov = np.zeros((ncls1, ncls2, nells1, nells2), dtype=dt)
             for i in range(ncls1):
                 for j in range(ncls2):
-                    _covkey = covkeys[(i,j)]
+                    _covkey = covkeys[(i, j)]
                     if _covkey not in cov.keys():
                         # This triggers if the element doesn't exist
                         # but the symmetrical term does
@@ -616,6 +620,7 @@ def cov2spinblocks(cls, cov):
                         _cov[i, j, :, :] = cov[_covkey]
             _covs[covkey] = Result(_cov, ell=(ell1, ell2))
     return _covs
+
 
 def write(path, results, *, clobber=False):
     """
