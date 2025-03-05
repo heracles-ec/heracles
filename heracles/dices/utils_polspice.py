@@ -19,14 +19,8 @@
 import numpy as np
 from scipy.special import lpn as legendrep
 
-try:
-    from ..mathutils import gauss_legendre
-except:
-    # use np.polynomial.legendre if can't load fast native (so can use module without compiling camb)
-    # Fortran version is much faster than current np.polynomial
-    gauss_legendre = None
-    raise
 
+gauss_legendre = None
 _gauss_legendre_cache = {}
 
 
