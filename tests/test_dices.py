@@ -3,7 +3,7 @@ import numpy as np
 import heracles
 import pytest
 import yaml
-import dices
+import heracles.dices as dices
 
 
 def make_map():

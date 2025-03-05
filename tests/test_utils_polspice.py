@@ -1,5 +1,5 @@
 import numpy as np
-import dices
+import heracles.dices as dices
 
 
 def test_cl2corr():
