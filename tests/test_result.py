@@ -157,3 +157,13 @@ def test_binned_mapping():
     for i, key in enumerate(result):
         assert mock.call_args_list[i] == call(result[key], bins, weight)
         assert out[key] is mock.return_value
+
+
+def test_binned_metadata():
+    md = {"test": object()}
+
+    result = np.zeros(3, dtype=np.dtype(float, metadata=md))
+    assert result.dtype.metadata == md
+
+    binned = heracles.binned(result, np.array([0, 1, 2]))
+    assert binned.dtype.metadata == md

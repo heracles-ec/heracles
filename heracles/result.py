@@ -133,10 +133,13 @@ def binned(result, bins, weight=None):
     m = bins.size
 
     # shape of the data
-    axis = getattr(result, "axis", (result.ndim - 1,))[0]
-    if len(result.axis) != 1:
+    ellaxis = getattr(result, "axis", None)
+    if ellaxis is None:
+        ellaxis = (result.ndim - 1,)
+    if len(ellaxis) != 1:
         # multi-binning not implemented yet
         raise NotImplementedError("only 1D binning is supported")
+    axis = ellaxis[0]
     shape = result.shape
     n = shape[axis]
 
@@ -170,8 +173,15 @@ def binned(result, bins, weight=None):
     # compute the binned weight
     wb = np.bincount(index, weights=w, minlength=m)[1:m]
 
+    # construct output dtype with metadata
+    md = {}
+    if result.dtype.metadata:
+        md.update(result.dtype.metadata)
+    dt = np.dtype(float, metadata=md)
+
     # create an empty binned output array
-    out = np.empty(shape[:axis] + (m - 1,) + shape[axis + 1 :])
+    sh = shape[:axis] + (m - 1,) + shape[axis + 1 :]
+    out = np.empty(sh, dtype=dt)
 
     # compute the binned result axis by axis
     for i in np.ndindex(shape[:axis]):
