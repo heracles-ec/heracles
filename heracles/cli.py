@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import gc
 import sys
 import textwrap
@@ -82,14 +83,14 @@ def _maps_alms_internal(
     *,
     maps_path: str | None = None,
     alms_path: str | None = None,
-    config: str | None = None,
+    config_path: str | None = None,
     parallel: bool = False,
 ) -> None:
     """
     Compute maps and/or alms from catalogues.
     """
 
-    config_loaded = read_config(config)
+    config = read_config(config_path)
 
     if maps_path is not None:
         maps_out = heracles.io.MapFits(maps_path, clobber=True)
@@ -101,7 +102,7 @@ def _maps_alms_internal(
     else:
         alms_out = None
 
-    for catalog_config in config_loaded.catalogs:
+    for catalog_config in config.catalogs:
         base_catalog = heracles.FitsCatalog(catalog_config.source)
         base_catalog.label = catalog_config.label
 
@@ -114,7 +115,7 @@ def _maps_alms_internal(
             catalogs[selection.key] = base_catalog[selection.selection]
             visibilities[selection.key] = selection.visibility
 
-        fields = {key: config_loaded.fields[key] for key in catalog_config.fields}
+        fields = {key: config.fields[key] for key in catalog_config.fields}
 
         for key, catalog in catalogs.items():
             if visibilities[key] is not None:
@@ -166,7 +167,7 @@ def _maps_alms_internal(
 
 def maps(
     path: str,
-    config: str | None = None,
+    config_path: str | None = None,
     parallel: bool = False,
 ) -> None:
     """map catalogues
@@ -174,13 +175,17 @@ def maps(
     Create maps from input catalogues.
 
     """
-    _maps_alms_internal(maps_path=path, config=config, parallel=parallel)
+    return _maps_alms_internal(
+        maps_path=path,
+        config_path=config_path,
+        parallel=parallel,
+    )
 
 
 def alms(
     path: str,
-    maps: list[str] | None = None,
-    config: str | None = None,
+    maps: list[str],
+    config_path: str | None = None,
     parallel: bool = False,
 ) -> None:
     """compute alms from catalogues or maps
@@ -189,12 +194,15 @@ def alms(
 
     """
     # if no maps are given, process directly from catalogues
-    if maps is None:
-        _maps_alms_internal(alms_path=path, config=config, parallel=parallel)
-        return
+    if not maps:
+        return _maps_alms_internal(
+            alms_path=path,
+            config_path=config_path,
+            parallel=parallel,
+        )
 
     # load configuration to get fields
-    config_loaded = read_config(config)
+    config = read_config(config_path)
 
     # open output FITS
     alms_out = heracles.io.AlmFits(path, clobber=True)
@@ -208,10 +216,44 @@ def alms(
         data = heracles.io.MapFits(maps_path)
 
         # transform this fits
-        heracles.transform(config_loaded.fields, data, out=alms_out)
+        heracles.transform(config.fields, data, out=alms_out)
 
         # clean up before next iteration
         del data
+
+
+def spectra(
+    path: str,
+    alms: list[str],
+    *,
+    config_path: str | None = None,
+) -> None:
+    """compute angular power spectra
+
+    Compute angular power spectra from sets of alms.
+
+    """
+
+    # load configuration to get requested spectra
+    config = read_config(config_path)
+
+    # make sure two-point statistics are defined in config
+    if not config.spectra:
+        raise ValueError(f"{config_path}: no 'spectra' in config")
+
+    # lazy-load all input FITS into a combined mapping
+    all_alms = collections.ChainMap({})
+    for alms_path in alms:
+        # quick check to see if file is readable
+        with open(alms_path) as _fp:
+            pass
+
+        # add new lazy-loaded FITS to the ChainMap
+        # keys will be sorted in the order the files are passed
+        all_alms = all_alms.new_child(heracles.io.AlmFits(alms_path, clobber=False))
+
+    # compute all spectra combinations
+    spectra = {}
 
 
 def main() -> int:
@@ -240,7 +282,12 @@ def main() -> int:
 
     # common parser for all subcommands
     cmd_parser = argparse.ArgumentParser(add_help=False)
-    cmd_parser.add_argument("-c", "--config", help="configuration file")
+    cmd_parser.add_argument(
+        "-c",
+        "--config",
+        help="configuration file",
+        dest="config_path",
+    )
 
     # main parser for CLI invokation
     main_parser = argparse.ArgumentParser(
@@ -294,9 +341,24 @@ def main() -> int:
         help="output FITS file for alms",
     )
     alms_parser.add_argument(
-        "--maps",
-        action="append",
+        "maps",
+        nargs="*",
         help="transform pre-computed maps",
+    )
+
+    ###########
+    # spectra #
+    ###########
+
+    spectra_parser = add_command(spectra)
+    spectra_parser.add_argument(
+        "path",
+        help="output FITS file for spectra",
+    )
+    spectra_parser.add_argument(
+        "alms",
+        nargs="+",
+        help="input FITS file(s) with sets of alms",
     )
 
     #######
