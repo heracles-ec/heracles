@@ -1,7 +1,7 @@
 import numpy as np
 import heracles
-import pytest
 import heracles.dices as dices
+
 
 def test_add_to_cls():
     cls = {}
