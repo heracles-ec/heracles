@@ -1,13 +1,7 @@
 import numpy as np
 import heracles
-<<<<<<< HEAD
 import pytest
-import yaml
 import heracles.dices as dices
-=======
-import dices
->>>>>>> 6596cde87ca2f08afe99d7e7d5d7a66a9279acb1
-
 
 def test_add_to_cls():
     cls = {}
