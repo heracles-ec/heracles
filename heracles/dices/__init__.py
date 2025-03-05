@@ -45,6 +45,8 @@ __all__ = [
     "cl2corr",
     "corr2cl",
     # utils
+    "cov2corr",
+    "add_to_Cls",
     "compsep_Cls",
     "dict2mat",
     "mat2dict",
@@ -58,5 +60,5 @@ from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import get_delete1_cov
 from .delete2 import get_delete2_cov, get_delete2_correction
 from .dices import get_dices_cov
-from .utils_cl import compsep_Cls, dict2mat, mat2dict, cov2spinblocks
+from .utils_cl import cov2corr, add_to_Cls, compsep_Cls, dict2mat, mat2dict, cov2spinblocks
 from .utils_polspice import cl2corr, corr2cl
