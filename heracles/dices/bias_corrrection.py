@@ -1,14 +1,5 @@
-import os
-import math
-import heracles
 import numpy as np
-import healpy as hp
-from copy import deepcopy
-from heracles.fields import Positions, Shears, Visibility, Weights
-from heracles import transform
-from heracles.healpy import HealpixMapper
-from heracles.result import binned, Result
-from heracles.io import write, read
+from heracles.result import Result
 from .utils_cl import (
     add_to_Cls,
     sub_to_Cls,

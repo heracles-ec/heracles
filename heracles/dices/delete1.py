@@ -105,6 +105,7 @@ def get_delete1_cov(Cls0, Clsjks, shrink=True):
     S = mat2dict(Cqs0, S)
     return shrunk_S, S, T
 
+
 def get_W(x, xbar, jk=False):
     """
     Computes the W matrices used to cpmpute the covariance

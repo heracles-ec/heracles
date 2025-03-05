@@ -81,6 +81,7 @@ def compsep_Cls(Cls):
             Cls_compsep[("POS", "G_B", b1, b2)] = Result(cl[..., 1, :], ell)
     return Cls_compsep
 
+
 def get_Clkey(sources1, sources2):
     """
     Produces a Cl key for data maps.
@@ -102,6 +103,7 @@ def get_Clkey(sources1, sources2):
         else:
             Clkey = (n1, n2, i1, i2)
     return Clkey
+
 
 def add_to_Cls(Cls, x):
     """
@@ -328,9 +330,9 @@ def dict2mat(cls, cov):
             covkey = (A, B, C, D, nA, nB, nC, nD)
             size_i = nells[i]
             size_j = nells[j]
-            full_cov[
-                i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j
-            ] = cov[covkey]
+            full_cov[i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j] = (
+                cov[covkey]
+            )
             if i != j:
                 full_cov[
                     j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i

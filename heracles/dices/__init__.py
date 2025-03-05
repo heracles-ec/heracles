@@ -49,6 +49,6 @@ from .cls import get_cls, get_delete_cls
 from .bias_corrrection import get_bias, get_delete_fsky, get_biasjk, correct_bias
 from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import get_delete1_cov
-from .delete2 import  get_delete2_cov, get_delete2_correction
+from .delete2 import get_delete2_cov, get_delete2_correction
 from .dices import get_dices_cov
 from .utils_polspice import cl2corr, corr2cl

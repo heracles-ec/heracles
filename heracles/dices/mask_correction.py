@@ -164,5 +164,6 @@ def correct_mask(Cljk, Mljk, Mls0):
         corr_Cljk[Cl_key] = Result(_corr_Cljk, ell=ell)
     return corr_Cljk
 
+
 def logistic(x, x0=-5, k=50):
     return 1 / (1.0 + np.exp(-k * (x - x0)))

@@ -82,6 +82,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
         Q_cov[key] *= 1 / (JackNjk * (JackNjk + 1))
     return Q_cov
 
+
 def get_delete2_cov(delete1_cov, Q):
     """
     Internal method to compute the delete2 covariance.

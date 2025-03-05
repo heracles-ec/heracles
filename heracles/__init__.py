@@ -100,7 +100,7 @@ from .catalog import (
     InvalidValueFilter,
 )
 
-from .dices import(
+from .dices import (
     get_cls,
     get_delete_cls,
     get_bias,

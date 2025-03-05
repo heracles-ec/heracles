@@ -10,6 +10,7 @@ config.DISABLE_JIT = True
 def rng(seed: int = 50) -> np.random.Generator:
     return np.random.default_rng(seed)
 
+
 @pytest.fixture
 def data_path():
     return Path(__file__).parent / "data"

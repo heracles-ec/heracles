@@ -157,9 +157,7 @@ class DICES:
                     # Mask correction
                     if self.mask_correction:
                         _, mls0 = get_cls(self.data_maps, self.vis_maps)
-                        cls_cbias = correct_mask(
-                            cls, cls_mm, mls0
-                        )
+                        cls_cbias = correct_mask(cls, cls_mm, mls0)
 
                     # Bias correction
                     cls_cbias = correct_bias(
@@ -167,7 +165,7 @@ class DICES:
                         self.jkmaps,
                         jk,
                         jk,
-                        )
+                    )
 
                     self.delete1_data_cls[(jk, jk)] = cls_cbias
                     self.delete1_mask_cls[(jk, jk)] = cls_mm
@@ -217,9 +215,7 @@ class DICES:
                         # Mask correction
                         if self.mask_correction:
                             _, mls0 = get_cls(self.data_maps, self.vis_maps)
-                            cls_cbias = correct_mask(
-                                cls, cls_mm, mls0
-                            )
+                            cls_cbias = correct_mask(cls, cls_mm, mls0)
 
                         # Bias correction
                         cls_cbias = correct_bias(
@@ -227,7 +223,7 @@ class DICES:
                             self.jkmaps,
                             jk,
                             jk2,
-                            )
+                        )
 
                         self.delete2_data_cls[(jk, jk2)] = cls_cbias
                         self.delete2_mask_cls[(jk, jk2)] = cls_mm
@@ -239,7 +235,6 @@ class DICES:
             self.delete2_data_cls,
             self.delete2_mask_cls,
         )
-
 
     ###
     # Step 2: delete1 Covariance
