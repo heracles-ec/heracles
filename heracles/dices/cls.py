@@ -45,7 +45,7 @@ def get_delete_cls(data_maps, vis_maps, jkmaps, jk, jk2):
         cls_mm (dict): Dictionary of mask Cls
     """
     # grab metadata
-    print(f" - Computing Cls for regions ({jk},{jk2})",  end="\r", flush=True)
+    print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
     _d = data_maps[list(data_maps.keys())[0]]
     meta = _d.dtype.metadata
     nside = meta["nside"]

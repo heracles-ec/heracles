@@ -1,7 +1,6 @@
-
 Nside: 128
 Njk: 5
-Output: 
+Output:
   save: False
   path: ./tests_output/
 

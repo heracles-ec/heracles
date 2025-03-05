@@ -1,8 +1,5 @@
-import healpy as hp
 import numpy as np
 import heracles
-import pytest
-import yaml
 import dices
 
 
