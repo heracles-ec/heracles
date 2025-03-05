@@ -25,6 +25,7 @@ except:
     # use np.polynomial.legendre if can't load fast native (so can use module without compiling camb)
     # Fortran version is much faster than current np.polynomial
     gauss_legendre = None
+    raise
 
 _gauss_legendre_cache = {}
 

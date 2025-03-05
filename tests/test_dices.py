@@ -10,7 +10,6 @@ def make_map():
     nbins = 2
     nside = 128
     lmax = 128
-    bin_num = 15
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
@@ -92,13 +91,13 @@ def test_cls(data_path):
     data_cls, mask_cls = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
     for key in list(data_cls.keys()):
         _cl = np.atleast_2d(data_cls[key])
-        ncls, nells = _cl.shape
+        _, nells = _cl.shape
         assert nells == DICESObj.nside + 1
 
     for key in list(mask_cls.keys()):
         _cl = np.atleast_2d(mask_cls[key])
         print(key, _cl.shape)
-        ncls, nells = _cl.shape
+        _, nells = _cl.shape
         assert nells == DICESObj.nside + 1
 
 
@@ -117,7 +116,7 @@ def test_delete1_cls(data_path):
         cl = delete1_mask_cls[key]
         for key in list(cl.keys()):
             _cl = np.atleast_2d(cl[key])
-            ncls, nells = _cl.shape
+            _, nells = _cl.shape
             assert nells == DICESObj.nside + 1
 
 
@@ -131,14 +130,14 @@ def test_delete2_cls(data_path):
             cl = delete2_data_cls[(jk, jk2)]
             for key in list(cl.keys()):
                 _cl = np.atleast_2d(cl[key])
-                ncls, nells = _cl.shape
+                _, nells = _cl.shape
                 assert nells == DICESObj.nside + 1
     for jk in range(1, DICESObj.JackNjk + 1):
         for jk2 in range(jk + 1, DICESObj.JackNjk + 1):
             cl = delete2_mask_cls[(jk, jk2)]
             for key in list(cl.keys()):
                 _cl = np.atleast_2d(cl[key])
-                ncls, nells = _cl.shape
+                _, nells = _cl.shape
                 assert nells == DICESObj.nside + 1
 
 
@@ -147,11 +146,6 @@ def test_get_delete1_fsky(data_path):
     for jk in range(1, DICESObj.JackNjk + 1):
         alphas = dices.get_delete_fsky(DICESObj.jkmaps, jk, jk)
         for key in list(alphas.keys()):
-            f1, b1 = key
-            if f1 == "POS":
-                fsky = DICESObj.fsky[("VIS", 1)]
-            elif f1 == "SHE":
-                fsky = DICESObj.fsky[("WHT", 1)]
             _alpha = 1 - 1 / DICESObj.JackNjk
             alpha = alphas[key]
             assert alpha == pytest.approx(_alpha, rel=1e-1)
@@ -163,11 +157,6 @@ def test_get_delete2_fsky(data_path):
         for jk2 in range(jk + 1, DICESObj.JackNjk + 1):
             alphas = dices.get_delete_fsky(DICESObj.jkmaps, jk, jk2)
             for key in list(alphas.keys()):
-                f1, bq = key
-                if f1 == "POS":
-                    fsky = DICESObj.fsky[("VIS", 1)]
-                elif f1 == "SHE":
-                    fsky = DICESObj.fsky[("WHT", 1)]
                 _alpha = 1 - 2 / DICESObj.JackNjk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
@@ -179,7 +168,7 @@ def test_delete1_cov(data_path):
     Cqs0 = heracles.binned(Cls0, DICESObj.ledges)
     Clsjks, _ = DICESObj.get_delete1_cls()
     Cqsjks = heracles.binned(Clsjks, DICESObj.ledges)
-    shrunk_delete1_cov, delete1_cov, _ = dices.get_delete1_cov(
+    _, delete1_cov, _ = dices.get_delete1_cov(
         Cqs0,
         Cqsjks,
     )

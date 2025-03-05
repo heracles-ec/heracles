@@ -318,7 +318,6 @@ def get_Cl_cov(Clss, jk=False):
 
 def dict2mat(cls, cov):
     Clkeys = list(cls.keys())
-    ncls = len(Clkeys)
     nells = [len(cls[key].ell) for key in Clkeys]
     full_cov = np.zeros((np.sum(nells), np.sum(nells)))
     for i in range(0, len(Clkeys)):
@@ -342,7 +341,6 @@ def dict2mat(cls, cov):
 
 def mat2dict(cls, cov):
     Clkeys = list(cls.keys())
-    ncls = len(Clkeys)
     nells = [len(cls[key].ell) for key in Clkeys]
     Cl_cov_dict = {}
     for i in range(0, len(Clkeys)):

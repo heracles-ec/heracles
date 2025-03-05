@@ -63,10 +63,6 @@ def get_delete1_cov(Cls0, Clsjks, shrink=True):
         Cqsjks[key] = compsep_Cls(Clsjk)
         Cqsjks_wbias[key] = compsep_Cls(Clsjk_wbias)
 
-    # Mean Cls
-    Cqsjks_mu = get_Cl_mu(Cqsjks)
-    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
-
     # Concatenate Cls
     Cqsjks_all = []
     for key in Cqsjks.keys():
@@ -83,6 +79,7 @@ def get_delete1_cov(Cls0, Clsjks, shrink=True):
     S = (JackNjk / (JackNjk - 1)) * Wbar
 
     # Compute target matrix
+    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
     ClGauss_cov = get_gaussian_cov(Cqsjks_mu_wbias)
     ClGauss_fullcov = dict2mat(Cqs0, ClGauss_cov)
     ClGauss_corr = cov2corr(ClGauss_fullcov)

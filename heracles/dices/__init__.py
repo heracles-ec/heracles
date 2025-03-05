@@ -39,6 +39,8 @@ __all__ = [
     # Delete2
     "get_delete2_cov",
     "get_delete2_correction",
+    # DICES
+    "get_dices_cov",
     # PolSpice
     "cl2corr",
     "corr2cl",
