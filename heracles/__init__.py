@@ -32,6 +32,19 @@ __all__ = [
     "FitsCatalog",
     "FootprintFilter",
     "InvalidValueFilter",
+    # dices
+    "get_cls",
+    "get_delete_cls",
+    "get_bias",
+    "get_delete_fsky",
+    "get_biasjk",
+    "correct_bias",
+    "compute_mask_correction",
+    "correct_mask",
+    "get_delete1_cov",
+    "get_delete2_cov",
+    "get_delete2_correction",
+    "get_dices_cov",
     # core
     "TocDict",
     "toc_filter",
@@ -85,6 +98,21 @@ from .catalog import (
     FitsCatalog,
     FootprintFilter,
     InvalidValueFilter,
+)
+
+from .dices import(
+    get_cls,
+    get_delete_cls,
+    get_bias,
+    get_delete_fsky,
+    get_biasjk,
+    correct_bias,
+    compute_mask_correction,
+    correct_mask,
+    get_delete1_cov,
+    get_delete2_cov,
+    get_delete2_correction,
+    get_dices_cov,
 )
 
 from .core import (

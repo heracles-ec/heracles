@@ -1,0 +1,18 @@
+
+Nside: 128
+Njk: 5
+Output: 
+  save: False
+  path: ./tests_output/
+
+bins:
+  Lmin: 10
+  Lmax: 128
+  Lbin: 10
+  Logbins: True
+
+DICES:
+  bin: True
+  mask_correction: True
+  shrinkage: True
+  delete2_correction: True
