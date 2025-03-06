@@ -51,9 +51,7 @@ def get_delete_cls(data_maps, vis_maps, jkmaps, jk, jk2):
     nside = meta["nside"]
     lmax = meta["lmax"]
     mapper = HealpixMapper(nside=nside, lmax=lmax)
-    fields = {
-        "POS": Positions(mapper, mask="VIS"),
-        "SHE": Shears(mapper, mask="WHT")}
+    fields = {"POS": Positions(mapper, mask="VIS"), "SHE": Shears(mapper, mask="WHT")}
     fields_vis = {
         "VIS": Visibility(mapper),
         "WHT": Weights(mapper),
