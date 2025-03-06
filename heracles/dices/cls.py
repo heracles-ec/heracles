@@ -53,7 +53,8 @@ def get_delete_cls(data_maps, vis_maps, jkmaps, jk, jk2):
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
-        "SHE": Shears(mapper, mask="WHT"),
+        "SHE": Shears(mapper, mask="WHT")}
+    fields_vis = {
         "VIS": Visibility(mapper),
         "WHT": Weights(mapper),
     }
@@ -81,7 +82,7 @@ def get_delete_cls(data_maps, vis_maps, jkmaps, jk, jk2):
         _vmap *= _mask
     # compute alms
     alms = transform(fields, datas)
-    alms_mm = transform(fields, vmaps)
+    alms_mm = transform(fields_vis, vmaps)
     # compute cls
     cls = angular_power_spectra(alms)
     cls_mm = angular_power_spectra(alms_mm)
