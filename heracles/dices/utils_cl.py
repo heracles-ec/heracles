@@ -329,9 +329,9 @@ def dict2mat(cls, cov):
             covkey = (A, B, C, D, nA, nB, nC, nD)
             size_i = nells[i]
             size_j = nells[j]
-            full_cov[i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j] = (
-                cov[covkey]
-            )
+            full_cov[
+                i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j
+            ] = cov[covkey]
             if i != j:
                 full_cov[
                     j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i
