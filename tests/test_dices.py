@@ -135,7 +135,7 @@ def test_dices(data_path):
 
     delete1_data_cls = {}
     delete1_mask_cls = {}
-    for jk in range(1, JackNjk+1):
+    for jk in range(1, JackNjk + 1):
         _cls, _cls_mm = dices.get_delete_cls(
             data_maps,
             vis_maps,
@@ -162,8 +162,8 @@ def test_dices(data_path):
 
     delete2_data_cls = {}
     delete2_mask_cls = {}
-    for jk in range(1, JackNjk+1):
-        for jk2 in range(jk+1, JackNjk+1):
+    for jk in range(1, JackNjk + 1):
+        for jk2 in range(jk + 1, JackNjk + 1):
             _cls, _cls_mm = dices.get_delete_cls(
                 data_maps,
                 vis_maps,
