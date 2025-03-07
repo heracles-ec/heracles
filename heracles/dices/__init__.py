@@ -21,8 +21,6 @@ Main module of the *DICES* package.
 """
 
 __all__ = [
-    # dices
-    "DICES",
     # cls
     "get_cls",
     "get_delete_cls",
@@ -54,7 +52,6 @@ __all__ = [
     "cov2spinblocks",
 ]
 
-from .master import DICES
 from .cls import get_cls, get_delete_cls
 from .bias_corrrection import get_bias, get_delete_fsky, get_biasjk, correct_bias
 from .mask_correction import compute_mask_correction, correct_mask

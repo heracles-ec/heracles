@@ -6,7 +6,7 @@ import yaml
 import heracles.dices as dices
 
 
-def make_map():
+def make_data_maps():
     nbins = 2
     nside = 128
     lmax = 128
@@ -54,7 +54,7 @@ def make_map():
     return maps
 
 
-def make_vis_map():
+def make_vis_maps():
     nbins = 2
     nside = 128
     npix = hp.nside2npix(nside)
@@ -66,186 +66,211 @@ def make_vis_map():
     return maps
 
 
-def make_DICESObj(data_path):
-    data_maps = make_map()
-    vis_maps = make_vis_map()
+def make_jkmaps(data_path):
+    vis_maps = make_vis_maps()
     jkmap = hp.read_map(data_path / "jkmap.fits")
-    with open(data_path / "params_test.yaml", mode="r") as file:
-        config = yaml.safe_load(file)
     jkmaps = {}
     for key in list(vis_maps.keys()):
         jkmaps[key] = jkmap
+    return jkmaps
+
+
+def make_DICESObj(data_path):
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    jkmaps = make_jkmaps(data_path)
+    with open(data_path / "params_test.yaml", mode="r") as file:
+        config = yaml.safe_load(file)
     DICESObj = dices.DICES(data_maps, jkmaps, vis_maps, config)
     return DICESObj
 
 
 def test_jkmap(data_path):
-    DICESObj = make_DICESObj(data_path)
-    Njk = DICESObj.JackNjk
-    for key in list(DICESObj.jkmaps.keys()):
-        assert np.all(np.unique(DICESObj.jkmaps[key]) == np.arange(0, Njk + 1))
-
-
-def test_cls(data_path):
-    DICESObj = make_DICESObj(data_path)
-    data_cls, mask_cls = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
-    for key in list(data_cls.keys()):
-        _cl = np.atleast_2d(data_cls[key])
-        _, nells = _cl.shape
-        assert nells == DICESObj.nside + 1
-
-    for key in list(mask_cls.keys()):
-        _cl = np.atleast_2d(mask_cls[key])
-        print(key, _cl.shape)
-        _, nells = _cl.shape
-        assert nells == DICESObj.nside + 1
-
-
-def test_delete1_cls(data_path):
-    DICESObj = make_DICESObj(data_path)
-    delete1_data_cls, delete1_mask_cls = DICESObj.get_delete1_cls()
-    assert len(delete1_data_cls) == DICESObj.JackNjk
-    assert len(delete1_mask_cls) == DICESObj.JackNjk
-    for key in delete1_mask_cls.keys():
-        cl = delete1_data_cls[key]
-        for key in list(cl.keys()):
-            _cl = np.atleast_2d(cl[key])
-            ncls, nells = _cl.shape
-            assert nells == DICESObj.nside + 1
-    for key in delete1_mask_cls.keys():
-        cl = delete1_mask_cls[key]
-        for key in list(cl.keys()):
-            _cl = np.atleast_2d(cl[key])
-            _, nells = _cl.shape
-            assert nells == DICESObj.nside + 1
-
-
-def test_delete2_cls(data_path):
-    DICESObj = make_DICESObj(data_path)
-    delete2_data_cls, delete2_mask_cls = DICESObj.get_delete2_cls()
-    assert len(delete2_data_cls) == 2 * DICESObj.JackNjk
-    assert len(delete2_mask_cls) == 2 * DICESObj.JackNjk
-    for jk in range(1, DICESObj.JackNjk + 1):
-        for jk2 in range(jk + 1, DICESObj.JackNjk + 1):
-            cl = delete2_data_cls[(jk, jk2)]
-            for key in list(cl.keys()):
-                _cl = np.atleast_2d(cl[key])
-                _, nells = _cl.shape
-                assert nells == DICESObj.nside + 1
-    for jk in range(1, DICESObj.JackNjk + 1):
-        for jk2 in range(jk + 1, DICESObj.JackNjk + 1):
-            cl = delete2_mask_cls[(jk, jk2)]
-            for key in list(cl.keys()):
-                _cl = np.atleast_2d(cl[key])
-                _, nells = _cl.shape
-                assert nells == DICESObj.nside + 1
+    Njk = 5
+    jkmaps = make_jkmaps(data_path)
+    for key in list(jkmaps.keys()):
+        assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
 
 
 def test_get_delete1_fsky(data_path):
-    DICESObj = make_DICESObj(data_path)
-    for jk in range(1, DICESObj.JackNjk + 1):
-        alphas = dices.get_delete_fsky(DICESObj.jkmaps, jk, jk)
+    JackNjk = 5
+    jkmaps = make_jkmaps(data_path)
+    for jk in range(1, JackNjk + 1):
+        alphas = dices.get_delete_fsky(jkmaps, jk, jk)
         for key in list(alphas.keys()):
-            _alpha = 1 - 1 / DICESObj.JackNjk
+            _alpha = 1 - 1 / JackNjk
             alpha = alphas[key]
             assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
 def test_get_delete2_fsky(data_path):
-    DICESObj = make_DICESObj(data_path)
-    for jk in range(1, DICESObj.JackNjk + 1):
-        for jk2 in range(jk + 1, DICESObj.JackNjk + 1):
-            alphas = dices.get_delete_fsky(DICESObj.jkmaps, jk, jk2)
+    JackNjk = 5
+    jkmaps = make_jkmaps(data_path)
+    for jk in range(1, JackNjk + 1):
+        for jk2 in range(jk + 1, JackNjk + 1):
+            alphas = dices.get_delete_fsky(jkmaps, jk, jk2)
             for key in list(alphas.keys()):
-                _alpha = 1 - 2 / DICESObj.JackNjk
+                _alpha = 1 - 2 / JackNjk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_delete1_cov(data_path):
-    DICESObj = make_DICESObj(data_path)
-    Cls0, _ = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
-    Cqs0 = heracles.binned(Cls0, DICESObj.ledges)
-    Clsjks, _ = DICESObj.get_delete1_cls()
-    Cqsjks = heracles.binned(Clsjks, DICESObj.ledges)
-    _, delete1_cov, _ = dices.get_delete1_cov(
-        Cqs0,
-        Cqsjks,
+def test_dices(data_path):
+    JackNjk = 5
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    jkmaps = make_jkmaps(data_path)
+
+    data_cls, mask_cls = dices.get_cls(data_maps, vis_maps)
+    for key in list(data_cls.keys()):
+        _cl = np.atleast_2d(data_cls[key])
+        _, nells = _cl.shape
+        assert nells == nside + 1
+
+    for key in list(mask_cls.keys()):
+        _cl = np.atleast_2d(mask_cls[key])
+        _, nells = _cl.shape
+        assert nells == nside + 1
+
+    delete1_data_cls = {}
+    delete1_mask_cls = {}
+    for jk in range(1, JackNjk+1):
+        _cls, _cls_mm = dices.get_delete_cls(
+            data_maps,
+            vis_maps,
+            jkmaps,
+            jk,
+            jk,
+        )
+        delete1_data_cls[(jk, jk)] = _cls
+        delete1_mask_cls[(jk, jk)] = _cls_mm
+    assert len(delete1_data_cls) == JackNjk
+    assert len(delete1_mask_cls) == JackNjk
+    for key in delete1_mask_cls.keys():
+        cl = delete1_data_cls[key]
+        for key in list(cl.keys()):
+            _cl = np.atleast_2d(cl[key])
+            ncls, nells = _cl.shape
+            assert nells == nside + 1
+    for key in delete1_mask_cls.keys():
+        cl = delete1_mask_cls[key]
+        for key in list(cl.keys()):
+            _cl = np.atleast_2d(cl[key])
+            _, nells = _cl.shape
+            assert nells == nside + 1
+
+    delete2_data_cls = {}
+    delete2_mask_cls = {}
+    for jk in range(1, JackNjk+1):
+        for jk2 in range(jk+1, JackNjk+1):
+            _cls, _cls_mm = dices.get_delete_cls(
+                data_maps,
+                vis_maps,
+                jkmaps,
+                jk,
+                jk2,
+            )
+            delete2_data_cls[(jk, jk2)] = _cls
+            delete2_mask_cls[(jk, jk2)] = _cls_mm
+    assert len(delete2_data_cls) == 2 * JackNjk
+    assert len(delete2_mask_cls) == 2 * JackNjk
+    for jk in range(1, JackNjk + 1):
+        for jk2 in range(jk + 1, JackNjk + 1):
+            cl = delete2_data_cls[(jk, jk2)]
+            for key in list(cl.keys()):
+                _cl = np.atleast_2d(cl[key])
+                _, nells = _cl.shape
+                assert nells == nside + 1
+    for jk in range(1, JackNjk + 1):
+        for jk2 in range(jk + 1, JackNjk + 1):
+            cl = delete2_mask_cls[(jk, jk2)]
+            for key in list(cl.keys()):
+                _cl = np.atleast_2d(cl[key])
+                _, nells = _cl.shape
+                assert nells == nside + 1
+
+    lbins = 5
+    ledges = np.logspace(np.log10(1), np.log10(nside), lbins + 1)
+    lgrid = (ledges[1:] + ledges[:-1]) / 2
+    cqs0 = heracles.binned(data_cls, ledges)
+    for key in list(cqs0.keys()):
+        cq = np.atleast_2d(cqs0[key])
+        ncls, nells = cq.shape
+        assert nells == len(lgrid)
+    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    for key in list(cqs1.keys()):
+        for k in list(cqs1[key].keys()):
+            cq = np.atleast_2d(cqs1[key][k])
+            ncls, nells = cq.shape
+            assert nells == len(lgrid)
+    cqs2 = heracles.binned(delete2_data_cls, ledges)
+    for key in list(cqs2.keys()):
+        for k in list(cqs2[key].keys()):
+            cq = np.atleast_2d(cqs2[key][k])
+            ncls, nells = cq.shape
+            assert nells == len(lgrid)
+
+    shrunk_cov1, delete1_cov, _ = dices.get_delete1_cov(
+        cqs0,
+        cqs1,
     )
 
-    # Only test diagonal
-    for key in list(delete1_cov.keys()):
-        _k1 = (key[0], key[1], key[4], key[5])
-        _k2 = (key[2], key[3], key[6], key[7])
-        if _k1 != _k2:
-            delete1_cov.pop(key)
-
-    # Check for correct keys
-    data_cls, _ = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
+    # Check for correct keys)
     compsep_cls = dices.compsep_Cls(data_cls)
-    kk = list(delete1_cov.keys())
-    k = list(compsep_cls.keys())
-    for i in np.arange(len(kk)):
-        _k1 = (kk[i][0], kk[i][1], kk[i][4], kk[i][5])
-        _k2 = (kk[i][2], kk[i][3], kk[i][6], kk[i][7])
-        if _k1 == _k2:
-            assert _k1 == k[i]
+    compsep_keys = list(compsep_cls.keys())
+    k = 0
+    for i in range(0, len(compsep_keys)):
+        for j in range(i, len(compsep_keys)):
+            ki = compsep_keys[i]
+            kj = compsep_keys[j]
+            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
+            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
+            _covkey = (A, B, C, D, nA, nB, nC, nD)
+            assert _covkey in list(delete1_cov.keys())
 
     # Check for correct shape
     for key in list(delete1_cov.keys()):
         cov = delete1_cov[key]
-        assert cov.shape == (DICESObj.lbins, DICESObj.lbins)
+        assert cov.shape == (lbins, lbins)
 
-
-def test_delete2_cov(data_path):
-    DICESObj = make_DICESObj(data_path)
-    _, delete1_cov, _ = DICESObj.get_delete1_cov()
-    delete2_cov = DICESObj.get_delete2_cov()
-
-    Cls0, _ = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
-    Clsjks, _ = DICESObj.get_delete1_cls()
-    Clsjk2s, _ = DICESObj.get_delete2_cls()
-
-    Cls0 = heracles.binned(Cls0, DICESObj.ledges)
-    Clsjks = heracles.binned(Clsjks, DICESObj.ledges)
-    Clsjk2s = heracles.binned(Clsjk2s, DICESObj.ledges)
+    # TO DO:
+    # We should check that Shrunk = alpha * Target + (1-alpha) * Cov
 
     Q = dices.get_delete2_correction(
-        Cls0,
-        Clsjks,
-        Clsjk2s,
+        cqs0,
+        cqs1,
+        cqs2,
     )
-    _delete2_cov = dices.get_delete2_cov(delete1_cov, Q)
+    delete2_cov = dices.get_delete2_cov(delete1_cov, Q)
+    _delete2_cov = {}
+    for key in list(delete1_cov.keys()):
+        _delete2_cov[key] = delete1_cov[key] - Q[key]
 
     for key in list(delete2_cov.keys()):
         assert (delete2_cov[key] == _delete2_cov[key]).all()
 
-
-def test_dices_cov(data_path):
-    DICESObj = make_DICESObj(data_path)
-    Cls0, _ = dices.get_cls(DICESObj.data_maps, DICESObj.vis_maps)
-    Cqs0 = heracles.binned(Cls0, DICESObj.ledges)
-    Cqs0 = dices.compsep_Cls(Cqs0)
-    cov1, _, T = DICESObj.get_delete1_cov()
-    cov2 = DICESObj.get_delete2_cov()
-    dices_cov = DICESObj.get_dices_cov()
+    dices_cov = dices.get_dices_cov(cqs0, delete1_cov, delete2_cov)
 
     # Check keys
-    keys1 = set(cov1.keys())
-    keys2 = set(cov2.keys())
+    keys0 = set(shrunk_cov1.keys())
+    keys1 = set(delete1_cov.keys())
+    keys2 = set(delete2_cov.keys())
     keys3 = set(dices_cov.keys())
-    assert keys1 == keys2 == keys3
+    assert keys0 == keys1 == keys2 == keys3
 
     # Check for correct shape
-    for key in list(cov1.keys()):
-        C1 = cov1[key]
-        C2 = cov2[key]
+    for key in list(delete1_cov.keys()):
+        C0 = shrunk_cov1[key]
+        C1 = delete1_cov[key]
+        C2 = delete2_cov[key]
         CD = dices_cov[key]
-        assert C1.shape == C2.shape == CD.shape
+        assert C0.shape == C1.shape == C2.shape == CD.shape
 
     # Check for delete2 correction
-    _cov1 = dices.dict2mat(Cqs0, cov1)
-    _cov2 = dices.dict2mat(Cqs0, cov2)
+    _cqs0 = dices.compsep_Cls(cqs0)
+    _cov1 = dices.dict2mat(_cqs0, delete1_cov)
+    _cov2 = dices.dict2mat(_cqs0, delete2_cov)
     _corr1 = dices.cov2corr(_cov1)
     _var1 = np.diag(_cov1).copy()
     _var2 = np.diag(_cov2).copy()
@@ -254,6 +279,9 @@ def test_dices_cov(data_path):
     _sig2 = np.sqrt(_var2)
     _corr2 = np.outer(_sig2, _sig2)
     _D = _corr2 * _corr1
-    _dices_cov = dices.mat2dict(Cqs0, _D)
+    _dices_cov = dices.mat2dict(_cqs0, _D)
     for key in list(dices_cov.keys()):
+        print(key)
+        print(dices_cov[key])
+        print(_dices_cov[key])
         assert np.all(dices_cov[key] == _dices_cov[key])
