@@ -619,9 +619,9 @@ class FitsDict(MutableMapping):
         if data is None:
             with self.fits as fits:
                 try:
-                 data = self.reader(fits[ext])
+                    data = self.reader(fits[ext])
                 except Exception:
-                 raise KeyError(ext) 
+                    raise KeyError(ext)
             self._cache[ext] = data
         return data
 
