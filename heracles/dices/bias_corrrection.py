@@ -14,7 +14,7 @@ def get_bias(cls):
     """
     bias = {}
     for key in list(cls.keys()):
-        cl = cls[key].__array__()
+        cl = cls[key] #.__array__()
         meta = cl.dtype.metadata
         if "bias" in meta.keys():
             b = meta["bias"]
