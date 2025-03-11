@@ -618,10 +618,10 @@ class FitsDict(MutableMapping):
         data = self._cache.get(ext)
         if data is None:
             with self.fits as fits:
-                try:
-                    data = self.reader(fits[ext])
-                except Exception:
-                    raise KeyError(ext)
+                    if ext in fits:
+                        data = self.reader(fits[ext])
+                    else:
+                        raise KeyError(ext) 
             self._cache[ext] = data
         return data
 
