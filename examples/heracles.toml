@@ -1,0 +1,77 @@
+# example config file for Heracles
+
+[[catalogs]]
+source = "pos_catalog.fits"
+label = "position catalogue"
+fields = ["POS", "VIS"]
+selections = [
+    {key = 1, selection = "POS_TOM_BIN_ID==1", visibility = "visibility.1.fits"},
+    {key = 2, selection = "POS_TOM_BIN_ID==2", visibility = "visibility.2.fits"},
+    {key = 3, selection = "POS_TOM_BIN_ID==3", visibility = "visibility.3.fits"},
+]
+
+[[catalogs]]
+source = "she_catalog.fits"
+label = "shear catalogue"
+fields = ["SHE", "WHT"]
+visibility = "coverage.fits" # global visibility for this catalogue
+selections = [
+    {key = 1, selection = "TOM_BIN_ID==1"},
+    {key = 2, selection = "TOM_BIN_ID==2"},
+    {key = 3, selection = "TOM_BIN_ID==3"},
+]
+
+[[fields]]
+key = "POS"
+type = "positions"
+columns = ["RIGHT_ASCENSION", "DECLINATION"]
+mask = "VIS"
+mapper = "healpix" # default, requires healpy
+lmax = 2000
+nside = 2048
+
+[[fields]]
+key = "VIS"
+type = "visibility"
+lmax = 6000 # maximum lmax + l2max from spectra involving POS
+nside = 4096
+
+[[fields]]
+key = "SHE"
+type = "shears"
+columns = ["SHE_RA", "SHE_DEC", "SHE_E1_CAL", "-SHE_E2_CAL", "SHE_WEIGHT"]
+mask = "WHT"
+mapper = "discrete" # requires ducc, no nside here
+lmax = 3000
+
+[[fields]]
+key = "WHT"
+type = "weights"
+columns = ["SHE_RA", "SHE_DEC", "SHE_WEIGHT"]
+lmax = 8000 # maximum lmax + l2max from spectra involving SHE
+nside = 8192
+
+[[spectra]]
+# galaxy clustering
+key = "POS-POS" # can use string syntax here
+lmin = 10 # for angular binning
+lmax = 2000
+l2max = 4000 # mixing matrix: number of columns
+l3max = 6000 # lmax + l2max is the default
+bins = {n = 32, spacing = "log", weights = "2l+1"}
+
+[[spectra]]
+# cosmic shear
+key = "SHE-SHE"
+lmin = 10
+lmax = 3000
+l2max = 5000
+bins = {n = 32, spacing = "log", weights = "2l+1"}
+
+[[spectra]]
+# galaxy-galaxy lensing
+key = ["POS", "SHE"] # can also use sequence
+lmin = 10
+lmax = 1000
+l2max = 2000
+bins = {n = 32, spacing = "log", weights = "2l+1"}

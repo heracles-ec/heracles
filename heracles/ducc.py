@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from typing import Any
 
-    from numpy.typing import ArrayLike, DTypeLike, NDArray
+    from numpy.typing import DTypeLike, NDArray
 
 
 class DiscreteMapper:
@@ -136,10 +136,7 @@ class DiscreteMapper:
 
         data += alms
 
-    def transform(
-        self,
-        data: ArrayLike,
-    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
+    def transform(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         Does nothing, since inputs are alms already.
         """

@@ -20,21 +20,16 @@
 
 import logging
 import os
-import re
-from collections.abc import MutableMapping, Sequence
+from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
 from warnings import warn
 from weakref import WeakValueDictionary
 
 import fitsio
 import numpy as np
 
-from .core import toc_match
+from .core import toc_match, key_to_str, key_from_str
 from .result import Result
-
-if TYPE_CHECKING:
-    from typing import TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -66,45 +61,6 @@ _METADATA_COMMENTS = {
     "wbar_2": "mean weight of second field",
     "bias": "additive bias of spectrum",
 }
-
-# type for valid keys
-_DictKey: "TypeAlias" = Union[str, int, tuple["_DictKey", ...]]
-
-
-def _string_from_key(key: _DictKey) -> str:
-    """
-    Return string representation for a given key.
-    """
-    # recursive expansion for sequences
-    if isinstance(key, Sequence) and not isinstance(key, str):
-        return "-".join(map(_string_from_key, key))
-
-    # get string representation of key
-    s = str(key)
-
-    # escape literal "\"
-    s = s.replace("\\", "\\\\")
-
-    # escape literal "-"
-    s = s.replace("-", "\\-")
-
-    # substitute non-FITS characters by tilde
-    s = re.sub(r"[^ -~]+", "~", s, flags=re.ASCII)
-
-    return s
-
-
-def _key_from_string(s: str) -> _DictKey:
-    """
-    Return key for a given string representation.
-    """
-    parts = re.split(r"(?<!\\)-", s.replace("\\\\", "\0"))
-    if len(parts) > 1:
-        return tuple(map(_key_from_string, parts))
-    key = parts[0]
-    key = key.replace("\\-", "-")
-    key = key.replace("\0", "\\")
-    return int(key) if key.removeprefix("-").isdigit() else key
 
 
 def _write_metadata(hdu, metadata):
@@ -389,7 +345,7 @@ def write_maps(path, maps, *, clobber=False):
             logger.info("writing map %s", key)
 
             # extension name
-            ext = _string_from_key(key)
+            ext = key_to_str(key)
 
             # write the map in HEALPix FITS format
             _write_map(fits, ext, m)
@@ -416,7 +372,7 @@ def read_maps(path, *, include=None, exclude=None):
             if not ext:
                 continue
             # decode extension name into key, skip if empty
-            key = _key_from_string(ext)
+            key = key_from_str(ext)
             if not key:
                 continue
             # match key against explicit include and exclude
@@ -452,7 +408,7 @@ def write_alms(path, alms, *, clobber=False):
             logger.info("writing alm %s", key)
 
             # extension name
-            ext = _string_from_key(key)
+            ext = key_to_str(key)
 
             # write the alm as structured data with metadata
             _write_complex(fits, ext, alm)
@@ -479,7 +435,7 @@ def read_alms(path, *, include=None, exclude=None):
             if not ext:
                 continue
             # decode extension name into key, skip if empty
-            key = _key_from_string(ext)
+            key = key_from_str(ext)
             if not key:
                 continue
             # match key against explicit include and exclude
@@ -516,7 +472,7 @@ def write(path, results, *, clobber=False):
             logger.info("writing result %s", key)
 
             # extension name
-            ext = _string_from_key(key)
+            ext = key_to_str(key)
 
             # write the data in structured format
             _write_result(fits, ext, result)
@@ -542,7 +498,7 @@ def read(path):
             ext = hdu.get_extname()
             if not ext:
                 continue
-            key = _key_from_string(ext)
+            key = key_from_str(ext)
             if not key:
                 continue
             logger.info("reading result %s", key)
@@ -596,7 +552,7 @@ class FitsDict(MutableMapping):
                 if not ext:
                     continue
                 # decode extension name into key, skip if empty
-                key = _key_from_string(ext)
+                key = key_from_str(ext)
                 if not key:
                     continue
                 yield key
@@ -608,13 +564,13 @@ class FitsDict(MutableMapping):
         return n
 
     def __contains__(self, key):
-        ext = _string_from_key(key)
+        ext = key_to_str(key)
         with fitsio.FITS(self.path) as fits:
             return ext in fits
 
     def __getitem__(self, key):
         # a specific extension was requested, fetch data
-        ext = _string_from_key(key)
+        ext = key_to_str(key)
         data = self._cache.get(ext)
         if data is None:
             with self.fits as fits:
@@ -623,7 +579,7 @@ class FitsDict(MutableMapping):
         return data
 
     def __setitem__(self, key, value):
-        ext = _string_from_key(key)
+        ext = key_to_str(key)
         with self.fits as fits:
             self.writer(fits, ext, value)
 
