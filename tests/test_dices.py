@@ -2,7 +2,6 @@ import healpy as hp
 import numpy as np
 import heracles
 import pytest
-import yaml
 import heracles.dices as dices
 
 
@@ -129,15 +128,17 @@ def test_polspice():
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     cls, _ = dices.get_cls(data_maps, vis_maps)
-    cls = np.array([
-        cls[("POS", "POS", 1, 1)],
-        cls[("SHE", "SHE", 1, 1)][0],
-        cls[("SHE", "SHE", 1, 1)][1],
-        cls[("POS", "SHE", 1, 1)][0],
-    ]).T
+    cls = np.array(
+        [
+            cls[("POS", "POS", 1, 1)],
+            cls[("SHE", "SHE", 1, 1)][0],
+            cls[("SHE", "SHE", 1, 1)][1],
+            cls[("POS", "SHE", 1, 1)][0],
+        ]
+    ).T
     corrs = dices.cl2corr(cls)
     _cls = dices.corr2cl(corrs)
-    for (cl, _cl) in zip(cls.T, _cls.T):
+    for cl, _cl in zip(cls.T, _cls.T):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
