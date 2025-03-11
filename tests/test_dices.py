@@ -75,21 +75,20 @@ def make_jkmaps(data_path):
     return jkmaps
 
 
-def make_DICESObj(data_path):
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    jkmaps = make_jkmaps(data_path)
-    with open(data_path / "params_test.yaml", mode="r") as file:
-        config = yaml.safe_load(file)
-    DICESObj = dices.DICES(data_maps, jkmaps, vis_maps, config)
-    return DICESObj
-
-
 def test_jkmap(data_path):
     Njk = 5
     jkmaps = make_jkmaps(data_path)
     for key in list(jkmaps.keys()):
         assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
+
+
+def test_bias():
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    cls, _ = dices.get_cls(data_maps, vis_maps)
+    b = dices.get_bias(cls)
+    for key in list(cls.keys()):
+        assert key in list(b.keys())
 
 
 def test_get_delete1_fsky(data_path):
@@ -113,6 +112,33 @@ def test_get_delete2_fsky(data_path):
                 _alpha = 1 - 2 / JackNjk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
+
+
+def test_mask_correction():
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    cls, mls = dices.get_cls(data_maps, vis_maps)
+    _cls = dices.correct_mask(cls, mls, mls)
+    for key in list(cls.keys()):
+        cl = cls[key].__array__()
+        _cl = _cls[key].__array__()
+        assert np.isclose(cl[2:], _cl[2:]).all()
+
+
+def test_polspice():
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    cls, _ = dices.get_cls(data_maps, vis_maps)
+    cls = np.array([
+        cls[("POS", "POS", 1, 1)],
+        cls[("SHE", "SHE", 1, 1)][0],
+        cls[("SHE", "SHE", 1, 1)][1],
+        cls[("POS", "SHE", 1, 1)][0],
+    ]).T
+    corrs = dices.cl2corr(cls)
+    _cls = dices.corr2cl(corrs)
+    for (cl, _cl) in zip(cls.T, _cls.T):
+        assert np.isclose(cl[2:], _cl[2:]).all()
 
 
 def test_dices(data_path):
