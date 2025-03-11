@@ -244,7 +244,7 @@ def test_dices(data_path):
     )
 
     # Check for correct keys)
-    compsep_cls = dices.compsep_Cls(data_cls)
+    compsep_cls = dices.Fields2Components(data_cls)
     compsep_keys = list(compsep_cls.keys())
     k = 0
     for i in range(0, len(compsep_keys)):
@@ -295,7 +295,7 @@ def test_dices(data_path):
         assert C0.shape == C1.shape == C2.shape == CD.shape
 
     # Check for delete2 correction
-    _cqs0 = dices.compsep_Cls(cqs0)
+    _cqs0 = dices.Fields2Components(cqs0)
     _cov1 = dices.dict2mat(_cqs0, delete1_cov)
     _cov2 = dices.dict2mat(_cqs0, delete2_cov)
     _corr1 = dices.cov2corr(_cov1)

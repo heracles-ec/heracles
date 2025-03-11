@@ -34,6 +34,9 @@ __all__ = [
     "correct_mask",
     # Delete1
     "get_delete1_cov",
+    "get_target_cov",
+    "get_W",
+    "shrink_cov",
     # Delete2
     "get_delete2_cov",
     "get_delete2_correction",
@@ -46,7 +49,7 @@ __all__ = [
     "cov2corr",
     "add_to_Cls",
     "sub_to_Cls",
-    "compsep_Cls",
+    "Fields2Components",
     "dict2mat",
     "mat2dict",
     "cov2spinblocks",
@@ -62,7 +65,7 @@ from .utils_cl import (
     cov2corr,
     add_to_Cls,
     sub_to_Cls,
-    compsep_Cls,
+    Fields2Components,
     dict2mat,
     mat2dict,
     cov2spinblocks,

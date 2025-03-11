@@ -18,7 +18,7 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .utils_cl import (
-    compsep_Cls,
+    Fields2Components,
     dict2mat,
     cov2corr,
     mat2dict,
@@ -26,6 +26,8 @@ from .utils_cl import (
 
 
 def get_dices_cov(cls0, cov1, cov2):
+    # TO DO:
+    # This is technically
     """
     Internal method to compute the Dices covariance.
     inputs:
@@ -35,7 +37,7 @@ def get_dices_cov(cls0, cov1, cov2):
     returns:
         dices_cov (dict): Dictionary of Dices covariance
     """
-    cqs0 = compsep_Cls(cls0)
+    cqs0 = Fields2Components(cls0)
     _cov1 = dict2mat(cqs0, cov1)
     _cov2 = dict2mat(cqs0, cov2)
     _corr1 = cov2corr(_cov1)

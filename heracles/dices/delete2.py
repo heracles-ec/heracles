@@ -18,7 +18,7 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .utils_cl import (
-    compsep_Cls,
+    Fields2Components,
     get_Cl_cov,
 )
 
@@ -37,10 +37,10 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     JackNjk = len(Clsjks.keys())
 
     # Bin Cls
-    Cqs0 = compsep_Cls(Cls0)
+    Cqs0 = Fields2Components(Cls0)
     Cqsjks = []
     for key in Clsjks.keys():
-        Cqsjks.append(compsep_Cls(Clsjks[key]))
+        Cqsjks.append(Fields2Components(Clsjks[key]))
 
     jk1 = []
     jk2 = []
@@ -53,7 +53,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
         _Clsjks = []
         for __jk2 in _jk2:
             cqs = Clsjk2s[(jk, __jk2)]
-            _Clsjks.append(compsep_Cls(cqs))
+            _Clsjks.append(Fields2Components(cqs))
         jk1.append(_jk1)
         jk2.append(_jk2)
         [Cqsjks2.append(_Cls) for _Cls in _Clsjks]

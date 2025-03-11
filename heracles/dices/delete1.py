@@ -21,7 +21,7 @@ from .utils_cl import (
     get_Clkey,
     mat2dict,
     dict2mat,
-    compsep_Cls,
+    Fields2Components,
     get_Cl_mu,
     cov2corr,
 )
@@ -31,21 +31,43 @@ from .bias_corrrection import (
 )
 
 
-def get_delete1_cov(Cls0, Clsjks, shrink=True):
+def get_delete1_cov(Clsjks):
     """
-    Internal method to compute the shrunk covariance.
+    Computes the delete1 covariance matrix.
     inputs:
-        Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
-        Clsjks_wbias (dict): Dictionary of delete1 data Cls
     returns:
-        shrunk_cov (dict): Dictionary of shrunk delete1 covariance
         delete1_cov (dict): Dictionary of delete1 covariance
-        target_cov (dict): Dictionary of target covariance
     """
     # Get JackNJk
     JackNjk = len(Clsjks.keys())
 
+    # Component separate
+    Cqsjks = {}
+    for key in list(Clsjks.keys()):
+        Clsjk = Clsjks[key]
+        Cqsjks[key] = Fields2Components(Clsjk)
+
+    # W matrices
+    W = get_W(Clsjks, jk=True)
+    Wbar = np.mean(W, axis=0)
+
+    # Compute Jackknife covariance
+    cov1 = (JackNjk / (JackNjk - 1)) * Wbar
+
+    # Data vector to dictionary
+    cov1 = mat2dict(Cqsjks[(1, 1)], cov1)
+    return cov1
+
+
+def get_gaussian_target(Clsjks):
+    """
+    Computes the target matrix.
+    inputs:
+        Clsjks (dict): Dictionary of delete1 data Cls
+    returns:
+        target_cov (dict): Dictionary of target covariance
+    """
     # Add bias to Cls
     Clsjks_wbias = {}
     for key in list(Clsjks.keys()):
@@ -54,14 +76,63 @@ def get_delete1_cov(Cls0, Clsjks, shrink=True):
         Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
 
     # Separate component Cls
-    Cqs0 = compsep_Cls(Cls0)
-    Cqsjks = {}
     Cqsjks_wbias = {}
+    for key in list(Clsjks_wbias.keys()):
+        Clsjk_wbias = Clsjks_wbias[key]
+        Cqsjks_wbias[key] = Fields2Components(Clsjk_wbias)
+
+    # Compute target matrix
+    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
+    target = get_gaussian_cov(Cqsjks_mu_wbias)
+
+    # Data vector to dictionary
+    target = mat2dict(Cqsjks_wbias[(1, 1)], target)
+    return target
+
+
+def shrink_cov(Cls0, cov, target, shrinkage):
+    """
+    Internal method to compute the shrunk covariance.
+    inputs:
+        Cls0 (dict): Dictionary of data Cls
+        W (array): W matrices of the original covariance matrix
+        target (dict): Dictionary of target covariance
+    returns:
+        shrunk_cov (dict): Dictionary of shrunk delete1 covariance
+    """
+    # Separate component Cls
+    Cqs0 = Fields2Components(Cls0)
+
+    # to matrices
+    cov = dict2mat(Cqs0, cov)
+    target = dict2mat(Cqs0, target)
+
+    # Compute scalar shrinkage intensity
+    target_corr = cov2corr(target)
+    _target = correlate_target(cov, target_corr)
+
+    # Apply shrinkage
+    shrunk_S = shrinkage * _target + (1 - shrinkage) * cov
+
+    # To dictionaries
+    shrunk_S = mat2dict(Cqs0, shrunk_S)
+
+    return shrunk_S
+
+
+def get_W(Clsjks):
+    """
+    Computes the W matrices from the ensemble of delete1 cls.
+    inputs:
+        Clsjks (dict): Dictionary of delete1 data Cls
+    returns:
+        delete1_cov (dict): Dictionary of delete1 covariance
+    """
+    # Separate component Cls
+    Cqsjks = {}
     for key in list(Clsjks.keys()):
         Clsjk = Clsjks[key]
-        Clsjk_wbias = Clsjks_wbias[key]
-        Cqsjks[key] = compsep_Cls(Clsjk)
-        Cqsjks_wbias[key] = compsep_Cls(Clsjk_wbias)
+        Cqsjks[key] = Fields2Components(Clsjk)
 
     # Concatenate Cls
     Cqsjks_all = []
@@ -72,41 +143,13 @@ def get_delete1_cov(Cls0, Clsjks, shrink=True):
     Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
 
     # W matrices
-    W = get_W(Cqsjks_all, Cqsjks_mu_all, jk=True)
-    Wbar = np.mean(W, axis=0)
-
-    # Compute Jackknife covariance
-    S = (JackNjk / (JackNjk - 1)) * Wbar
-
-    # Compute target matrix
-    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
-    ClGauss_cov = get_gaussian_cov(Cqsjks_mu_wbias)
-    ClGauss_fullcov = dict2mat(Cqs0, ClGauss_cov)
-    ClGauss_corr = cov2corr(ClGauss_fullcov)
-    T = get_target_cov(S, ClGauss_corr)
-
-    # Compute scalar shrinkage intensity
-    if shrink:
-        lambda_star = get_lambda_star_single_rbar(S, W, Wbar, ClGauss_corr)
-    else:
-        print("Shrinkage intensity not implemented for unbinned Cls")
-        lambda_star = 0.0
-    print("Shrinkage intensity = %0.4f" % lambda_star)
-
-    # Apply shrinkage
-    shrunk_S = lambda_star * T + (1 - lambda_star) * S
-
-    # To dictionaries
-    shrunk_S = mat2dict(Cqs0, shrunk_S)
-    T = mat2dict(Cqs0, T)
-    S = mat2dict(Cqs0, S)
-    return shrunk_S, S, T
+    W = _get_W(Cqsjks_all, Cqsjks_mu_all, jk=True)
+    return W
 
 
-def get_W(x, xbar, jk=False):
+def _get_W(x, xbar, jk=False):
     """
-    Computes the W matrices used to cpmpute the covariance
-    of the covariance matrix estimate.
+    Internal method to compute the W matrices.
     input:
         x: Cl
         xbar: mean Cl
@@ -127,12 +170,12 @@ def get_W(x, xbar, jk=False):
     return W
 
 
-def get_target_cov(S, rbar):
+def correlate_target(S, rbar):
     """
     Computes the estimate of the target matrix.
     input:
-        S: target covariance matrix
-        rbar: Gaussian correlation matrix
+        S (array): target covariance matrix
+        rbar (array): Gaussian correlation matrix
     returns:
         T: correlation matrix of S
     """
@@ -227,26 +270,27 @@ def get_f(S, W, Wbar):
     return f
 
 
-def get_lambda_star_single_rbar(S, W, Wbar, rbar):
+def get_shrinkage(W, target_corr):
     """
     Computes the optimal linear shrinkage factor.
     input:
-        S: target covariance matrix
-        W: W matrices
-        Wbar: mean W matrix
-        rbar: correlation matrix
+        W: W matrices of the original covariance matrix
+        rbar: correlation of the target matrix
     returns:
         lambda_star: optimal linear shrinkage factor
     """
+    Njk = len(W)
+    Wbar = np.mean(W, axis=0)
+    S = (Njk / (Njk - 1)) * Wbar
     f = get_f(S, W, Wbar)
     numerator = 0.0
     denominator = 0.0
     for i in range(0, len(S)):
         for j in range(0, len(S)):
             if i != j:
-                numerator += get_covSS(i, j, i, j, W, Wbar) - rbar[i, j] * f[i, j]
+                numerator += get_covSS(i, j, i, j, W, Wbar) - target_corr[i, j] * f[i, j]
                 denominator += (
-                    S[i, j] - rbar[i, j] * np.sqrt(S[i, i] * S[j, j])
+                    S[i, j] - target_corr[i, j] * np.sqrt(S[i, i] * S[j, j])
                 ) ** 2.0
     lambda_star = numerator / denominator
     return lambda_star

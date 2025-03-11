@@ -48,7 +48,7 @@ def get_lgrid(lmin, lmax, nbin, uselog=True):
     return lgrid, ledges, dl
 
 
-def compsep_Cls(Cls):
+def Fields2Components(result):
     """
     Separates the SHE values into E and B modes.
     input:
@@ -56,30 +56,26 @@ def compsep_Cls(Cls):
     returns:
         Cls_unraveled: dictionary of Cl values
     """
-    Cls_compsep = {}
-    for key in list(Cls.keys()):
+    _result = {}
+    for key in list(result.keys()):
         t1, t2, b1, b2 = key
-        cl = Cls[key]
-        ell = cl.ell
-        if t1 == t2 == "POS":
-            ndims = len(cl.shape)
-            if ndims == 3:
-                Cls_compsep[key] = Result(cl[..., 0, :], ell)
-            else:
-                Cls_compsep[key] = Result(cl[..., :], ell)
-        elif t1 == t2 == "SHE" and b1 == b2:
-            Cls_compsep[("G_E", "G_E", b1, b2)] = Result(cl[..., 0, :], ell)
-            Cls_compsep[("G_B", "G_B", b1, b2)] = Result(cl[..., 1, :], ell)
-            Cls_compsep[("G_E", "G_B", b1, b2)] = Result(cl[..., 2, :], ell)
+        _r = result[key]
+        ell = _r.ell
+        if t1 == t2 == "SHE" and b1 == b2:
+            _result[("G_E", "G_E", b1, b2)] = Result(_r[..., 0, :], ell)
+            _result[("G_B", "G_B", b1, b2)] = Result(_r[..., 1, :], ell)
+            _result[("G_E", "G_B", b1, b2)] = Result(_r[..., 2, :], ell)
         elif t1 == t2 == "SHE" and b1 != b2:
-            Cls_compsep[("G_E", "G_E", b1, b2)] = Result(cl[..., 0, :], ell)
-            Cls_compsep[("G_B", "G_B", b1, b2)] = Result(cl[..., 1, :], ell)
-            Cls_compsep[("G_E", "G_B", b1, b2)] = Result(cl[..., 2, :], ell)
-            Cls_compsep[("G_E", "G_B", b2, b1)] = Result(cl[..., 3, :], ell)
+            _result[("G_E", "G_E", b1, b2)] = Result(_r[..., 0, :], ell)
+            _result[("G_B", "G_B", b1, b2)] = Result(_r[..., 1, :], ell)
+            _result[("G_E", "G_B", b1, b2)] = Result(_r[..., 2, :], ell)
+            _result[("G_E", "G_B", b2, b1)] = Result(_r[..., 3, :], ell)
         elif t1 == "POS" and t2 == "SHE":
-            Cls_compsep[("POS", "G_E", b1, b2)] = Result(cl[..., 0, :], ell)
-            Cls_compsep[("POS", "G_B", b1, b2)] = Result(cl[..., 1, :], ell)
-    return Cls_compsep
+            _result[("POS", "G_E", b1, b2)] = Result(_r[..., 0, :], ell)
+            _result[("POS", "G_B", b1, b2)] = Result(_r[..., 1, :], ell)
+        else:
+            _result[key] = _r
+    return _result
 
 
 def get_Clkey(sources1, sources2):
