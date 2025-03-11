@@ -7,20 +7,25 @@ import heracles
 def zbins():
     return {0: (0.0, 0.8), 1: (1.0, 1.2)}
 
+
 @pytest.fixture
 def zbins2():
     return {2: (0.0, 0.8), 3: (1.0, 1.2)}
+
 
 @pytest.fixture
 def mock_alms(rng, zbins):
     return generate_mock_alms(rng, zbins)
 
+
 @pytest.fixture
 def mock_alms2(rng, zbins2):
     return generate_mock_alms(rng, zbins2)
 
+
 def generate_mock_alms(rng, zbins):
     import numpy as np
+
     lmax = 32
     Nlm = (lmax + 1) * (lmax + 2) // 2
 
@@ -35,6 +40,7 @@ def generate_mock_alms(rng, zbins):
             alms[n, i] = a
 
     return alms
+
 
 @pytest.fixture
 def mock_cls(rng):
@@ -274,51 +280,56 @@ def test_write_read_alms(mock_alms, tmp_path):
         np.testing.assert_array_equal(mock_alms[key], alms[key])
         assert mock_alms[key].dtype.metadata == alms[key].dtype.metadata
 
-def test_fitsDictError(mock_alms,tmp_path):
+
+def test_fitsDictError(mock_alms, tmp_path):
     from heracles.io import FitsDict
     from pathlib import Path
-    tmp_path = Path(tmp_path) 
+
+    tmp_path = Path(tmp_path)
     path1 = tmp_path / "alms1.fits"
 
     heracles.write_alms(path1, mock_alms)
- 
+
     assert path1.exists()
-  
+
     alms1 = FitsDict(path1, clobber=False)
-  
+
     # Ensure bad key raises a key error
     with pytest.raises(KeyError):
-        _ = alms1['badkey']
+        _ = alms1["badkey"]
 
     # Ensure an existing key does NOT raise an error
-    _ = alms1[('P',0)] 
+    _ = alms1[("P", 0)]
 
-def test_chain_almfits(mock_alms,mock_alms2, tmp_path):
+
+def test_chain_almfits(mock_alms, mock_alms2, tmp_path):
     from heracles.io import AlmFits
     from collections import ChainMap
     import numpy as np
+
     path1 = tmp_path / "alms1.fits"
     path2 = tmp_path / "alms2.fits"
 
     heracles.write_alms(path1, mock_alms)
     heracles.write_alms(path2, mock_alms2)
-    
+
     assert path1.exists()
     assert path2.exists()
 
     alms1 = AlmFits(path1, clobber=False)
     alms2 = AlmFits(path2, clobber=False)
     chained_alms = ChainMap()
-    
+
     chained_alms.maps.append(alms1)
     chained_alms.maps.append(alms2)
-   
+
     for key in mock_alms:
-         np.testing.assert_array_equal(mock_alms[key], chained_alms[key])
-         assert mock_alms[key].dtype.metadata == chained_alms[key].dtype.metadata
+        np.testing.assert_array_equal(mock_alms[key], chained_alms[key])
+        assert mock_alms[key].dtype.metadata == chained_alms[key].dtype.metadata
     for key in mock_alms2:
         np.testing.assert_array_equal(mock_alms2[key], chained_alms[key])
         assert mock_alms2[key].dtype.metadata == chained_alms[key].dtype.metadata
+
 
 def test_write_read_cls(mock_cls, tmp_path):
     import numpy as np
