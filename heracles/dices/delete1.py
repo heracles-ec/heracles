@@ -297,7 +297,9 @@ def get_shrinkage(cls0, target, W):
     for i in range(0, len(S)):
         for j in range(0, len(S)):
             if i != j:
-                numerator += get_covSS(i, j, i, j, W, Wbar) - target_corr[i, j] * f[i, j]
+                numerator += (
+                    get_covSS(i, j, i, j, W, Wbar) - target_corr[i, j] * f[i, j]
+                )
                 denominator += (
                     S[i, j] - target_corr[i, j] * np.sqrt(S[i, i] * S[j, j])
                 ) ** 2.0
