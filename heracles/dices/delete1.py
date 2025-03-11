@@ -31,10 +31,11 @@ from .bias_corrrection import (
 )
 
 
-def get_delete1_cov(Clsjks):
+def get_delete1_cov(Cls0, Clsjks):
     """
     Computes the delete1 covariance matrix.
     inputs:
+        Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
     returns:
         delete1_cov (dict): Dictionary of delete1 covariance
@@ -43,6 +44,7 @@ def get_delete1_cov(Clsjks):
     JackNjk = len(Clsjks.keys())
 
     # Component separate
+    Cqs0 = Fields2Components(Cls0)
     Cqsjks = {}
     for key in list(Clsjks.keys()):
         Clsjk = Clsjks[key]
@@ -56,14 +58,15 @@ def get_delete1_cov(Clsjks):
     cov1 = (JackNjk / (JackNjk - 1)) * Wbar
 
     # Data vector to dictionary
-    cov1 = mat2dict(Cqsjks[(1, 1)], cov1)
-    return cov1
+    cov1 = mat2dict(Cqs0, cov1)
+    return cov1, W
 
 
-def get_gaussian_target(Clsjks):
+def get_gaussian_target(Cls0, Clsjks):
     """
     Computes the target matrix.
     inputs:
+        Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
     returns:
         target_cov (dict): Dictionary of target covariance
@@ -76,6 +79,7 @@ def get_gaussian_target(Clsjks):
         Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
 
     # Separate component Cls
+    Cqs0 = Fields2Components(Cls0)
     Cqsjks_wbias = {}
     for key in list(Clsjks_wbias.keys()):
         Clsjk_wbias = Clsjks_wbias[key]
@@ -84,9 +88,6 @@ def get_gaussian_target(Clsjks):
     # Compute target matrix
     Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
     target = get_gaussian_cov(Cqsjks_mu_wbias)
-
-    # Data vector to dictionary
-    target = mat2dict(Cqsjks_wbias[(1, 1)], target)
     return target
 
 
@@ -120,7 +121,7 @@ def shrink_cov(Cls0, cov, target, shrinkage):
     return shrunk_S
 
 
-def get_W(Clsjks):
+def get_W(Clsjks, jk=True):
     """
     Computes the W matrices from the ensemble of delete1 cls.
     inputs:
@@ -143,7 +144,7 @@ def get_W(Clsjks):
     Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
 
     # W matrices
-    W = _get_W(Cqsjks_all, Cqsjks_mu_all, jk=True)
+    W = _get_W(Cqsjks_all, Cqsjks_mu_all, jk=jk)
     return W
 
 
@@ -270,15 +271,23 @@ def get_f(S, W, Wbar):
     return f
 
 
-def get_shrinkage(W, target_corr):
+def get_shrinkage(cls0, target, W):
     """
     Computes the optimal linear shrinkage factor.
     input:
+        cls0: data Cls
         W: W matrices of the original covariance matrix
-        rbar: correlation of the target matrix
+        target: target matrix
     returns:
         lambda_star: optimal linear shrinkage factor
     """
+    # Separate component Cls
+    cqs0 = Fields2Components(cls0)
+    # to matrices
+    target = dict2mat(cqs0, target)
+    # Compute correlation of target
+    target_corr = cov2corr(target)
+    # Compute shrinkage factor
     Njk = len(W)
     Wbar = np.mean(W, axis=0)
     S = (Njk / (Njk - 1)) * Wbar

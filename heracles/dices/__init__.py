@@ -34,8 +34,9 @@ __all__ = [
     "correct_mask",
     # Delete1
     "get_delete1_cov",
-    "get_target_cov",
+    "get_gaussian_target",
     "get_W",
+    "get_shrinkage",
     "shrink_cov",
     # Delete2
     "get_delete2_cov",
@@ -58,7 +59,13 @@ __all__ = [
 from .cls import get_cls, get_delete_cls
 from .bias_corrrection import get_bias, get_delete_fsky, get_biasjk, correct_bias
 from .mask_correction import compute_mask_correction, correct_mask
-from .delete1 import get_delete1_cov
+from .delete1 import (
+    get_delete1_cov,
+    get_gaussian_target,
+    get_W,
+    get_shrinkage,
+    shrink_cov,
+)
 from .delete2 import get_delete2_cov, get_delete2_correction
 from .dices import get_dices_cov
 from .utils_cl import (

@@ -238,10 +238,14 @@ def test_dices(data_path):
             ncls, nells = cq.shape
             assert nells == len(lgrid)
 
-    shrunk_cov1, delete1_cov, _ = dices.get_delete1_cov(
+    delete1_cov, W = dices.get_delete1_cov(cqs0, cqs1)
+    target_cov = dices.get_gaussian_target(cqs0, cqs1)
+    shrinkage = dices.get_shrinkage(cqs0, target_cov, W)
+    shrunk_cov1 = dices.shrink_cov(
         cqs0,
-        cqs1,
-    )
+        delete1_cov, 
+        target_cov,
+        shrinkage)
 
     # Check for correct keys)
     compsep_cls = dices.Fields2Components(data_cls)
