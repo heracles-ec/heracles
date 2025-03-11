@@ -88,7 +88,7 @@ def test_result_2d(rng):
 @pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
 @pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (3, 1)])
 def test_binned(ndim, axis, weight, rng):
-    shape = rng.integers(0, 100, ndim)
+    shape = rng.integers(1, 100, ndim)
     lmax = shape[axis] - 1
 
     data = heracles.Result(rng.standard_normal(shape), axis=axis)
