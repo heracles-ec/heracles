@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .utils_cl import (
+from .utils import (
     Fields2Components,
-    get_Cl_cov,
+    _get_W,
+    mat2dict,
 )
 
 
@@ -38,9 +39,12 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
 
     # Bin Cls
     Cqs0 = Fields2Components(Cls0)
-    Cqsjks = []
+    Cqs0_all = np.concatenate([Cqs0[key] for key in list(Cqs0.keys())])
+    Cqsjks_all = []
     for key in Clsjks.keys():
-        Cqsjks.append(Fields2Components(Clsjks[key]))
+        cls = Fields2Components(Clsjks[key])
+        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
+        Cqsjks_all.append(cls_all)
 
     jk1 = []
     jk2 = []
@@ -53,7 +57,9 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
         _Clsjks = []
         for __jk2 in _jk2:
             cqs = Clsjk2s[(jk, __jk2)]
-            _Clsjks.append(Fields2Components(cqs))
+            cqs = Fields2Components(cqs)
+            cqs_all = np.concatenate([cqs[key] for key in list(cqs.keys())])
+            _Clsjks.append(cqs_all)
         jk1.append(_jk1)
         jk2.append(_jk2)
         [Cqsjks2.append(_Cls) for _Cls in _Clsjks]
@@ -65,22 +71,20 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     for i in range(0, len(Cqsjks2)):
         i1 = jk1[i]
         i2 = jk2[i]
-        _Qii = {}
-        for key in list(Cqs0.keys()):
-            __Qii = JackNjk * Cqs0[key].__array__()
-            __Qii -= (JackNjk - 1) * (
-                Cqsjks[i1 - 1][key].__array__() + Cqsjks[i2 - 1][key].__array__()
-            )
-            __Qii += (JackNjk - 2) * Cqsjks2[i][key].__array__()
-            _Qii[key] = __Qii
+        _Qii = JackNjk * Cqs0_all
+        _Qii -= (JackNjk - 1) * (Cqsjks_all[i1 - 1] + Cqsjks_all[i2 - 1])
+        _Qii += (JackNjk - 2) * Cqsjks2[i]
         Qii.append(_Qii)
 
+    Qii_m = np.mean(Qii, axis=0)
+    Qii_W = _get_W(Qii, Qii_m)
+    Q = np.mean(Qii_W, axis=0)
     n = JackNjk * (JackNjk - 1) / 2
-    Q_cov = get_Cl_cov(Qii)
-    for key in Q_cov.keys():
-        Q_cov[key] *= n - 1
-        Q_cov[key] *= 1 / (JackNjk * (JackNjk + 1))
-    return Q_cov
+    d = 1 / (JackNjk * (JackNjk + 1))
+    Q *= (n-1)
+    Q *= d
+    Q = mat2dict(Cqs0, Q)
+    return Q
 
 
 def get_delete2_cov(delete1_cov, Cls0, Clsjks, Clsjk2s):

@@ -1,6 +1,6 @@
 import numpy as np
 from heracles.result import Result
-from .utils_cl import (
+from .utils import (
     add_to_Cls,
     sub_to_Cls,
 )

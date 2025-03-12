@@ -290,8 +290,7 @@ def test_dices(data_path):
         cov = delete1_cov[key]
         assert cov.shape == (lbins, lbins)
 
-    # TO DO:
-    # We should check that Shrunk = alpha * Target + (1-alpha) * Cov
+    
 
     delete2_cov = dices.get_delete2_cov(delete1_cov, cqs0, cqs1, cqs2)
     Q = dices.get_delete2_correction(

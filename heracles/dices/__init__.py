@@ -34,7 +34,6 @@ __all__ = [
     # Delete1
     "get_delete1_cov",
     "get_gaussian_target",
-    "get_W",
     "get_shrinkage",
     "shrink_cov",
     # Delete2
@@ -49,6 +48,7 @@ __all__ = [
     "cov2corr",
     "add_to_Cls",
     "sub_to_Cls",
+    "get_W",
     "Fields2Components",
     "dict2mat",
     "mat2dict",
@@ -61,16 +61,16 @@ from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import (
     get_delete1_cov,
     get_gaussian_target,
-    get_W,
     get_shrinkage,
     shrink_cov,
 )
 from .delete2 import get_delete2_cov, get_delete2_correction
 from .dices import get_dices_cov
-from .utils_cl import (
+from .utils import (
     cov2corr,
     add_to_Cls,
     sub_to_Cls,
+    get_W,
     Fields2Components,
     dict2mat,
     mat2dict,

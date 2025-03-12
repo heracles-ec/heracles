@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .utils_cl import (
+from .utils import (
     Fields2Components,
     dict2mat,
     cov2corr,
