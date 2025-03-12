@@ -83,7 +83,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     Q = np.mean(Qii_W, axis=0)
     n = JackNjk * (JackNjk - 1) / 2
     d = 1 / (JackNjk * (JackNjk + 1))
-    Q *= (n-1)
+    Q *= n - 1
     Q *= d
     Q = Data2Components(Cqs0, Q)
     return Q

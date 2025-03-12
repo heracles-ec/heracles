@@ -51,11 +51,10 @@ __all__ = [
     "get_W",
     "Fields2Components",
     # io
-    "Fields2Components"
+    "Fields2Components",
     "Components2Data",
     "Data2Components",
     "Components2Fields",
-
 ]
 
 from .cls import get_cls
@@ -80,7 +79,7 @@ from .utils import (
     sub_to_Cls,
     get_W,
 )
-from .io import(
+from .io import (
     Fields2Components,
     Components2Data,
     Data2Components,
