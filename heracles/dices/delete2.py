@@ -83,15 +83,18 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     return Q_cov
 
 
-def get_delete2_cov(delete1_cov, Q):
+def get_delete2_cov(delete1_cov, Cls0, Clsjks, Clsjk2s):
     """
     Internal method to compute the delete2 covariance.
     inputs:
         delete1_cov (dict): Dictionary of delete1 covariance
-        Q (dict): Dictionary of delete2 correction
+        Cls0 (dict): Dictionary of data Cls
+        Clsjks (dict): Dictionary of delete1 data Cls
+        Clsjk2s (dict): Dictionary of delete2 data Cls
     returns:
         delete2_cov (dict): Dictionary of delete2 covariance
     """
+    Q = get_delete2_correction(Cls0, Clsjks, Clsjk2s)
     delete2_cov = {}
     for key in list(delete1_cov.keys()):
         delete2_cov[key] = delete1_cov[key] - Q[key]

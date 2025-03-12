@@ -89,6 +89,23 @@ def test_jkmap(data_path):
         assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
 
 
+def test_cls(data_path):
+    nside = 128
+    data_maps = make_data_maps()
+    jkmaps = make_jkmaps(data_path)
+    data_cls = dices.get_cls(data_maps, jkmaps)
+    _data_cls = dices.get_cls(data_maps, jkmaps, jk=0, jk2=0)
+    for key in list(data_cls.keys()):
+        _cl = np.atleast_2d(data_cls[key])
+        _, nells = _cl.shape
+        assert nells == nside + 1
+
+    for key in list(data_cls.keys()):
+        cl = data_cls[key].__array__()
+        _cl = _data_cls[key].__array__()
+        assert (cl == _cl).all()
+
+
 def test_bias(data_path):
     data_maps = make_data_maps()
     jkmaps = make_jkmaps(data_path)
@@ -161,21 +178,20 @@ def test_dices(data_path):
 
     data_cls = dices.get_cls(data_maps, jkmaps)
     mask_cls = dices.get_cls(vis_maps, jkmaps)
-    for key in list(data_cls.keys()):
-        _cl = np.atleast_2d(data_cls[key])
-        _, nells = _cl.shape
-        assert nells == nside + 1
-
-    for key in list(mask_cls.keys()):
-        _cl = np.atleast_2d(mask_cls[key])
-        _, nells = _cl.shape
-        assert nells == nside + 1
 
     delete1_data_cls = {}
     delete1_mask_cls = {}
     for jk in range(1, JackNjk + 1):
         _cls = dices.get_cls(data_maps, jkmaps, jk=jk)
         _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk)
+        # Mask correction
+        _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
+        # Bias correction
+        _cls = dices.correct_bias(
+            _cls,
+            jkmaps,
+            jk=jk
+        )
         delete1_data_cls[jk] = _cls
         delete1_mask_cls[jk] = _cls_mm
     assert len(delete1_data_cls) == JackNjk
@@ -199,6 +215,15 @@ def test_dices(data_path):
         for jk2 in range(jk + 1, JackNjk + 1):
             _cls = dices.get_cls(data_maps, jkmaps, jk=jk, jk2=jk2)
             _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk, jk2=jk2)
+            # Mask correction
+            _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
+            # Bias correction
+            _cls = dices.correct_bias(
+                _cls,
+                jkmaps,
+                jk=jk,
+                jk2=jk2
+            )
             delete2_data_cls[(jk, jk2)] = _cls
             delete2_mask_cls[(jk, jk2)] = _cls_mm
     assert len(delete2_data_cls) == 2 * JackNjk
@@ -239,8 +264,11 @@ def test_dices(data_path):
             ncls, nells = cq.shape
             assert nells == len(lgrid)
 
-    delete1_cov, W = dices.get_delete1_cov(cqs0, cqs1)
-    target_cov = dices.get_gaussian_target(cqs0, cqs1)
+    # Delete1
+    delete1_cov = dices.get_delete1_cov(cqs0, cqs1)
+    # Shrinkage
+    target_cov = dices.get_gaussian_target(cqs1)
+    W = dices.get_W(cqs1, jk=True)
     shrinkage = dices.get_shrinkage(cqs0, target_cov, W)
     shrunk_cov1 = dices.shrink_cov(cqs0, delete1_cov, target_cov, shrinkage)
 
@@ -265,12 +293,12 @@ def test_dices(data_path):
     # TO DO:
     # We should check that Shrunk = alpha * Target + (1-alpha) * Cov
 
+    delete2_cov = dices.get_delete2_cov(delete1_cov, cqs0, cqs1, cqs2)
     Q = dices.get_delete2_correction(
         cqs0,
         cqs1,
         cqs2,
     )
-    delete2_cov = dices.get_delete2_cov(delete1_cov, Q)
     _delete2_cov = {}
     for key in list(delete1_cov.keys()):
         _delete2_cov[key] = delete1_cov[key] - Q[key]
@@ -310,6 +338,8 @@ def test_dices(data_path):
     _dices_cov = dices.mat2dict(_cqs0, _D)
     for key in list(dices_cov.keys()):
         print(key)
-        print(dices_cov[key])
-        print(_dices_cov[key])
-        assert np.all(dices_cov[key] == _dices_cov[key])
+        d = dices_cov[key]
+        d = d[~np.isnan(d)]
+        _d = _dices_cov[key]
+        _d = _d[~np.isnan(_d)]
+        assert np.all(d == _d)

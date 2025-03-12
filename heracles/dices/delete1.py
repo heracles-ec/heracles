@@ -45,10 +45,6 @@ def get_delete1_cov(Cls0, Clsjks):
 
     # Component separate
     Cqs0 = Fields2Components(Cls0)
-    Cqsjks = {}
-    for key in list(Clsjks.keys()):
-        Clsjk = Clsjks[key]
-        Cqsjks[key] = Fields2Components(Clsjk)
 
     # W matrices
     W = get_W(Clsjks, jk=True)
@@ -59,10 +55,10 @@ def get_delete1_cov(Cls0, Clsjks):
 
     # Data vector to dictionary
     cov1 = mat2dict(Cqs0, cov1)
-    return cov1, W
+    return cov1
 
 
-def get_gaussian_target(Cls0, Clsjks):
+def get_gaussian_target(Clsjks):
     """
     Computes the target matrix.
     inputs:
@@ -79,7 +75,6 @@ def get_gaussian_target(Cls0, Clsjks):
         Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
 
     # Separate component Cls
-    Cqs0 = Fields2Components(Cls0)
     Cqsjks_wbias = {}
     for key in list(Clsjks_wbias.keys()):
         Clsjk_wbias = Clsjks_wbias[key]
@@ -87,7 +82,7 @@ def get_gaussian_target(Cls0, Clsjks):
 
     # Compute target matrix
     Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
-    target = get_gaussian_cov(Cqsjks_mu_wbias)
+    target = _get_gaussian_cov(Cqsjks_mu_wbias)
     return target
 
 
@@ -190,7 +185,7 @@ def correlate_target(S, rbar):
     return T
 
 
-def get_gaussian_cov(Cl_mu):
+def _get_gaussian_cov(Cl_mu):
     """
     Computes Gaussian estimate of the target matrix.
     input:
