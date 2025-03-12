@@ -49,6 +49,10 @@ __all__ = [
     "get_delete2_cov",
     "get_delete2_correction",
     "get_dices_cov",
+    "Components2Data",
+    "Data2Components",
+    "Components2Fields",
+    "Fields2Components",
     # core
     "TocDict",
     "toc_filter",
@@ -120,6 +124,10 @@ from .dices import (
     get_delete2_cov,
     get_delete2_correction,
     get_dices_cov,
+    Components2Data,
+    Data2Components,
+    Components2Fields,
+    Fields2Components,
 )
 
 from .core import (

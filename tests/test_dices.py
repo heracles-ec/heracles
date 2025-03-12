@@ -334,7 +334,7 @@ def test_dices(data_path):
     _sig2 = np.sqrt(_var2)
     _corr2 = np.outer(_sig2, _sig2)
     _D = _corr2 * _corr1
-    _dices_cov = dices.mat2dict(_cqs0, _D)
+    _dices_cov = dices.Data2Components(_cqs0, _D)
     for key in list(dices_cov.keys()):
         print(key)
         d = dices_cov[key]

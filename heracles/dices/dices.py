@@ -18,10 +18,12 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .utils import (
-    Fields2Components,
-    dict2mat,
     cov2corr,
-    mat2dict,
+)
+from .io import (
+    Fields2Components,
+    Components2Data,
+    Data2Components,
 )
 
 
@@ -38,8 +40,8 @@ def get_dices_cov(cls0, cov1, cov2):
         dices_cov (dict): Dictionary of Dices covariance
     """
     cqs0 = Fields2Components(cls0)
-    _cov1 = dict2mat(cqs0, cov1)
-    _cov2 = dict2mat(cqs0, cov2)
+    _cov1 = Components2Data(cqs0, cov1)
+    _cov2 = Components2Data(cqs0, cov2)
     _corr1 = cov2corr(_cov1)
     _var1 = np.diag(_cov1).copy()
     _var2 = np.diag(_cov2).copy()
@@ -48,4 +50,4 @@ def get_dices_cov(cls0, cov1, cov2):
     _sig2 = np.sqrt(_var2)
     _corr2 = np.outer(_sig2, _sig2)
     dices_cov = _corr2 * _corr1
-    return mat2dict(cqs0, dices_cov)
+    return Data2Components(cqs0, dices_cov)

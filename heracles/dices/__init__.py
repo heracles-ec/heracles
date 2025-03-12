@@ -50,13 +50,21 @@ __all__ = [
     "sub_to_Cls",
     "get_W",
     "Fields2Components",
-    "dict2mat",
-    "mat2dict",
-    "cov2spinblocks",
+    # io
+    "Fields2Components"
+    "Components2Data",
+    "Data2Components",
+    "Components2Fields",
+
 ]
 
 from .cls import get_cls
-from .bias_corrrection import get_bias, get_delete_fsky, get_biasjk, correct_bias
+from .bias_corrrection import (
+    get_bias,
+    get_delete_fsky,
+    get_biasjk,
+    correct_bias,
+)
 from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import (
     get_delete1_cov,
@@ -71,9 +79,11 @@ from .utils import (
     add_to_Cls,
     sub_to_Cls,
     get_W,
-    Fields2Components,
-    dict2mat,
-    mat2dict,
-    cov2spinblocks,
 )
-from .utils_polspice import cl2corr, corr2cl
+from .io import(
+    Fields2Components,
+    Components2Data,
+    Data2Components,
+    Components2Fields,
+)
+from .polspice import cl2corr, corr2cl

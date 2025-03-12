@@ -19,9 +19,6 @@
 import numpy as np
 from .utils import (
     get_Clkey,
-    mat2dict,
-    dict2mat,
-    Fields2Components,
     get_Cl_mu,
     get_W,
     cov2corr,
@@ -29,6 +26,11 @@ from .utils import (
 from .bias_corrrection import (
     get_bias,
     add_to_Cls,
+)
+from .io import (
+    Fields2Components,
+    Data2Components,
+    Components2Data,
 )
 
 
@@ -55,7 +57,7 @@ def get_delete1_cov(Cls0, Clsjks):
     cov1 = (JackNjk / (JackNjk - 1)) * Wbar
 
     # Data vector to dictionary
-    cov1 = mat2dict(Cqs0, cov1)
+    cov1 = Data2Components(Cqs0, cov1)
     return cov1
 
 
@@ -101,8 +103,8 @@ def shrink_cov(Cls0, cov, target, shrinkage):
     Cqs0 = Fields2Components(Cls0)
 
     # to matrices
-    cov = dict2mat(Cqs0, cov)
-    target = dict2mat(Cqs0, target)
+    cov = Components2Data(Cqs0, cov)
+    target = Components2Data(Cqs0, target)
 
     # Compute scalar shrinkage intensity
     target_corr = cov2corr(target)
@@ -112,7 +114,7 @@ def shrink_cov(Cls0, cov, target, shrinkage):
     shrunk_S = shrinkage * _target + (1 - shrinkage) * cov
 
     # To dictionaries
-    shrunk_S = mat2dict(Cqs0, shrunk_S)
+    shrunk_S = Data2Components(Cqs0, shrunk_S)
 
     return shrunk_S
 

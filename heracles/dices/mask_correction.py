@@ -1,6 +1,6 @@
 import numpy as np
 from heracles.result import Result
-from .utils_polspice import (
+from .polspice import (
     cl2corr,
     corr2cl,
 )

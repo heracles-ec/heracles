@@ -18,9 +18,11 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .utils import (
-    Fields2Components,
     _get_W,
-    mat2dict,
+)
+from .io import (
+    Fields2Components,
+    Data2Components,
 )
 
 
@@ -83,7 +85,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     d = 1 / (JackNjk * (JackNjk + 1))
     Q *= (n-1)
     Q *= d
-    Q = mat2dict(Cqs0, Q)
+    Q = Data2Components(Cqs0, Q)
     return Q
 
 
