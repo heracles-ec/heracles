@@ -232,7 +232,7 @@ def get_shrinkage(cls0, target, W):
     # Separate component Cls
     cqs0 = Fields2Components(cls0)
     # to matrices
-    target = dict2mat(cqs0, target)
+    target = Components2Data(cqs0, target)
     # Compute correlation of target
     target_corr = cov2corr(target)
     # Compute shrinkage factor

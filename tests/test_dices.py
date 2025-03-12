@@ -324,8 +324,8 @@ def test_dices(data_path):
 
     # Check for delete2 correction
     _cqs0 = dices.Fields2Components(cqs0)
-    _cov1 = dices.dict2mat(_cqs0, delete1_cov)
-    _cov2 = dices.dict2mat(_cqs0, delete2_cov)
+    _cov1 = dices.Components2Data(_cqs0, delete1_cov)
+    _cov2 = dices.Components2Data(_cqs0, delete2_cov)
     _corr1 = dices.cov2corr(_cov1)
     _var1 = np.diag(_cov1).copy()
     _var2 = np.diag(_cov2).copy()
