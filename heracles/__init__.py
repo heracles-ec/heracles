@@ -106,7 +106,6 @@ from .catalog import (
 
 from .dices import (
     get_cls,
-    get_delete_cls,
     get_bias,
     get_delete_fsky,
     get_biasjk,

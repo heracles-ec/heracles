@@ -23,7 +23,6 @@ Main module of the *DICES* package.
 __all__ = [
     # cls
     "get_cls",
-    "get_delete_cls",
     # bias_correction
     "get_bias",
     "get_delete_fsky",
@@ -56,7 +55,7 @@ __all__ = [
     "cov2spinblocks",
 ]
 
-from .cls import get_cls, get_delete_cls
+from .cls import get_cls
 from .bias_corrrection import get_bias, get_delete_fsky, get_biasjk, correct_bias
 from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import (

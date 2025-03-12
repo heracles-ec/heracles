@@ -59,6 +59,14 @@ def make_vis_maps():
     npix = hp.nside2npix(nside)
     map = 4 * np.ones(npix)
     maps = {}
+    heracles.update_metadata(
+        map,
+        nside=nside,
+        lmax=nside,
+        bias=0.0,
+        fsky=1 / 2,
+        spin=0,
+    )
     for i in range(1, nbins + 1):
         maps[("VIS", i)] = map
         maps[("WHT", i)] = np.array([map])
@@ -81,10 +89,10 @@ def test_jkmap(data_path):
         assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
 
 
-def test_bias():
+def test_bias(data_path):
     data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    cls, _ = dices.get_cls(data_maps, vis_maps)
+    jkmaps = make_jkmaps(data_path)
+    cls = dices.get_cls(data_maps, jkmaps)
     b = dices.get_bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
@@ -113,10 +121,12 @@ def test_get_delete2_fsky(data_path):
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction():
+def test_mask_correction(data_path):
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
-    cls, mls = dices.get_cls(data_maps, vis_maps)
+    jkmaps = make_jkmaps(data_path)
+    cls = dices.get_cls(data_maps, jkmaps)
+    mls = dices.get_cls(vis_maps, jkmaps)
     _cls = dices.correct_mask(cls, mls, mls)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
@@ -124,10 +134,10 @@ def test_mask_correction():
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_polspice():
+def test_polspice(data_path):
     data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    cls, _ = dices.get_cls(data_maps, vis_maps)
+    jkmaps = make_jkmaps(data_path)
+    cls = dices.get_cls(data_maps, jkmaps)
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
@@ -149,7 +159,8 @@ def test_dices(data_path):
     vis_maps = make_vis_maps()
     jkmaps = make_jkmaps(data_path)
 
-    data_cls, mask_cls = dices.get_cls(data_maps, vis_maps)
+    data_cls = dices.get_cls(data_maps, jkmaps)
+    mask_cls = dices.get_cls(vis_maps, jkmaps)
     for key in list(data_cls.keys()):
         _cl = np.atleast_2d(data_cls[key])
         _, nells = _cl.shape
@@ -163,15 +174,10 @@ def test_dices(data_path):
     delete1_data_cls = {}
     delete1_mask_cls = {}
     for jk in range(1, JackNjk + 1):
-        _cls, _cls_mm = dices.get_delete_cls(
-            data_maps,
-            vis_maps,
-            jkmaps,
-            jk,
-            jk,
-        )
-        delete1_data_cls[(jk, jk)] = _cls
-        delete1_mask_cls[(jk, jk)] = _cls_mm
+        _cls = dices.get_cls(data_maps, jkmaps, jk=jk)
+        _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk)
+        delete1_data_cls[jk] = _cls
+        delete1_mask_cls[jk] = _cls_mm
     assert len(delete1_data_cls) == JackNjk
     assert len(delete1_mask_cls) == JackNjk
     for key in delete1_mask_cls.keys():
@@ -191,13 +197,8 @@ def test_dices(data_path):
     delete2_mask_cls = {}
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
-            _cls, _cls_mm = dices.get_delete_cls(
-                data_maps,
-                vis_maps,
-                jkmaps,
-                jk,
-                jk2,
-            )
+            _cls = dices.get_cls(data_maps, jkmaps, jk=jk, jk2=jk2)
+            _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk, jk2=jk2)
             delete2_data_cls[(jk, jk2)] = _cls
             delete2_mask_cls[(jk, jk2)] = _cls_mm
     assert len(delete2_data_cls) == 2 * JackNjk
@@ -241,11 +242,7 @@ def test_dices(data_path):
     delete1_cov, W = dices.get_delete1_cov(cqs0, cqs1)
     target_cov = dices.get_gaussian_target(cqs0, cqs1)
     shrinkage = dices.get_shrinkage(cqs0, target_cov, W)
-    shrunk_cov1 = dices.shrink_cov(
-        cqs0,
-        delete1_cov, 
-        target_cov,
-        shrinkage)
+    shrunk_cov1 = dices.shrink_cov(cqs0, delete1_cov, target_cov, shrinkage)
 
     # Check for correct keys)
     compsep_cls = dices.Fields2Components(data_cls)
