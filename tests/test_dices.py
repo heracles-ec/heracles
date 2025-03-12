@@ -235,7 +235,7 @@ def test_dices(data_path):
                 assert nells == nside + 1
 
     lbins = 5
-    ledges = np.logspace(np.log10(1), np.log10(nside), lbins + 1)
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     lgrid = (ledges[1:] + ledges[:-1]) / 2
     cqs0 = heracles.binned(data_cls, ledges)
     for key in list(cqs0.keys()):
@@ -327,7 +327,5 @@ def test_dices(data_path):
     for key in list(dices_cov.keys()):
         print(key)
         d = dices_cov[key]
-        d = d[~np.isnan(d)]
         _d = _dices_cov[key]
-        _d = _d[~np.isnan(_d)]
         assert np.all(d == _d)
