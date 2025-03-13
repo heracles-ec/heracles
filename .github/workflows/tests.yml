@@ -49,25 +49,10 @@ jobs:
           cache-dependency-path: "pyproject.toml"
       - run: sudo apt-get install -y libbz2-dev # required to build fitsio
       - run: pip install -c .github/test-constraints.txt '.[test]'
-      - run: pytest --cov=heracles
-      - uses: coverallsapp/github-action@v2
+      - run: pytest --cov=heracles --cov-report=xml --cov-report=term
+      - uses: codecov/codecov-action@v5
         with:
-          flag-name: run-${{ matrix.python-version }}
-          parallel: true
-          base-path: heracles/
-          debug: ${{ runner.debug == '1' }}
-
-  finish:
-    name: Finish
-    needs: test
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: coverallsapp/github-action@v2
-        with:
-          parallel-finished: true
-          carryforward: "run-3.9,run-3.10,run-3.11,run-3.12,run-3.13"
-          debug: ${{ runner.debug == '1' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: Build
