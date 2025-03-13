@@ -281,7 +281,7 @@ def test_write_read_alms(mock_alms, tmp_path):
         assert mock_alms[key].dtype.metadata == alms[key].dtype.metadata
 
 
-def test_fitsDictError(mock_alms, tmp_path):
+def test_fits_dict_keyerror(mock_alms, tmp_path):
     from heracles.io import FitsDict
     from pathlib import Path
 
