@@ -49,6 +49,7 @@ __all__ = [
     "add_to_Cls",
     "sub_to_Cls",
     "get_W",
+    "get_Wbar",
     "Fields2Components",
     # io
     "Fields2Components",
@@ -78,6 +79,7 @@ from .utils import (
     add_to_Cls,
     sub_to_Cls,
     get_W,
+    get_Wbar,
 )
 from .io import (
     Fields2Components,

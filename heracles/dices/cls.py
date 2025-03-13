@@ -42,6 +42,8 @@ def get_cls(maps, jkmaps, jk=0, jk2=0):
     meta = _m.dtype.metadata
     nside = meta["nside"]
     lmax = meta["lmax"]
+    ell = np.arange(lmax + 1)
+    # initialize fields
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
@@ -66,4 +68,7 @@ def get_cls(maps, jkmaps, jk=0, jk2=0):
     alms = transform(fields, _maps)
     # compute cls
     cls = angular_power_spectra(alms)
+    # Result
+    for key in cls.keys():
+        cls[key] = Result(cls[key], ell=ell)
     return cls

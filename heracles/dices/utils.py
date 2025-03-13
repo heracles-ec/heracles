@@ -195,3 +195,51 @@ def _get_W(x, xbar, jk=False):
         n = len(x)
         W *= ((n - 1) ** 2.0) / n
     return W
+
+
+def get_Wbar(Clsjks, jk=True):
+    """
+    Computes the W matrices from the ensemble of delete1 cls.
+    inputs:
+        Clsjks (dict): Dictionary of delete1 data Cls
+    returns:
+        delete1_cov (dict): Dictionary of delete1 covariance
+    """
+    # Separate component Cls
+    Cqsjks = {}
+    for key in list(Clsjks.keys()):
+        Clsjk = Clsjks[key]
+        Cqsjks[key] = Fields2Components(Clsjk)
+
+    # Concatenate Cls
+    Cqsjks_all = []
+    for key in Cqsjks.keys():
+        cls = Cqsjks[key]
+        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
+        Cqsjks_all.append(cls_all)
+    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
+
+    # W matrices
+    Wbar = _get_Wbar(Cqsjks_all, Cqsjks_mu_all, jk=jk)
+    return Wbar
+
+def _get_Wbar(x, xbar, jk=False):
+    """
+    Internal method to compute the W matrices.
+    input:
+        x: Cl
+        xbar: mean Cl
+        jk: if True, computes the jackknife version of the W matrices
+    returns:
+        W: W matrices
+    """
+    W = np.zeros((len(xbar), len(xbar)))
+    n = len(x)
+    _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
+    for i in range(0, len(x)):
+        _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
+        W += (_xi - _xbi) * (_xj - _xbj)
+    W *= 1/n
+    if jk:
+        W *= ((n - 1) ** 2.0) / n
+    return W

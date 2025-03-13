@@ -108,28 +108,6 @@ from .catalog import (
     InvalidValueFilter,
 )
 
-from .dices import (
-    get_cls,
-    get_bias,
-    get_delete_fsky,
-    get_biasjk,
-    correct_bias,
-    compute_mask_correction,
-    correct_mask,
-    get_delete1_cov,
-    get_gaussian_target,
-    get_W,
-    get_shrinkage,
-    shrink_cov,
-    get_delete2_cov,
-    get_delete2_correction,
-    get_dices_cov,
-    Components2Data,
-    Data2Components,
-    Components2Fields,
-    Fields2Components,
-)
-
 from .core import (
     TocDict,
     toc_filter,

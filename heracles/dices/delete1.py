@@ -20,7 +20,7 @@ import numpy as np
 from .utils import (
     get_Clkey,
     get_Cl_mu,
-    get_W,
+    get_Wbar,
     cov2corr,
 )
 from .bias_corrrection import (
@@ -50,8 +50,7 @@ def get_delete1_cov(Cls0, Clsjks):
     Cqs0 = Fields2Components(Cls0)
 
     # W matrices
-    W = get_W(Clsjks, jk=True)
-    Wbar = np.mean(W, axis=0)
+    Wbar = get_Wbar(Clsjks, jk=True)
 
     # Compute Jackknife covariance
     cov1 = (JackNjk / (JackNjk - 1)) * Wbar
