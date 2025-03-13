@@ -52,14 +52,15 @@ jobs:
       - run: pytest --cov=heracles
       - uses: coverallsapp/github-action@v2
         with:
-          parallel: true
           flag-name: run-${{ matrix.python-version }}
+          parallel: true
+          base-path: heracles/
 
   finish:
     name: Finish
-    runs-on: ubuntu-latest
     needs: test
     if: always()
+    runs-on: ubuntu-latest
     steps:
       - uses: coverallsapp/github-action@v2
         with:
