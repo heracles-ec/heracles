@@ -55,6 +55,7 @@ jobs:
           flag-name: run-${{ matrix.python-version }}
           parallel: true
           base-path: heracles/
+          debug: ${{ runner.debug == '1' }}
 
   finish:
     name: Finish
@@ -66,6 +67,7 @@ jobs:
         with:
           parallel-finished: true
           carryforward: "run-3.9,run-3.10,run-3.11,run-3.12,run-3.13"
+          debug: ${{ runner.debug == '1' }}
 
   build:
     name: Build
