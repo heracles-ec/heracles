@@ -35,8 +35,7 @@ def get_bias(cls):
     """
     bias = {}
     for key in list(cls.keys()):
-        cl = cls[key]  # .__array__()
-        meta = cl.dtype.metadata
+        meta = cls[key].dtype.metadata
         bias[key] = meta.get("bias", 0)
     return bias
 

@@ -3,6 +3,8 @@ import numpy as np
 import heracles
 import pytest
 import heracles.dices as dices
+from heracles.healpy import HealpixMapper
+from heracles.fields import Positions, Shears, Visibility, Weights
 
 
 def make_data_maps():
@@ -73,6 +75,27 @@ def make_vis_maps():
     return maps
 
 
+def get_fields():
+    """
+    Internal method to initialize fields.
+    inputs:
+        nside (int): Healpix nside
+        lmax (int): Maximum multipole
+    returns:
+        fields (dict): Dictionary of fields
+    """
+    nside = 128
+    lmax = 128
+    mapper = HealpixMapper(nside=nside, lmax=lmax)
+    fields = {
+        "POS": Positions(mapper, mask="VIS"),
+        "SHE": Shears(mapper, mask="WHT"),
+        "VIS": Visibility(mapper),
+        "WHT": Weights(mapper),
+    }
+    return fields
+
+
 def make_jkmaps(data_path):
     vis_maps = make_vis_maps()
     jkmap = hp.read_map(data_path / "jkmap.fits")
@@ -92,9 +115,10 @@ def test_jkmap(data_path):
 def test_cls(data_path):
     nside = 128
     data_maps = make_data_maps()
+    fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    data_cls = dices.get_cls(data_maps, jkmaps)
-    _data_cls = dices.get_cls(data_maps, jkmaps, jk=0, jk2=0)
+    data_cls = dices.get_cls(data_maps, jkmaps, fields)
+    _data_cls = dices.get_cls(data_maps, jkmaps, fields, jk=0, jk2=0)
     for key in list(data_cls.keys()):
         _cl = np.atleast_2d(data_cls[key])
         _, nells = _cl.shape
@@ -108,8 +132,9 @@ def test_cls(data_path):
 
 def test_bias(data_path):
     data_maps = make_data_maps()
+    fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps)
+    cls = dices.get_cls(data_maps, jkmaps, fields)
     b = dices.get_bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
@@ -141,9 +166,10 @@ def test_get_delete2_fsky(data_path):
 def test_mask_correction(data_path):
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
+    fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps)
-    mls = dices.get_cls(vis_maps, jkmaps)
+    cls = dices.get_cls(data_maps, jkmaps, fields)
+    mls = dices.get_cls(vis_maps, jkmaps, fields)
     _cls = dices.correct_mask(cls, mls, mls)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
@@ -153,8 +179,9 @@ def test_mask_correction(data_path):
 
 def test_polspice(data_path):
     data_maps = make_data_maps()
+    fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps)
+    cls = dices.get_cls(data_maps, jkmaps, fields)
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
@@ -174,16 +201,17 @@ def test_dices(data_path):
     nside = 128
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
+    fields = get_fields()
     jkmaps = make_jkmaps(data_path)
 
-    data_cls = dices.get_cls(data_maps, jkmaps)
-    mask_cls = dices.get_cls(vis_maps, jkmaps)
+    data_cls = dices.get_cls(data_maps, jkmaps, fields)
+    mask_cls = dices.get_cls(vis_maps, jkmaps, fields)
 
     delete1_data_cls = {}
     delete1_mask_cls = {}
     for jk in range(1, JackNjk + 1):
-        _cls = dices.get_cls(data_maps, jkmaps, jk=jk)
-        _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk)
+        _cls = dices.get_cls(data_maps, jkmaps, fields, jk=jk)
+        _cls_mm = dices.get_cls(vis_maps, jkmaps, fields, jk=jk)
         # Mask correction
         _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
         # Bias correction
@@ -209,8 +237,8 @@ def test_dices(data_path):
     delete2_mask_cls = {}
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
-            _cls = dices.get_cls(data_maps, jkmaps, jk=jk, jk2=jk2)
-            _cls_mm = dices.get_cls(vis_maps, jkmaps, jk=jk, jk2=jk2)
+            _cls = dices.get_cls(data_maps, jkmaps, fields, jk=jk, jk2=jk2)
+            _cls_mm = dices.get_cls(vis_maps, jkmaps, fields, jk=jk, jk2=jk2)
             # Mask correction
             _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
             # Bias correction
