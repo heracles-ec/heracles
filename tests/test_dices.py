@@ -207,56 +207,31 @@ def test_dices(data_path):
     data_cls = dices.get_cls(data_maps, jkmaps, fields)
     mask_cls = dices.get_cls(vis_maps, jkmaps, fields)
 
-    delete1_data_cls = {}
-    delete1_mask_cls = {}
-    for jk in range(1, JackNjk + 1):
-        _cls = dices.get_cls(data_maps, jkmaps, fields, jk=jk)
-        _cls_mm = dices.get_cls(vis_maps, jkmaps, fields, jk=jk)
-        # Mask correction
-        _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
-        # Bias correction
-        _cls = dices.correct_bias(_cls, jkmaps, fields, jk=jk)
-        delete1_data_cls[jk] = _cls
-        delete1_mask_cls[jk] = _cls_mm
+    delete1_data_cls = dices.jackknife(
+        data_maps,
+        vis_maps,
+        jkmaps, 
+        fields, 
+        nd=1)
+
     assert len(delete1_data_cls) == JackNjk
-    assert len(delete1_mask_cls) == JackNjk
-    for key in delete1_mask_cls.keys():
+    for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
         for key in list(cl.keys()):
             _cl = np.atleast_2d(cl[key])
             ncls, nells = _cl.shape
             assert nells == nside + 1
-    for key in delete1_mask_cls.keys():
-        cl = delete1_mask_cls[key]
-        for key in list(cl.keys()):
-            _cl = np.atleast_2d(cl[key])
-            _, nells = _cl.shape
-            assert nells == nside + 1
 
-    delete2_data_cls = {}
-    delete2_mask_cls = {}
-    for jk in range(1, JackNjk + 1):
-        for jk2 in range(jk + 1, JackNjk + 1):
-            _cls = dices.get_cls(data_maps, jkmaps, fields, jk=jk, jk2=jk2)
-            _cls_mm = dices.get_cls(vis_maps, jkmaps, fields, jk=jk, jk2=jk2)
-            # Mask correction
-            _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
-            # Bias correction
-            _cls = dices.correct_bias(_cls, jkmaps, fields, jk=jk, jk2=jk2)
-            delete2_data_cls[(jk, jk2)] = _cls
-            delete2_mask_cls[(jk, jk2)] = _cls_mm
+    delete2_data_cls = dices.jackknife(
+        data_maps,
+        vis_maps,
+        jkmaps,
+        fields,
+        nd=2)
     assert len(delete2_data_cls) == 2 * JackNjk
-    assert len(delete2_mask_cls) == 2 * JackNjk
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
             cl = delete2_data_cls[(jk, jk2)]
-            for key in list(cl.keys()):
-                _cl = np.atleast_2d(cl[key])
-                _, nells = _cl.shape
-                assert nells == nside + 1
-    for jk in range(1, JackNjk + 1):
-        for jk2 in range(jk + 1, JackNjk + 1):
-            cl = delete2_mask_cls[(jk, jk2)]
             for key in list(cl.keys()):
                 _cl = np.atleast_2d(cl[key])
                 _, nells = _cl.shape

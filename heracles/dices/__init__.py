@@ -22,6 +22,7 @@ Main module of the *DICES* package.
 
 __all__ = [
     # cls
+    "jackknife",
     "get_cls",
     # bias_correction
     "get_bias",
@@ -58,8 +59,8 @@ __all__ = [
     "Components2Fields",
 ]
 
-from .cls import get_cls
-from .bias_corrrection import (
+from .cls import jackknife, get_cls
+from .bias_correction import (
     get_bias,
     get_delete_fsky,
     get_biasjk,

@@ -18,11 +18,41 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from copy import deepcopy
-from ..fields import Positions, Shears, Visibility, Weights
-from ..mapping import transform
+from itertools import combinations
+from .bias_correction import correct_bias
+from .mask_correction import correct_mask
 from ..result import Result
-from ..healpy import HealpixMapper
+from ..mapping import transform
 from ..twopoint import angular_power_spectra
+
+
+def jackknife(data_maps, vis_maps, jk_maps, fields, nd=1):
+    """
+    Compute the Cls of removing 1 Jackknife.
+    inputs:
+        data_maps (dict): Dictionary of data maps
+        vis_maps (dict): Dictionary of visibility maps
+        jkmaps (dict): Dictionary of mask maps
+        fields (dict): Dictionary of fields
+        nd (int): Number of Jackknife regions
+    returns:
+        cls (dict): Dictionary of data Cls
+    """
+    if nd < 0 or nd > 2:
+        raise ValueError("number of deletions must be 0, 1, or 2")
+    cls = {}
+    mls0 = get_cls(vis_maps, jk_maps, fields)
+    jkmap = jk_maps[list(jk_maps.keys())[0]]
+    njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
+    for regions in combinations(range(1, njk + 1), nd):
+        _cls = get_cls(data_maps, jk_maps, fields, *regions)
+        _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
+        # Mask correction
+        _cls = correct_mask(_cls, _cls_mm, mls0)
+        # Bias correction
+        _cls = correct_bias(_cls, jk_maps, fields, *regions)
+        cls[regions] = _cls
+    return cls
 
 
 def get_cls(maps, jkmaps, fields, jk=0, jk2=0):

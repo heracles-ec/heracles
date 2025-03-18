@@ -24,7 +24,7 @@ from .utils import (
     get_W,
     cov2corr,
 )
-from .bias_corrrection import (
+from .bias_correction import (
     get_bias,
     add_to_Cls,
 )
