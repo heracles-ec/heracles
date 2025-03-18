@@ -21,6 +21,7 @@ from .utils import (
     get_Clkey,
     get_Cl_mu,
     get_Wbar,
+    get_W,
     cov2corr,
 )
 from .bias_corrrection import (
@@ -45,13 +46,21 @@ def get_delete1_cov(Cls0, Clsjks):
     """
     # Get JackNJk
     JackNjk = len(Clsjks.keys())
-
     # Component separate
     Cqs0 = Fields2Components(Cls0)
-
+    Cqsjks = {}
+    for key in list(Clsjks.keys()):
+        Clsjk = Clsjks[key]
+        Cqsjks[key] = Fields2Components(Clsjk)
+    # Concatenate Cls
+    Cqsjks_all = []
+    for key in Cqsjks.keys():
+        cls = Cqsjks[key]
+        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
+        Cqsjks_all.append(cls_all)
+    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
     # W matrices
-    Wbar = get_Wbar(Clsjks, jk=True)
-
+    Wbar = get_Wbar(Cqsjks_all, Cqsjks_mu_all, jk=True)
     # Compute Jackknife covariance
     cov1 = (JackNjk / (JackNjk - 1)) * Wbar
 
@@ -64,7 +73,6 @@ def get_gaussian_target(Clsjks):
     """
     Computes the target matrix.
     inputs:
-        Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
     returns:
         target_cov (dict): Dictionary of target covariance
@@ -218,22 +226,36 @@ def get_f(S, W, Wbar):
     return f
 
 
-def get_shrinkage(cls0, target, W):
+def get_shrinkage(cls0, Clsjks, target):
     """
     Computes the optimal linear shrinkage factor.
     input:
         cls0: data Cls
-        W: W matrices of the original covariance matrix
+        Clsjks: delete1 data Cls
         target: target matrix
     returns:
         lambda_star: optimal linear shrinkage factor
     """
     # Separate component Cls
     cqs0 = Fields2Components(cls0)
+    Cqsjks = {}
+    for key in list(Clsjks.keys()):
+        Clsjk = Clsjks[key]
+        Cqsjks[key] = Fields2Components(Clsjk)
     # to matrices
     target = Components2Data(cqs0, target)
     # Compute correlation of target
     target_corr = cov2corr(target)
+    # Concatenate Cls
+    Cqsjks_all = []
+    for key in Cqsjks.keys():
+        cls = Cqsjks[key]
+        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
+        Cqsjks_all.append(cls_all)
+    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
+
+    # W matrices
+    W = get_W(Cqsjks_all, Cqsjks_mu_all, jk=True)
     # Compute shrinkage factor
     Njk = len(W)
     Wbar = np.mean(W, axis=0)

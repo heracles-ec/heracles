@@ -18,8 +18,7 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .utils import (
-    _get_W,
-    _get_Wbar,
+    get_Wbar,
 )
 from .io import (
     Fields2Components,
@@ -80,7 +79,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
         Qii.append(_Qii)
 
     Qii_m = np.mean(Qii, axis=0)
-    Q = _get_Wbar(Qii, Qii_m)
+    Q = get_Wbar(Qii, Qii_m)
     n = JackNjk * (JackNjk - 1) / 2
     d = 1 / (JackNjk * (JackNjk + 1))
     Q *= n - 1

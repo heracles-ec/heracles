@@ -287,8 +287,7 @@ def test_dices(data_path):
     delete1_cov = dices.get_delete1_cov(cqs0, cqs1)
     # Shrinkage
     target_cov = dices.get_gaussian_target(cqs1)
-    W = dices.get_W(cqs1, jk=True)
-    shrinkage = dices.get_shrinkage(cqs0, target_cov, W)
+    shrinkage = dices.get_shrinkage(cqs0, cqs1, target_cov)
     shrunk_cov1 = dices.shrink_cov(cqs0, delete1_cov, target_cov, shrinkage)
 
     # Check for correct keys)
