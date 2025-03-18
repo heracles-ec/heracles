@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from ..core import update_metadata
 from heracles.result import Result
 from .utils import (
     add_to_Cls,
@@ -110,12 +111,8 @@ def correct_bias(cls, jkmaps, jk=0, jk2=0):
     cls_wbias = add_to_Cls(cls, bias)
     cls_cbias = sub_to_Cls(cls_wbias, bias_jk)
     for key in cls_cbias.keys():
-        cl = cls_cbias[key]
-        meta = dict(cl.__array__().dtype.metadata)
-        meta["bias"] = bias_jk[key]
-        dtype = np.dtype(
-            float,
-            metadata=meta,
-        )
-        cls_cbias[key] = Result(np.array(cl, dtype=dtype), ell=cl.ell)
+        cl = cls_cbias[key].__array__()
+        ell = cls_cbias[key].ell
+        update_metadata(cl, bias=bias_jk[key])
+        cls_cbias[key] = Result(cl, ell=ell)
     return cls_cbias
