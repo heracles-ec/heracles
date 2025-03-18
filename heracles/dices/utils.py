@@ -223,6 +223,7 @@ def get_Wbar(Clsjks, jk=True):
     Wbar = _get_Wbar(Cqsjks_all, Cqsjks_mu_all, jk=jk)
     return Wbar
 
+
 def _get_Wbar(x, xbar, jk=False):
     """
     Internal method to compute the W matrices.
