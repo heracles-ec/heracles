@@ -25,31 +25,13 @@ from ..healpy import HealpixMapper
 from ..twopoint import angular_power_spectra
 
 
-def get_fields(nside, lmax):
-    """
-    Internal method to initialize fields.
-    inputs:
-        nside (int): Healpix nside
-        lmax (int): Maximum multipole
-    returns:
-        fields (dict): Dictionary of fields
-    """
-    mapper = HealpixMapper(nside=nside, lmax=lmax)
-    fields = {
-        "POS": Positions(mapper, mask="VIS"),
-        "SHE": Shears(mapper, mask="WHT"),
-        "VIS": Visibility(mapper),
-        "WHT": Weights(mapper),
-    }
-    return fields
-
-
 def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     """
     Internal method to compute the Cls of removing 2 Jackknife.
     inputs:
         maps (dict): Dictionary of data maps
         jkmaps (dict): Dictionary of mask maps
+        fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
     returns:

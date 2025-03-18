@@ -215,7 +215,7 @@ def test_dices(data_path):
         # Mask correction
         _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
         # Bias correction
-        _cls = dices.correct_bias(_cls, jkmaps, jk=jk)
+        _cls = dices.correct_bias(_cls, jkmaps, fields, jk=jk)
         delete1_data_cls[jk] = _cls
         delete1_mask_cls[jk] = _cls_mm
     assert len(delete1_data_cls) == JackNjk
@@ -242,7 +242,7 @@ def test_dices(data_path):
             # Mask correction
             _cls = dices.correct_mask(_cls, _cls_mm, mask_cls)
             # Bias correction
-            _cls = dices.correct_bias(_cls, jkmaps, jk=jk, jk2=jk2)
+            _cls = dices.correct_bias(_cls, jkmaps, fields, jk=jk, jk2=jk2)
             delete2_data_cls[(jk, jk2)] = _cls
             delete2_mask_cls[(jk, jk2)] = _cls_mm
     assert len(delete2_data_cls) == 2 * JackNjk

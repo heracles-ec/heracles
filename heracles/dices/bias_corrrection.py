@@ -61,12 +61,13 @@ def get_delete_fsky(jkmaps, jk=0, jk2=0):
     return rel_fskys
 
 
-def get_biasjk(bias, fsky):
+def get_biasjk(bias, fsky, fields):
     """
     Returns the bias for deleting a Jackknife region.
     inputs:
         bias (dict): Dictionary of biases
         fsky (dict): Dictionary of relative fskys
+        fields (dict): Dictionary of fields
     returns:
         bias_jk (dict): Dictionary of biases
     """
@@ -75,11 +76,9 @@ def get_biasjk(bias, fsky):
         f1, f2, b1, b2 = key
         b = bias[key]
         if (f1, b1) == (f2, b2):
-            if f1 == "POS":
-                f1 = "VIS"
-            elif f1 == "SHE":
-                f1 = "WHT"
-            fskyjk = fsky[(f1, b1)]
+            field = fields[f1]
+            m_f = field.mask
+            fskyjk = fsky[(m_f, b1)]
         else:
             fskyjk = 0.0
         b_jk = b * fskyjk
@@ -87,12 +86,13 @@ def get_biasjk(bias, fsky):
     return bias
 
 
-def correct_bias(cls, jkmaps, jk=0, jk2=0):
+def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     """
     Corrects the bias of the Cls due to taking out a region.
     inputs:
         cls (dict): Dictionary of Cls
         jkmaps (dict): Dictionary of Jackknife maps
+        fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
     returns:
@@ -102,7 +102,7 @@ def correct_bias(cls, jkmaps, jk=0, jk2=0):
     # Bias correction
     bias = get_bias(cls)
     fskyjk = get_delete_fsky(jkmaps, jk=jk, jk2=jk2)
-    bias_jk = get_biasjk(bias, fskyjk)
+    bias_jk = get_biasjk(bias, fskyjk, fields)
     # Correct Cls
     cls = add_to_Cls(cls, bias)
     cls = sub_to_Cls(cls, bias_jk)
