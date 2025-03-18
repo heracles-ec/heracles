@@ -69,40 +69,14 @@ def get_delete1_cov(Cls0, Clsjks):
     return cov1
 
 
-def get_gaussian_target(Clsjks):
-    """
-    Computes the target matrix.
-    inputs:
-        Clsjks (dict): Dictionary of delete1 data Cls
-    returns:
-        target_cov (dict): Dictionary of target covariance
-    """
-    # Add bias to Cls
-    Clsjks_wbias = {}
-    for key in list(Clsjks.keys()):
-        Cljk = Clsjks[key]
-        biasjk = get_bias(Cljk)
-        Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
-
-    # Separate component Cls
-    Cqsjks_wbias = {}
-    for key in list(Clsjks_wbias.keys()):
-        Clsjk_wbias = Clsjks_wbias[key]
-        Cqsjks_wbias[key] = Fields2Components(Clsjk_wbias)
-
-    # Compute target matrix
-    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
-    target = _get_gaussian_cov(Cqsjks_mu_wbias)
-    return target
-
-
-def shrink_cov(Cls0, cov, target, shrinkage):
+def shrink_cov(Cls0, cov, target, shrinkage_factor):
     """
     Internal method to compute the shrunk covariance.
     inputs:
         Cls0 (dict): Dictionary of data Cls
-        W (array): W matrices of the original covariance matrix
+        cov (dict): Dictionary of original covariance
         target (dict): Dictionary of target covariance
+        shrinkage_factor (float): Shrinkage factor
     returns:
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
@@ -118,7 +92,7 @@ def shrink_cov(Cls0, cov, target, shrinkage):
     _target = correlate_target(cov, target_corr)
 
     # Apply shrinkage
-    shrunk_S = shrinkage * _target + (1 - shrinkage) * cov
+    shrunk_S = shrinkage_factor * _target + (1 - shrinkage_factor) * cov
 
     # To dictionaries
     shrunk_S = Data2Components(Cqs0, shrunk_S)
@@ -143,6 +117,33 @@ def correlate_target(S, rbar):
             else:
                 T[i, j] = rbar[i, j] * np.sqrt(S[i, i] * S[j, j])
     return T
+
+
+def get_gaussian_cov(Clsjks):
+    """
+    Computes Gaussian covariance from delete1 Cls.
+    inputs:
+        Clsjks (dict): Dictionary of delete1 data Cls
+    returns:
+        target_cov (dict): Dictionary of target covariance
+    """
+    # Add bias to Cls
+    Clsjks_wbias = {}
+    for key in list(Clsjks.keys()):
+        Cljk = Clsjks[key]
+        biasjk = get_bias(Cljk)
+        Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
+
+    # Separate component Cls
+    Cqsjks_wbias = {}
+    for key in list(Clsjks_wbias.keys()):
+        Clsjk_wbias = Clsjks_wbias[key]
+        Cqsjks_wbias[key] = Fields2Components(Clsjk_wbias)
+
+    # Compute target matrix
+    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
+    target = _get_gaussian_cov(Cqsjks_mu_wbias)
+    return target
 
 
 def _get_gaussian_cov(Cl_mu):
@@ -226,7 +227,7 @@ def get_f(S, W, Wbar):
     return f
 
 
-def get_shrinkage(cls0, Clsjks, target):
+def get_shrinkage_factor(cls0, Clsjks, target):
     """
     Computes the optimal linear shrinkage factor.
     input:
