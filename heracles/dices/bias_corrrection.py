@@ -37,11 +37,7 @@ def get_bias(cls):
     for key in list(cls.keys()):
         cl = cls[key]  # .__array__()
         meta = cl.dtype.metadata
-        if "bias" in meta.keys():
-            b = meta["bias"]
-        else:
-            b = 0
-        bias[key] = b
+        bias[key] = meta.get("bias", 0)
     return bias
 
 
@@ -108,11 +104,13 @@ def correct_bias(cls, jkmaps, jk=0, jk2=0):
     bias = get_bias(cls)
     fskyjk = get_delete_fsky(jkmaps, jk=jk, jk2=jk2)
     bias_jk = get_biasjk(bias, fskyjk)
-    cls_wbias = add_to_Cls(cls, bias)
-    cls_cbias = sub_to_Cls(cls_wbias, bias_jk)
-    for key in cls_cbias.keys():
-        cl = cls_cbias[key].__array__()
-        ell = cls_cbias[key].ell
+    # Correct Cls
+    cls = add_to_Cls(cls, bias)
+    cls = sub_to_Cls(cls, bias_jk)
+    # Update metadata
+    for key in cls.keys():
+        cl = cls[key].__array__()
+        ell = cls[key].ell
         update_metadata(cl, bias=bias_jk[key])
-        cls_cbias[key] = Result(cl, ell=ell)
-    return cls_cbias
+        cls[key] = Result(cl, ell=ell)
+    return cls
