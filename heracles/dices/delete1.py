@@ -35,14 +35,14 @@ from .io import (
 )
 
 
-def get_delete1_cov(Cls0, Clsjks):
+def get_jackknife_cov(Cls0, Clsjks):
     """
-    Computes the delete1 covariance matrix.
+    Computes the jackknife covariance matrix.
     inputs:
         Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
     returns:
-        delete1_cov (dict): Dictionary of delete1 covariance
+        cov_jk (dict): Dictionary of delete1 covariance
     """
     # Get JackNJk
     JackNjk = len(Clsjks.keys())
@@ -60,13 +60,12 @@ def get_delete1_cov(Cls0, Clsjks):
         Cqsjks_all.append(cls_all)
     Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
     # W matrices
-    Wbar = get_Wbar(Cqsjks_all, Cqsjks_mu_all, jk=True)
+    Wbar = get_Wbar(Cqsjks_all, Cqsjks_mu_all)
     # Compute Jackknife covariance
-    cov1 = (JackNjk / (JackNjk - 1)) * Wbar
-
+    cov_jk = (JackNjk - 1) * Wbar
     # Data vector to dictionary
-    cov1 = Data2Components(Cqs0, cov1)
-    return cov1
+    cov_jk = Data2Components(Cqs0, cov_jk)
+    return cov_jk
 
 
 def shrink_cov(Cls0, cov, target, shrinkage_factor):
@@ -74,7 +73,7 @@ def shrink_cov(Cls0, cov, target, shrinkage_factor):
     Internal method to compute the shrunk covariance.
     inputs:
         Cls0 (dict): Dictionary of data Cls
-        cov (dict): Dictionary of original covariance
+        cov (dict): Dictionary of Jackknife covariance
         target (dict): Dictionary of target covariance
         shrinkage_factor (float): Shrinkage factor
     returns:
@@ -212,7 +211,7 @@ def get_f(S, W, Wbar):
     """
     Computes the covariance of the W matrices with the target matrix.
     input:
-        S: target covariance matrix
+        S: Jackknife covariance matrix
         W: W matrices
         Wbar: mean W matrix
     returns:
@@ -256,11 +255,11 @@ def get_shrinkage_factor(cls0, Clsjks, target):
     Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
 
     # W matrices
-    W = get_W(Cqsjks_all, Cqsjks_mu_all, jk=True)
+    W = get_W(Cqsjks_all, Cqsjks_mu_all)
     # Compute shrinkage factor
     Njk = len(W)
     Wbar = np.mean(W, axis=0)
-    S = (Njk / (Njk - 1)) * Wbar
+    S = (Njk - 1) * Wbar
     f = get_f(S, W, Wbar)
     numerator = 0.0
     denominator = 0.0

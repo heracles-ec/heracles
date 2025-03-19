@@ -28,13 +28,13 @@ from .io import (
 
 def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     """
-    Internal method to compute the delete2 covariance.
+    Internal method to compute the delete2 correction.
     inputs:
         Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
         Clsjk2s (dict): Dictionary of delete2 data Cls
     returns:
-        Cljk_cov (dict): Dictionary of delete2 covariance
+        Q (dict): Dictionary of delete2 correction
     """
     # Get JackNJk
     JackNjk = len(Clsjks.keys())
@@ -80,27 +80,24 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
 
     Qii_m = np.mean(Qii, axis=0)
     Q = get_Wbar(Qii, Qii_m)
-    n = JackNjk * (JackNjk - 1) / 2
-    d = 1 / (JackNjk * (JackNjk + 1))
-    Q *= n - 1
-    Q *= d
+    Q *= (JackNjk * (JackNjk - 1) - 2) / (2 * JackNjk * (JackNjk + 1))
     Q = Data2Components(Cqs0, Q)
     return Q
 
 
-def get_delete2_cov(delete1_cov, Cls0, Clsjks, Clsjk2s):
+def debias_cov(cov_jk, Cls0, Clsjks, Clsjk2s):
     """
-    Internal method to compute the delete2 covariance.
+    Debiases the Jackknife covariance using the delete2 ensemble.
     inputs:
-        delete1_cov (dict): Dictionary of delete1 covariance
+        cov_jk (dict): Dictionary of delete1 covariance
         Cls0 (dict): Dictionary of data Cls
         Clsjks (dict): Dictionary of delete1 data Cls
         Clsjk2s (dict): Dictionary of delete2 data Cls
     returns:
-        delete2_cov (dict): Dictionary of delete2 covariance
+        debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
     Q = get_delete2_correction(Cls0, Clsjks, Clsjk2s)
-    delete2_cov = {}
-    for key in list(delete1_cov.keys()):
-        delete2_cov[key] = delete1_cov[key] - Q[key]
-    return delete2_cov
+    debiased_cov = {}
+    for key in list(cov_jk.keys()):
+        debiased_cov[key] = cov_jk[key] - Q[key]
+    return debiased_cov

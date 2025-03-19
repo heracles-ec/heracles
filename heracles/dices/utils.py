@@ -170,7 +170,7 @@ def get_W(x, xbar, jk=False):
     return W
 
 
-def get_Wbar(x, xbar, jk=False):
+def get_Wbar(x, xbar):
     """
     Internal method to compute the W matrices.
     input:
@@ -187,6 +187,4 @@ def get_Wbar(x, xbar, jk=False):
         _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
         W += (_xi - _xbi) * (_xj - _xbj)
     W *= 1/n
-    if jk:
-        W *= ((n - 1) ** 2.0) / n
     return W

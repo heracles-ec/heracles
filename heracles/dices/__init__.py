@@ -33,12 +33,12 @@ __all__ = [
     "compute_mask_correction",
     "correct_mask",
     # Delete1
-    "get_delete1_cov",
+    "get_jackknife_cov",
     "get_gaussian_cov",
     "get_shrinkage_factor",
     "shrink_cov",
     # Delete2
-    "get_delete2_cov",
+    "debias_cov",
     "get_delete2_correction",
     # DICES
     "get_dices_cov",
@@ -68,12 +68,12 @@ from .bias_correction import (
 )
 from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import (
-    get_delete1_cov,
+    get_jackknife_cov,
     get_gaussian_cov,
     get_shrinkage_factor,
     shrink_cov,
 )
-from .delete2 import get_delete2_cov, get_delete2_correction
+from .delete2 import debias_cov, get_delete2_correction
 from .dices import get_dices_cov
 from .utils import (
     cov2corr,

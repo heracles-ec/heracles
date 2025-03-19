@@ -205,15 +205,13 @@ def test_dices(data_path):
     jkmaps = make_jkmaps(data_path)
 
     data_cls = dices.get_cls(data_maps, jkmaps, fields)
-    mask_cls = dices.get_cls(vis_maps, jkmaps, fields)
 
     delete1_data_cls = dices.jackknife(
         data_maps,
         vis_maps,
-        jkmaps, 
-        fields, 
+        jkmaps,
+        fields,
         nd=1)
-
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
@@ -259,11 +257,11 @@ def test_dices(data_path):
             assert nells == len(lgrid)
 
     # Delete1
-    delete1_cov = dices.get_delete1_cov(cqs0, cqs1)
+    cov_jk = dices.get_jackknife_cov(cqs0, cqs1)
     # Shrinkage
     target_cov = dices.get_gaussian_cov(cqs1)
     shrinkage = dices.get_shrinkage_factor(cqs0, cqs1, target_cov)
-    shrunk_cov1 = dices.shrink_cov(cqs0, delete1_cov, target_cov, shrinkage)
+    shrunk_cov = dices.shrink_cov(cqs0, cov_jk, target_cov, shrinkage)
 
     # Check for correct keys)
     compsep_cls = dices.Fields2Components(data_cls)
@@ -276,47 +274,47 @@ def test_dices(data_path):
             A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
             C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
             _covkey = (A, B, C, D, nA, nB, nC, nD)
-            assert _covkey in list(delete1_cov.keys())
+            assert _covkey in list(cov_jk.keys())
 
     # Check for correct shape
-    for key in list(delete1_cov.keys()):
-        cov = delete1_cov[key]
+    for key in list(cov_jk.keys()):
+        cov = cov_jk[key]
         assert cov.shape == (lbins, lbins)
 
-    delete2_cov = dices.get_delete2_cov(delete1_cov, cqs0, cqs1, cqs2)
+    debiased_cov = dices.debias_cov(cov_jk, cqs0, cqs1, cqs2)
     Q = dices.get_delete2_correction(
         cqs0,
         cqs1,
         cqs2,
     )
     _delete2_cov = {}
-    for key in list(delete1_cov.keys()):
-        _delete2_cov[key] = delete1_cov[key] - Q[key]
+    for key in list(cov_jk.keys()):
+        _delete2_cov[key] = cov_jk[key] - Q[key]
 
-    for key in list(delete2_cov.keys()):
-        assert (delete2_cov[key] == _delete2_cov[key]).all()
+    for key in list(debiased_cov.keys()):
+        assert (debiased_cov[key] == _delete2_cov[key]).all()
 
-    dices_cov = dices.get_dices_cov(cqs0, delete1_cov, delete2_cov)
+    dices_cov = dices.get_dices_cov(cqs0, shrunk_cov, debiased_cov)
 
     # Check keys
-    keys0 = set(shrunk_cov1.keys())
-    keys1 = set(delete1_cov.keys())
-    keys2 = set(delete2_cov.keys())
+    keys0 = set(shrunk_cov.keys())
+    keys1 = set(cov_jk.keys())
+    keys2 = set(debiased_cov.keys())
     keys3 = set(dices_cov.keys())
     assert keys0 == keys1 == keys2 == keys3
 
     # Check for correct shape
-    for key in list(delete1_cov.keys()):
-        C0 = shrunk_cov1[key]
-        C1 = delete1_cov[key]
-        C2 = delete2_cov[key]
+    for key in list(cov_jk.keys()):
+        C0 = shrunk_cov[key]
+        C1 = cov_jk[key]
+        C2 = debiased_cov[key]
         CD = dices_cov[key]
         assert C0.shape == C1.shape == C2.shape == CD.shape
 
     # Check for delete2 correction
     _cqs0 = dices.Fields2Components(cqs0)
-    _cov1 = dices.Components2Data(_cqs0, delete1_cov)
-    _cov2 = dices.Components2Data(_cqs0, delete2_cov)
+    _cov1 = dices.Components2Data(_cqs0, shrunk_cov)
+    _cov2 = dices.Components2Data(_cqs0, debiased_cov)
     _corr1 = dices.cov2corr(_cov1)
     _var1 = np.diag(_cov1).copy()
     _var2 = np.diag(_cov2).copy()
