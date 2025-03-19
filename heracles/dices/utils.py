@@ -125,7 +125,7 @@ def make_posdef(matrix):
 
 
 # Summary statistics for Cls
-def get_Cl_mu(Clss):
+def get_mean_Cljk(Clss):
     Cl_mu = {}
     total = len(Clss)
     for i, key in enumerate(list(Clss.keys())):

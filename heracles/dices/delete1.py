@@ -19,7 +19,7 @@
 import numpy as np
 from .utils import (
     get_Clkey,
-    get_Cl_mu,
+    get_mean_Cljk,
     get_Wbar,
     get_W,
     cov2corr,
@@ -118,44 +118,22 @@ def correlate_target(S, rbar):
     return T
 
 
-def get_gaussian_cov(Clsjks):
-    """
-    Computes Gaussian covariance from delete1 Cls.
-    inputs:
-        Clsjks (dict): Dictionary of delete1 data Cls
-    returns:
-        target_cov (dict): Dictionary of target covariance
-    """
-    # Add bias to Cls
-    Clsjks_wbias = {}
-    for key in list(Clsjks.keys()):
-        Cljk = Clsjks[key]
-        biasjk = get_bias(Cljk)
-        Clsjks_wbias[key] = add_to_Cls(Cljk, biasjk)
-
-    # Separate component Cls
-    Cqsjks_wbias = {}
-    for key in list(Clsjks_wbias.keys()):
-        Clsjk_wbias = Clsjks_wbias[key]
-        Cqsjks_wbias[key] = Fields2Components(Clsjk_wbias)
-
-    # Compute target matrix
-    Cqsjks_mu_wbias = get_Cl_mu(Cqsjks_wbias)
-    target = _get_gaussian_cov(Cqsjks_mu_wbias)
-    return target
-
-
-def _get_gaussian_cov(Cl_mu):
+def get_gaussian_cov(Cls):
     """
     Computes Gaussian estimate of the target matrix.
     input:
-        Cl_mu: power spectrum
+        Cls: power spectra
         covkeys: list of covariance keys
     returns:
         T: target matrix
     """
+    # Add bias to Cls
+    bias = get_bias(Cls)
+    Cls = add_to_Cls(Cls, bias)
+    # Compute Gaussian covariance
     T = {}
-    Cl_keys = list(Cl_mu.keys())
+    Cls = Fields2Components(Cls)
+    Cl_keys = list(Cls.keys())
     for i in range(0, len(Cl_keys)):
         for j in range(i, len(Cl_keys)):
             ki = Cl_keys[i]
@@ -173,10 +151,10 @@ def _get_gaussian_cov(Cl_mu):
             clkey3 = get_Clkey(k, n)
             clkey4 = get_Clkey(q, m)
 
-            cl1 = Cl_mu[clkey1].__array__()
-            cl2 = Cl_mu[clkey2].__array__()
-            cl3 = Cl_mu[clkey3].__array__()
-            cl4 = Cl_mu[clkey4].__array__()
+            cl1 = Cls[clkey1].__array__()
+            cl2 = Cls[clkey2].__array__()
+            cl3 = Cls[clkey3].__array__()
+            cl4 = Cls[clkey4].__array__()
 
             Cl_diag = cl1 * cl2 + cl3 * cl4
             # (2*ls+1) term not needed since we only

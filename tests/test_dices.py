@@ -259,7 +259,7 @@ def test_dices(data_path):
     # Delete1
     cov_jk = dices.get_jackknife_cov(cqs0, cqs1)
     # Shrinkage
-    target_cov = dices.get_gaussian_cov(cqs1)
+    target_cov = dices.get_gaussian_cov(cqs0)
     shrinkage = dices.get_shrinkage_factor(cqs0, cqs1, target_cov)
     shrunk_cov = dices.shrink_cov(cqs0, cov_jk, target_cov, shrinkage)
 

@@ -49,9 +49,7 @@ __all__ = [
     "cov2corr",
     "add_to_Cls",
     "sub_to_Cls",
-    "get_W",
-    "get_Wbar",
-    "Fields2Components",
+    "get_mean_Cljk",
     # io
     "Fields2Components",
     "Components2Data",
@@ -79,8 +77,7 @@ from .utils import (
     cov2corr,
     add_to_Cls,
     sub_to_Cls,
-    get_W,
-    get_Wbar,
+    get_mean_Cljk,
 )
 from .io import (
     Fields2Components,
