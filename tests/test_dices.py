@@ -115,26 +115,26 @@ def test_jkmap(data_path):
 def test_cls(data_path):
     nside = 128
     data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    jk_maps = make_jkmaps(data_path)
     fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    data_cls = dices.get_cls(data_maps, jkmaps, fields)
-    _data_cls = dices.get_cls(data_maps, jkmaps, fields, jk=0, jk2=0)
+    data_cls = dices.cls.get_cls(data_maps, jk_maps, fields)
+    _data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
     for key in list(data_cls.keys()):
         _cl = np.atleast_2d(data_cls[key])
         _, nells = _cl.shape
         assert nells == nside + 1
-
     for key in list(data_cls.keys()):
         cl = data_cls[key].__array__()
         _cl = _data_cls[key].__array__()
-        assert (cl == _cl).all()
+        assert np.isclose(cl[2:], _cl[2:]).all()
 
 
 def test_bias(data_path):
     data_maps = make_data_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps, fields)
+    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
     b = dices.get_bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
@@ -168,8 +168,8 @@ def test_mask_correction(data_path):
     vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps, fields)
-    mls = dices.get_cls(vis_maps, jkmaps, fields)
+    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
+    mls = dices.cls.get_cls(vis_maps, jkmaps, fields)
     _cls = dices.correct_mask(cls, mls, mls)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
@@ -181,7 +181,7 @@ def test_polspice(data_path):
     data_maps = make_data_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.get_cls(data_maps, jkmaps, fields)
+    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
@@ -204,9 +204,9 @@ def test_dices(data_path):
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
 
-    data_cls = dices.get_cls(data_maps, jkmaps, fields)
+    data_cls = dices.cls.get_cls(data_maps, jkmaps, fields)
 
-    delete1_data_cls = dices.jackknife(
+    delete1_data_cls = dices.jackknife_cls(
         data_maps,
         vis_maps,
         jkmaps,
@@ -220,7 +220,7 @@ def test_dices(data_path):
             ncls, nells = _cl.shape
             assert nells == nside + 1
 
-    delete2_data_cls = dices.jackknife(
+    delete2_data_cls = dices.jackknife_cls(
         data_maps,
         vis_maps,
         jkmaps,
@@ -257,11 +257,11 @@ def test_dices(data_path):
             assert nells == len(lgrid)
 
     # Delete1
-    cov_jk = dices.get_jackknife_cov(cqs0, cqs1)
+    cov_jk = dices.jackknife_covariance(cqs0, cqs1)
     # Shrinkage
-    target_cov = dices.get_gaussian_cov(cqs0)
-    shrinkage = dices.get_shrinkage_factor(cqs0, cqs1, target_cov)
-    shrunk_cov = dices.shrink_cov(cqs0, cov_jk, target_cov, shrinkage)
+    target_cov = dices.gaussian_covariance(cqs0)
+    shrinkage = dices.shrinkage_factor(cqs0, cqs1, target_cov)
+    shrunk_cov = dices.shrink_covariance(cqs0, cov_jk, target_cov, shrinkage)
 
     # Check for correct keys)
     compsep_cls = dices.Fields2Components(data_cls)
@@ -281,8 +281,8 @@ def test_dices(data_path):
         cov = cov_jk[key]
         assert cov.shape == (lbins, lbins)
 
-    debiased_cov = dices.debias_cov(cov_jk, cqs0, cqs1, cqs2)
-    Q = dices.get_delete2_correction(
+    debiased_cov = dices.debias_covariance(cov_jk, cqs0, cqs1, cqs2)
+    Q = dices.delete2_correction(
         cqs0,
         cqs1,
         cqs2,
@@ -294,7 +294,7 @@ def test_dices(data_path):
     for key in list(debiased_cov.keys()):
         assert (debiased_cov[key] == _delete2_cov[key]).all()
 
-    dices_cov = dices.get_dices_cov(cqs0, shrunk_cov, debiased_cov)
+    dices_cov = dices.dices_covariance(cqs0, shrunk_cov, debiased_cov)
 
     # Check keys
     keys0 = set(shrunk_cov.keys())

@@ -26,7 +26,7 @@ from .io import (
 )
 
 
-def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
+def delete2_correction(Cls0, Clsjks, Clsjk2s):
     """
     Internal method to compute the delete2 correction.
     inputs:
@@ -85,7 +85,7 @@ def get_delete2_correction(Cls0, Clsjks, Clsjk2s):
     return Q
 
 
-def debias_cov(cov_jk, Cls0, Clsjks, Clsjk2s):
+def debias_covariance(cov_jk, Cls0, Clsjks, Clsjk2s):
     """
     Debiases the Jackknife covariance using the delete2 ensemble.
     inputs:
@@ -96,7 +96,7 @@ def debias_cov(cov_jk, Cls0, Clsjks, Clsjk2s):
     returns:
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
-    Q = get_delete2_correction(Cls0, Clsjks, Clsjk2s)
+    Q = delete2_correction(Cls0, Clsjks, Clsjk2s)
     debiased_cov = {}
     for key in list(cov_jk.keys()):
         debiased_cov[key] = cov_jk[key] - Q[key]

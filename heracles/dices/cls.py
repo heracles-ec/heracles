@@ -26,7 +26,7 @@ from ..mapping import transform
 from ..twopoint import angular_power_spectra
 
 
-def jackknife(data_maps, vis_maps, jk_maps, fields, nd=1):
+def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
     """
     Compute the Cls of removing 1 Jackknife.
     inputs:

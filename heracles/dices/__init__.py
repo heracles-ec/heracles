@@ -22,7 +22,7 @@ Main module of the *DICES* package.
 
 __all__ = [
     # cls
-    "jackknife",
+    "jackknife_cls",
     "get_cls",
     # bias_correction
     "get_bias",
@@ -33,15 +33,15 @@ __all__ = [
     "compute_mask_correction",
     "correct_mask",
     # Delete1
-    "get_jackknife_cov",
-    "get_gaussian_cov",
-    "get_shrinkage_factor",
-    "shrink_cov",
+    "jackknife_covariance",
+    "gaussian_covariance",
+    "shrinkage_factor",
+    "shrink_covariance",
     # Delete2
-    "debias_cov",
-    "get_delete2_correction",
+    "debias_covariance",
+    "delete2_correction",
     # DICES
-    "get_dices_cov",
+    "dices_covariance",
     # PolSpice
     "cl2corr",
     "corr2cl",
@@ -57,7 +57,7 @@ __all__ = [
     "Components2Fields",
 ]
 
-from .cls import jackknife, get_cls
+from .cls import jackknife_cls
 from .bias_correction import (
     get_bias,
     get_delete_fsky,
@@ -66,13 +66,16 @@ from .bias_correction import (
 )
 from .mask_correction import compute_mask_correction, correct_mask
 from .delete1 import (
-    get_jackknife_cov,
-    get_gaussian_cov,
-    get_shrinkage_factor,
-    shrink_cov,
+    jackknife_covariance,
+    gaussian_covariance,
+    shrinkage_factor,
+    shrink_covariance,
 )
-from .delete2 import debias_cov, get_delete2_correction
-from .dices import get_dices_cov
+from .delete2 import (
+    debias_covariance,
+    delete2_correction,
+)
+from .dices import dices_covariance
 from .utils import (
     cov2corr,
     add_to_Cls,

@@ -27,7 +27,7 @@ from .io import (
 )
 
 
-def get_dices_cov(cls0, cov1, cov2):
+def dices_covariance(cls0, cov1, cov2):
     """
     Internal method to compute the Dices covariance.
     inputs:

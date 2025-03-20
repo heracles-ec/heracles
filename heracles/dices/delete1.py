@@ -35,7 +35,7 @@ from .io import (
 )
 
 
-def get_jackknife_cov(Cls0, Clsjks):
+def jackknife_covariance(Cls0, Clsjks):
     """
     Computes the jackknife covariance matrix.
     inputs:
@@ -68,7 +68,7 @@ def get_jackknife_cov(Cls0, Clsjks):
     return cov_jk
 
 
-def shrink_cov(Cls0, cov, target, shrinkage_factor):
+def shrink_covariance(Cls0, cov, target, shrinkage_factor):
     """
     Internal method to compute the shrunk covariance.
     inputs:
@@ -118,7 +118,7 @@ def correlate_target(S, rbar):
     return T
 
 
-def get_gaussian_cov(Cls):
+def gaussian_covariance(Cls):
     """
     Computes Gaussian estimate of the target matrix.
     input:
@@ -204,7 +204,7 @@ def get_f(S, W, Wbar):
     return f
 
 
-def get_shrinkage_factor(cls0, Clsjks, target):
+def shrinkage_factor(cls0, Clsjks, target):
     """
     Computes the optimal linear shrinkage factor.
     input:
