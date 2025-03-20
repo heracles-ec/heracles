@@ -48,7 +48,7 @@ def jackknife_covariance(samples, nd=1):
             # compute jackknife covariance matrix
             a = sample_covariance(samples1, samples2)
             if nd == 1:
-                a *= (njk - 1)
+                a *= njk - 1
             elif nd == 2:
                 a *= (njk * (njk - 1) - 2) / (2 * njk * (njk + 1))
             elif nd > 2:
@@ -59,10 +59,7 @@ def jackknife_covariance(samples, nd=1):
             axis = tuple(range(-len(oldaxis), 0))
             a = np.moveaxis(a, oldaxis, axis)
             # get attributes of result
-            ell = (
-                get_result_array(result1, "ell")
-                + get_result_array(result2, "ell")
-            )
+            ell = get_result_array(result1, "ell") + get_result_array(result2, "ell")
             # wrap everything into a result instance
             result = Result(a, axis=axis, ell=ell)
             # store result
