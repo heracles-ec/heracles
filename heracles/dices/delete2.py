@@ -37,7 +37,7 @@ def delete2_correction(Cls0, Cls1, Cls2):
         qii = {}
         for key in Cls2[kk].keys():
             _qii = Njk * Cls0[key].array
-            _qii -= (Njk - 1) * Cls1[(k1,)][key].array 
+            _qii -= (Njk - 1) * Cls1[(k1,)][key].array
             _qii -= (Njk - 1) * Cls1[(k2,)][key].array
             _qii += (Njk - 2) * Cls2[kk][key].array
             _qii = Result(_qii, ell=Cls0[key].ell)
