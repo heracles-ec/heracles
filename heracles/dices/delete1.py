@@ -17,238 +17,81 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .utils import (
-    get_Clkey,
-    get_mean_Cljk,
-    get_Wbar,
-    get_W,
-    cov2corr,
-)
-from .bias_correction import (
-    get_bias,
-    add_to_Cls,
-)
-from .io import (
-    Fields2Components,
-    Data2Components,
-    Components2Data,
+import itertools
+from ..result import (
+    get_result_array,
+    Result,
 )
 
 
-def jackknife_covariance(Cls0, Clsjks):
+def jackknife_covariance(samples, nd=1):
     """
-    Computes the jackknife covariance matrix.
-    inputs:
-        Cls0 (dict): Dictionary of data Cls
-        Clsjks (dict): Dictionary of delete1 data Cls
-    returns:
-        cov_jk (dict): Dictionary of delete1 covariance
+    Compute the jackknife covariance matrix from a sequence
+    of spectra dictionaries *samples*.
     """
-    # Get JackNJk
-    JackNjk = len(Clsjks.keys())
-    # Component separate
-    Cqs0 = Fields2Components(Cls0)
-    Cqsjks = {}
-    for key in list(Clsjks.keys()):
-        Clsjk = Clsjks[key]
-        Cqsjks[key] = Fields2Components(Clsjk)
-    # Concatenate Cls
-    Cqsjks_all = []
-    for key in Cqsjks.keys():
-        cls = Cqsjks[key]
-        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
-        Cqsjks_all.append(cls_all)
-    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
-    # W matrices
-    Wbar = get_Wbar(Cqsjks_all, Cqsjks_mu_all)
-    # Compute Jackknife covariance
-    cov_jk = (JackNjk - 1) * Wbar
-    # Data vector to dictionary
-    cov_jk = Data2Components(Cqs0, cov_jk)
-    return cov_jk
+    cov = {}
+    # no samples means no covariance
+    if not samples:
+        return cov
+    # first sample is the blueprint that rest must follow
+    first, *rest = samples
+    # loop over pairs of keys to compute their covariance
+    for key1, key2 in itertools.combinations_with_replacement(first, 2):
+        # get reference results
+        result1 = first[key1]
+        result2 = first[key2]
+        # gather samples for this key combination
+        samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
+        samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
+        # if there are multiple samples, compute covariance
+        if (njk := len(samples1)) > 1:
+            # compute jackknife covariance matrix
+            a = sample_covariance(samples1, samples2)
+            if nd == 1:
+                a *= (njk - 1)
+            elif nd == 2:
+                a *= (njk * (njk - 1) - 2) / (2 * njk * (njk + 1))
+            elif nd > 2:
+                raise ValueError("number of deletions must be 0, 1, or 2")
+            # move ell axes last, in order
+            ndim1 = result1.ndim
+            oldaxis = result1.axis + tuple(ndim1 + ax for ax in result2.axis)
+            axis = tuple(range(-len(oldaxis), 0))
+            a = np.moveaxis(a, oldaxis, axis)
+            # get attributes of result
+            ell = (
+                get_result_array(result1, "ell"),
+                get_result_array(result2, "ell"),
+            )
+            # wrap everything into a result instance
+            result = Result(a, axis=axis, ell=ell)
+            # store result
+            a1, b1, i1, j1 = key1
+            a2, b2, i2, j2 = key2
+            cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
+    return cov
 
 
-def shrink_covariance(Cls0, cov, target, shrinkage_factor):
+def sample_covariance(samples, samples2=None):
     """
-    Internal method to compute the shrunk covariance.
-    inputs:
-        Cls0 (dict): Dictionary of data Cls
-        cov (dict): Dictionary of Jackknife covariance
-        target (dict): Dictionary of target covariance
-        shrinkage_factor (float): Shrinkage factor
-    returns:
-        shrunk_cov (dict): Dictionary of shrunk delete1 covariance
+    Returns the sample covariance matrix of *samples*, or the sample
+    cross-covariance between *samples* and *samples2* if the latter is
+    given.
     """
-    # Separate component Cls
-    Cqs0 = Fields2Components(Cls0)
-
-    # to matrices
-    cov = Components2Data(Cqs0, cov)
-    target = Components2Data(Cqs0, target)
-
-    # Compute scalar shrinkage intensity
-    target_corr = cov2corr(target)
-    _target = correlate_target(cov, target_corr)
-
-    # Apply shrinkage
-    shrunk_S = shrinkage_factor * _target + (1 - shrinkage_factor) * cov
-
-    # To dictionaries
-    shrunk_S = Data2Components(Cqs0, shrunk_S)
-
-    return shrunk_S
-
-
-def correlate_target(S, rbar):
-    """
-    Computes the estimate of the target matrix.
-    input:
-        S (array): target covariance matrix
-        rbar (array): Gaussian correlation matrix
-    returns:
-        T: correlation matrix of S
-    """
-    T = np.zeros(np.shape(S))
-    for i in range(0, len(T)):
-        for j in range(0, len(T)):
-            if i == j:
-                T[i, j] = S[i, j]
-            else:
-                T[i, j] = rbar[i, j] * np.sqrt(S[i, i] * S[j, j])
-    return T
-
-
-def gaussian_covariance(Cls):
-    """
-    Computes Gaussian estimate of the target matrix.
-    input:
-        Cls: power spectra
-        covkeys: list of covariance keys
-    returns:
-        T: target matrix
-    """
-    # Add bias to Cls
-    bias = get_bias(Cls)
-    Cls = add_to_Cls(Cls, bias)
-    # Compute Gaussian covariance
-    T = {}
-    Cls = Fields2Components(Cls)
-    Cl_keys = list(Cls.keys())
-    for i in range(0, len(Cl_keys)):
-        for j in range(i, len(Cl_keys)):
-            ki = Cl_keys[i]
-            kj = Cl_keys[j]
-            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
-            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
-            covkey = (A, B, C, D, nA, nB, nC, nD)
-            k = [A, nA]
-            q = [B, nB]
-            m = [C, nC]
-            n = [D, nD]
-
-            clkey1 = get_Clkey(k, m)
-            clkey2 = get_Clkey(q, n)
-            clkey3 = get_Clkey(k, n)
-            clkey4 = get_Clkey(q, m)
-
-            cl1 = Cls[clkey1].__array__()
-            cl2 = Cls[clkey2].__array__()
-            cl3 = Cls[clkey3].__array__()
-            cl4 = Cls[clkey4].__array__()
-
-            Cl_diag = cl1 * cl2 + cl3 * cl4
-            # (2*ls+1) term not needed since we only
-            # care about the correlation matrix
-            # Cl_diag /= (2*ls + 1)*fsky*dl
-            _T = np.zeros((len(Cl_diag), len(Cl_diag)))
-            ind = np.arange(len(Cl_diag))
-            _T[ind, ind] = Cl_diag
-            T[covkey] = _T
-    return T
-
-
-def get_covSS(i, j, q, m, W, Wbar):
-    """
-    Computes the covariance of the W matrices.
-    input:
-        i, j, l, m: indices
-        W: W matrices
-        Wbar: mean W matrix
-    returns:
-        covSS: covariance of W matrices
-    """
-    n = len(W)
-    covSS = 0.0
-    for k in range(0, len(W)):
-        covSS += (W[k][i, j] - Wbar[i, j]) * (W[k][q, m] - Wbar[q, m])
-    covSS *= n / ((n - 1) ** 3.0)
-    return covSS
-
-
-def get_f(S, W, Wbar):
-    """
-    Computes the covariance of the W matrices with the target matrix.
-    input:
-        S: Jackknife covariance matrix
-        W: W matrices
-        Wbar: mean W matrix
-    returns:
-        f: covariance of W matrices
-    """
-    f = np.zeros(np.shape(S))
-    for i in range(0, len(S)):
-        for j in range(0, len(S)):
-            f[i, j] += np.sqrt(S[j, j] / S[i, i]) * get_covSS(i, i, i, j, W, Wbar)
-            f[i, j] += np.sqrt(S[i, i] / S[j, j]) * get_covSS(j, j, i, j, W, Wbar)
-            f[i, j] *= 0.5
-    return f
-
-
-def shrinkage_factor(cls0, Clsjks, target):
-    """
-    Computes the optimal linear shrinkage factor.
-    input:
-        cls0: data Cls
-        Clsjks: delete1 data Cls
-        target: target matrix
-    returns:
-        lambda_star: optimal linear shrinkage factor
-    """
-    # Separate component Cls
-    cqs0 = Fields2Components(cls0)
-    Cqsjks = {}
-    for key in list(Clsjks.keys()):
-        Clsjk = Clsjks[key]
-        Cqsjks[key] = Fields2Components(Clsjk)
-    # to matrices
-    target = Components2Data(cqs0, target)
-    # Compute correlation of target
-    target_corr = cov2corr(target)
-    # Concatenate Cls
-    Cqsjks_all = []
-    for key in Cqsjks.keys():
-        cls = Cqsjks[key]
-        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
-        Cqsjks_all.append(cls_all)
-    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
-
-    # W matrices
-    W = get_W(Cqsjks_all, Cqsjks_mu_all)
-    # Compute shrinkage factor
-    Njk = len(W)
-    Wbar = np.mean(W, axis=0)
-    S = (Njk - 1) * Wbar
-    f = get_f(S, W, Wbar)
-    numerator = 0.0
-    denominator = 0.0
-    for i in range(0, len(S)):
-        for j in range(0, len(S)):
-            if i != j:
-                numerator += (
-                    get_covSS(i, j, i, j, W, Wbar) - target_corr[i, j] * f[i, j]
-                )
-                denominator += (
-                    S[i, j] - target_corr[i, j] * np.sqrt(S[i, i] * S[j, j])
-                ) ** 2.0
-    lambda_star = numerator / denominator
-    return lambda_star
+    if samples2 is None:
+        samples2 = samples
+    n, *dim = samples.shape
+    n2, *dim2 = samples2.shape
+    if n2 != n:
+        raise ValueError("different numbers of samples")
+    mu = np.zeros((*dim,))
+    mu2 = np.zeros((*dim2,))
+    cov = np.zeros((*dim, *dim2))
+    for i in range(n):
+        x = samples[i]
+        y = samples2[i]
+        delta = x - mu
+        mu += delta / (i + 1)
+        mu2 += (y - mu2) / (i + 1)
+        cov += (np.multiply.outer(delta, y - mu2) - cov) / (i + 1)
+    return cov

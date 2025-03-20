@@ -25,7 +25,7 @@ from .utils import (
 )
 
 
-def get_bias(cls):
+def bias(cls):
     """
     Internal method to compute the bias.
     inputs:
@@ -40,7 +40,7 @@ def get_bias(cls):
     return bias
 
 
-def get_delete_fsky(jkmaps, jk=0, jk2=0):
+def jackknife_fsky(jkmaps, jk=0, jk2=0):
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
@@ -61,7 +61,7 @@ def get_delete_fsky(jkmaps, jk=0, jk2=0):
     return rel_fskys
 
 
-def get_biasjk(bias, fsky, fields):
+def jackknife_bias(bias, fsky, fields):
     """
     Returns the bias for deleting a Jackknife region.
     inputs:
@@ -100,16 +100,16 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
         cls_wbias (dict): Cls with bias
     """
     # Bias correction
-    bias = get_bias(cls)
-    fskyjk = get_delete_fsky(jkmaps, jk=jk, jk2=jk2)
-    bias_jk = get_biasjk(bias, fskyjk, fields)
+    b = bias(cls)
+    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
+    b_jk = jackknife_bias(b, fskyjk, fields)
     # Correct Cls
-    cls = add_to_Cls(cls, bias)
-    cls = sub_to_Cls(cls, bias_jk)
+    cls = add_to_Cls(cls, b)
+    cls = sub_to_Cls(cls, b_jk)
     # Update metadata
     for key in cls.keys():
         cl = cls[key].__array__()
         ell = cls[key].ell
-        update_metadata(cl, bias=bias_jk[key])
+        update_metadata(cl, bias=b_jk[key])
         cls[key] = Result(cl, ell=ell)
     return cls

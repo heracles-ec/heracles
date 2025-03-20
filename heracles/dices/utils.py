@@ -18,7 +18,6 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from ..result import Result
-from .io import Fields2Components
 
 
 def get_lgrid(lmin, lmax, nbin, uselog=True):
@@ -145,46 +144,3 @@ def get_mean_Cljk(Clss):
         ell = cl.ell
         Cl_mu[key] = Result(cl.__array__() / total, ell)
     return Cl_mu
-
-
-def get_W(x, xbar, jk=False):
-    """
-    Internal method to compute the W matrices.
-    input:
-        x: Cl
-        xbar: mean Cl
-        jk: if True, computes the jackknife version of the W matrices
-    returns:
-        W: W matrices
-    """
-    W = []
-    _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
-    for i in range(0, len(x)):
-        _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
-        _Wk = (_xi - _xbi) * (_xj - _xbj)
-        W.append(_Wk)
-    W = np.array(W)
-    if jk:
-        n = len(x)
-        W *= ((n - 1) ** 2.0) / n
-    return W
-
-
-def get_Wbar(x, xbar):
-    """
-    Internal method to compute the W matrices.
-    input:
-        x: Cl
-        xbar: mean Cl
-        jk: if True, computes the jackknife version of the W matrices
-    returns:
-        W: W matrices
-    """
-    W = np.zeros((len(xbar), len(xbar)))
-    n = len(x)
-    _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
-    for i in range(0, len(x)):
-        _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
-        W += (_xi - _xbi) * (_xj - _xbj)
-    W *= 1/n
-    return W

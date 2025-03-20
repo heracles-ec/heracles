@@ -23,69 +23,41 @@ Main module of the *DICES* package.
 __all__ = [
     # cls
     "jackknife_cls",
-    "get_cls",
     # bias_correction
-    "get_bias",
-    "get_delete_fsky",
-    "get_biasjk",
+    "jackknife_fsky",
+    "jackknife_bias",
     "correct_bias",
     # mask_correction
-    "compute_mask_correction",
     "correct_mask",
     # Delete1
     "jackknife_covariance",
-    "gaussian_covariance",
-    "shrinkage_factor",
-    "shrink_covariance",
     # Delete2
     "debias_covariance",
     "delete2_correction",
-    # DICES
-    "dices_covariance",
     # PolSpice
     "cl2corr",
     "corr2cl",
-    # utils
-    "cov2corr",
-    "add_to_Cls",
-    "sub_to_Cls",
-    "get_mean_Cljk",
-    # io
-    "Fields2Components",
-    "Components2Data",
-    "Data2Components",
-    "Components2Fields",
 ]
 
-from .cls import jackknife_cls
+from .cls import (
+    jackknife_cls,
+)
 from .bias_correction import (
-    get_bias,
-    get_delete_fsky,
-    get_biasjk,
+    jackknife_fsky,
+    jackknife_bias,
     correct_bias,
 )
-from .mask_correction import compute_mask_correction, correct_mask
+from .mask_correction import (
+    correct_mask,
+)
 from .delete1 import (
     jackknife_covariance,
-    gaussian_covariance,
-    shrinkage_factor,
-    shrink_covariance,
 )
 from .delete2 import (
     debias_covariance,
     delete2_correction,
 )
-from .dices import dices_covariance
-from .utils import (
-    cov2corr,
-    add_to_Cls,
-    sub_to_Cls,
-    get_mean_Cljk,
+from .polspice import (
+    cl2corr,
+    corr2cl,
 )
-from .io import (
-    Fields2Components,
-    Components2Data,
-    Data2Components,
-    Components2Fields,
-)
-from .polspice import cl2corr, corr2cl

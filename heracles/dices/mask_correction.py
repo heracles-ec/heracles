@@ -6,7 +6,7 @@ from .polspice import (
 )
 
 
-def compute_mask_correction(Mljk, Mls0):
+def mask_correction(Mljk, Mls0):
     """
     Internal method to compute the mask correction.
     input:
@@ -57,7 +57,7 @@ def correct_mask(Cljk, Mljk, Mls0):
         # get alpha
         _Mls0 = Mls0[Clmm_key]
         _Mljk = Mljk[Clmm_key]
-        alpha = compute_mask_correction(_Mljk, _Mls0)
+        alpha = mask_correction(_Mljk, _Mls0)
         # Grab metadata
         dtype = Cljk[Cl_key].__array__().dtype
         ell = Cljk[Cl_key].ell

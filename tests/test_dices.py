@@ -135,7 +135,7 @@ def test_bias(data_path):
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
     cls = dices.cls.get_cls(data_maps, jkmaps, fields)
-    b = dices.get_bias(cls)
+    b = dices.bias_correction.bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
 
@@ -144,7 +144,7 @@ def test_get_delete1_fsky(data_path):
     JackNjk = 5
     jkmaps = make_jkmaps(data_path)
     for jk in range(1, JackNjk + 1):
-        alphas = dices.get_delete_fsky(jkmaps, jk, jk)
+        alphas = dices.jackknife_fsky(jkmaps, jk, jk)
         for key in list(alphas.keys()):
             _alpha = 1 - 1 / JackNjk
             alpha = alphas[key]
@@ -156,7 +156,7 @@ def test_get_delete2_fsky(data_path):
     jkmaps = make_jkmaps(data_path)
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
-            alphas = dices.get_delete_fsky(jkmaps, jk, jk2)
+            alphas = dices.jackknife_fsky(jkmaps, jk, jk2)
             for key in list(alphas.keys()):
                 _alpha = 1 - 2 / JackNjk
                 alpha = alphas[key]
@@ -257,20 +257,19 @@ def test_dices(data_path):
             assert nells == len(lgrid)
 
     # Delete1
-    cov_jk = dices.jackknife_covariance(cqs0, cqs1)
-    # Shrinkage
-    target_cov = dices.gaussian_covariance(cqs0)
-    shrinkage = dices.shrinkage_factor(cqs0, cqs1, target_cov)
-    shrunk_cov = dices.shrink_covariance(cqs0, cov_jk, target_cov, shrinkage)
+    cov_jk = dices.jackknife_covariance(cqs1.values())
+    #  Shrinkage
+    # target_cov = dices.gaussian_covariance(cqs0)
+    # shrinkage = dices.shrinkage_factor(cqs0, cqs1, target_cov)
+    # shrunk_cov = dices.shrink_covariance(cqs0, cov_jk, target_cov, shrinkage)
 
     # Check for correct keys)
-    compsep_cls = dices.Fields2Components(data_cls)
-    compsep_keys = list(compsep_cls.keys())
+    cls_keys = list(cqs0.keys())
     k = 0
-    for i in range(0, len(compsep_keys)):
-        for j in range(i, len(compsep_keys)):
-            ki = compsep_keys[i]
-            kj = compsep_keys[j]
+    for i in range(0, len(cls_keys)):
+        for j in range(i, len(cls_keys)):
+            ki = cls_keys[i]
+            kj = cls_keys[j]
             A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
             C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
             _covkey = (A, B, C, D, nA, nB, nC, nD)
@@ -279,7 +278,12 @@ def test_dices(data_path):
     # Check for correct shape
     for key in list(cov_jk.keys()):
         cov = cov_jk[key]
-        assert cov.shape == (lbins, lbins)
+        s = cov.shape
+        if len(s) == 2:
+            m, n = s
+        if len(s) == 3:
+            _, m, n = s
+        assert (m, n) == (lbins, lbins)
 
     debiased_cov = dices.debias_covariance(cov_jk, cqs0, cqs1, cqs2)
     Q = dices.delete2_correction(
@@ -287,45 +291,39 @@ def test_dices(data_path):
         cqs1,
         cqs2,
     )
-    _delete2_cov = {}
+    _debiased_cov = {}
     for key in list(cov_jk.keys()):
-        _delete2_cov[key] = cov_jk[key] - Q[key]
+        _debiased_cov[key] = cov_jk[key].array - Q[key].array
 
     for key in list(debiased_cov.keys()):
-        assert (debiased_cov[key] == _delete2_cov[key]).all()
-
-    dices_cov = dices.dices_covariance(cqs0, shrunk_cov, debiased_cov)
+        assert (debiased_cov[key] == _debiased_cov[key]).all()
 
     # Check keys
-    keys0 = set(shrunk_cov.keys())
     keys1 = set(cov_jk.keys())
     keys2 = set(debiased_cov.keys())
-    keys3 = set(dices_cov.keys())
-    assert keys0 == keys1 == keys2 == keys3
+    assert keys1 == keys2
 
     # Check for correct shape
     for key in list(cov_jk.keys()):
-        C0 = shrunk_cov[key]
         C1 = cov_jk[key]
         C2 = debiased_cov[key]
-        CD = dices_cov[key]
-        assert C0.shape == C1.shape == C2.shape == CD.shape
+        assert C1.shape == C2.shape
 
-    # Check for delete2 correction
-    _cqs0 = dices.Fields2Components(cqs0)
-    _cov1 = dices.Components2Data(_cqs0, shrunk_cov)
-    _cov2 = dices.Components2Data(_cqs0, debiased_cov)
-    _corr1 = dices.cov2corr(_cov1)
-    _var1 = np.diag(_cov1).copy()
-    _var2 = np.diag(_cov2).copy()
-    cond = np.where(_var2 < 0)[0]
-    _var2[cond] = _var1[cond]
-    _sig2 = np.sqrt(_var2)
-    _corr2 = np.outer(_sig2, _sig2)
-    _D = _corr2 * _corr1
-    _dices_cov = dices.Data2Components(_cqs0, _D)
-    for key in list(dices_cov.keys()):
-        print(key)
-        d = dices_cov[key]
-        _d = _dices_cov[key]
-        assert np.all(d == _d)
+    # dices_cov = dices.dices_covariance(cqs0, shrunk_cov, debiased_cov)
+    # _cqs0 = dices.Fields2Components(cqs0)
+    # _cov1 = dices.Components2Data(_cqs0, shrunk_cov)
+    # _cov2 = dices.Components2Data(_cqs0, debiased_cov)
+    # _corr1 = dices.cov2corr(_cov1)
+    # _var1 = np.diag(_cov1).copy()
+    # _var2 = np.diag(_cov2).copy()
+    # cond = np.where(_var2 < 0)[0]
+    # _var2[cond] = _var1[cond]
+    # _sig2 = np.sqrt(_var2)
+    # _corr2 = np.outer(_sig2, _sig2)
+    # _D = _corr2 * _corr1
+    # _dices_cov = dices.Data2Components(_cqs0, _D)
+    # for key in list(dices_cov.keys()):
+    #     print(key)
+    #     d = dices_cov[key]
+    #     _d = _dices_cov[key]
+    #     assert np.all(d == _d)
