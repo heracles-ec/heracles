@@ -60,8 +60,8 @@ def jackknife_covariance(samples, nd=1):
             a = np.moveaxis(a, oldaxis, axis)
             # get attributes of result
             ell = (
-                get_result_array(result1, "ell"),
-                get_result_array(result2, "ell"),
+                get_result_array(result1, "ell")
+                + get_result_array(result2, "ell")
             )
             # wrap everything into a result instance
             result = Result(a, axis=axis, ell=ell)
