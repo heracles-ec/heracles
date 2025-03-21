@@ -21,43 +21,31 @@ Main module of the *DICES* package.
 """
 
 __all__ = [
-    # cls
+    # jackknife
     "jackknife_cls",
-    # bias_correction
     "jackknife_fsky",
     "jackknife_bias",
     "correct_bias",
-    # mask_correction
-    "correct_mask",
-    # Delete1
     "jackknife_covariance",
-    # Delete2
     "debias_covariance",
     "delete2_correction",
-    # PolSpice
+    # mask_correction
+    "correct_mask"
     "cl2corr",
     "corr2cl",
 ]
 
-from .cls import (
+from .jackknife import (
     jackknife_cls,
-)
-from .bias_correction import (
     jackknife_fsky,
     jackknife_bias,
     correct_bias,
-)
-from .mask_correction import (
-    correct_mask,
-)
-from .delete1 import (
     jackknife_covariance,
-)
-from .delete2 import (
     debias_covariance,
     delete2_correction,
 )
-from .polspice import (
+from .mask_correction import (
+    correct_mask,
     cl2corr,
     corr2cl,
 )

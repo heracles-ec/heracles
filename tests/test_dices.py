@@ -118,7 +118,7 @@ def test_cls(data_path):
     vis_maps = make_vis_maps()
     jk_maps = make_jkmaps(data_path)
     fields = get_fields()
-    data_cls = dices.cls.get_cls(data_maps, jk_maps, fields)
+    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     _data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
     for key in list(data_cls.keys()):
         _cl = np.atleast_2d(data_cls[key])
@@ -134,7 +134,7 @@ def test_bias(data_path):
     data_maps = make_data_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
+    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     b = dices.bias_correction.bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
@@ -168,8 +168,8 @@ def test_mask_correction(data_path):
     vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
-    mls = dices.cls.get_cls(vis_maps, jkmaps, fields)
+    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    mls = dices.jackknife.get_cls(vis_maps, jkmaps, fields)
     _cls = dices.correct_mask(cls, mls, mls)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
@@ -181,7 +181,7 @@ def test_polspice(data_path):
     data_maps = make_data_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
-    cls = dices.cls.get_cls(data_maps, jkmaps, fields)
+    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
@@ -204,7 +204,7 @@ def test_dices(data_path):
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
 
-    data_cls = dices.cls.get_cls(data_maps, jkmaps, fields)
+    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
 
     delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
