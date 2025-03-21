@@ -206,12 +206,7 @@ def test_dices(data_path):
 
     data_cls = dices.cls.get_cls(data_maps, jkmaps, fields)
 
-    delete1_data_cls = dices.jackknife_cls(
-        data_maps,
-        vis_maps,
-        jkmaps,
-        fields,
-        nd=1)
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
@@ -220,12 +215,7 @@ def test_dices(data_path):
             ncls, nells = _cl.shape
             assert nells == nside + 1
 
-    delete2_data_cls = dices.jackknife_cls(
-        data_maps,
-        vis_maps,
-        jkmaps,
-        fields,
-        nd=2)
+    delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=2)
     assert len(delete2_data_cls) == 2 * JackNjk
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
