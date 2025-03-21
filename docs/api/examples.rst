@@ -12,3 +12,4 @@ __ https://github.com/heracles-ec/heracles/blob/main/examples
 
    ../examples/example.ipynb
    ../examples/discrete.ipynb
+   ../examples/jackknife-covariance.ipynb
