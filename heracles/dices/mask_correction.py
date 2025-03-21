@@ -1,10 +1,7 @@
 import numpy as np
 from scipy.special import lpn as legendrep
 from heracles.result import Result
-from .polspice import (
-    cl2corr,
-    corr2cl,
-)
+
 
 gauss_legendre = None
 _gauss_legendre_cache = {}

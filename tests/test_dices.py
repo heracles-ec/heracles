@@ -135,7 +135,7 @@ def test_bias(data_path):
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
     cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    b = dices.bias_correction.bias(cls)
+    b = dices.jackknife.bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
 
