@@ -30,7 +30,7 @@ __all__ = [
     "debias_covariance",
     "delete2_correction",
     # mask_correction
-    "correct_mask"
+    "correct_mask",
     "cl2corr",
     "corr2cl",
 ]
