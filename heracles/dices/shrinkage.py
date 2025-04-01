@@ -21,8 +21,10 @@ from .utils import (
     get_Clkey,
     cov2corr,
 )
-from .bias_correction import (
+from .jackknife import (
     bias,
+)
+from .utils import (
     add_to_Cls,
 )
 from .io import (

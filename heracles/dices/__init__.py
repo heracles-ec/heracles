@@ -33,6 +33,8 @@ __all__ = [
     "correct_mask",
     "cl2corr",
     "corr2cl",
+    # shrinkage
+    "shrink_covariance",
 ]
 
 from .jackknife import (
@@ -48,4 +50,7 @@ from .mask_correction import (
     correct_mask,
     cl2corr,
     corr2cl,
+)
+from .shrinkage import (
+    shrink_covariance,
 )
