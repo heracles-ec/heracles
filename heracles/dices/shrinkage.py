@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .utils import (
-    get_Clkey,
-    cov2corr,
+import itertools
+from ..result import (
+    Result,
+    get_result_array,
 )
 from .jackknife import (
     bias,
@@ -31,6 +32,8 @@ from .io import (
     Fields2Components,
     Data2Components,
     Components2Data,
+    Components2Fields,
+    format_key,
 )
 
 
@@ -61,6 +64,20 @@ def shrink_covariance(Cls0, cov, target, shrinkage_factor):
     return shrunk_S
 
 
+def cov2corr(cov):
+    """
+    Produces a correlation matrix from a covariance matrix.
+    input:
+        cov: covariance matrix
+    returns:
+        corr: correlation matrix
+    """
+    corr = np.copy(cov)
+    sig = np.sqrt(np.diag(cov))
+    corr /= np.outer(sig, sig)
+    return corr
+
+
 def correlate_target(S, rbar):
     """
     Computes the estimate of the target matrix.
@@ -85,48 +102,48 @@ def gaussian_covariance(Cls):
     Computes Gaussian estimate of the target matrix.
     input:
         Cls: power spectra
-        covkeys: list of covariance keys
     returns:
         T: target matrix
     """
     # Add bias to Cls
     b = bias(Cls)
     Cls = add_to_Cls(Cls, b)
-    # Compute Gaussian covariance
-    T = {}
+    # Separate Cls into Cls
     Cls = Fields2Components(Cls)
-    Cl_keys = list(Cls.keys())
-    for i in range(0, len(Cl_keys)):
-        for j in range(i, len(Cl_keys)):
-            ki = Cl_keys[i]
-            kj = Cl_keys[j]
-            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
-            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
-            covkey = (A, B, C, D, nA, nB, nC, nD)
-            k = [A, nA]
-            q = [B, nB]
-            m = [C, nC]
-            n = [D, nD]
-
-            clkey1 = get_Clkey(k, m)
-            clkey2 = get_Clkey(q, n)
-            clkey3 = get_Clkey(k, n)
-            clkey4 = get_Clkey(q, m)
-
-            cl1 = Cls[clkey1].__array__()
-            cl2 = Cls[clkey2].__array__()
-            cl3 = Cls[clkey3].__array__()
-            cl4 = Cls[clkey4].__array__()
-
-            Cl_diag = cl1 * cl2 + cl3 * cl4
-            # (2*ls+1) term not needed since we only
-            # care about the correlation matrix
-            # Cl_diag /= (2*ls + 1)*fsky*dl
-            _T = np.zeros((len(Cl_diag), len(Cl_diag)))
-            ind = np.arange(len(Cl_diag))
-            _T[ind, ind] = Cl_diag
-            T[covkey] = _T
-    return T
+    # Compute Gaussian covariance
+    cov = {}
+    for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
+        # get reference results
+        result1 = Cls[key1]
+        result2 = Cls[key2]
+        # get attributes of result
+        ell = get_result_array(result1, "ell")
+        ell += get_result_array(result2, "ell")
+        # get covariance
+        a1, b1, i1, j1 = key1
+        a2, b2, i2, j2 = key2
+        clkey1 = format_key((a1, a2, i1, i2))
+        clkey2 = format_key((b1, b2, j1, j2))
+        clkey3 = format_key((a1, b2, i1, j2))
+        clkey4 = format_key((b1, a2, j1, i2))
+        cl1 = Cls[clkey1]
+        cl2 = Cls[clkey2]
+        cl3 = Cls[clkey3]
+        cl4 = Cls[clkey4]
+        # Compute the Gaussian covariance
+        _cov = cl1.array * cl2.array + cl3.array * cl4.array
+        # _cov /= (2*ell + 1)
+        _cov = np.diag(_cov)
+        # move ell axes last, in order
+        ndim1 = result1.ndim
+        oldaxis = result1.axis + tuple(ndim1 + ax for ax in result2.axis)
+        axis = tuple(range(-len(oldaxis), 0))
+        _cov = np.moveaxis(_cov, oldaxis, axis)
+        result = Result(_cov, axis=axis, ell=ell)
+        cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
+    # Turn covariance back to fields
+    cov = Components2Fields(cov)
+    return cov
 
 
 def get_covSS(i, j, q, m, W, Wbar):

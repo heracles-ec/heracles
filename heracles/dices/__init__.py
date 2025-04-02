@@ -35,6 +35,12 @@ __all__ = [
     "corr2cl",
     # shrinkage
     "shrink_covariance",
+    "gaussian_covariance",
+    # io
+    "Fields2Components",
+    "Components2Data",
+    "Data2Components",
+    "Components2Fields",
 ]
 
 from .jackknife import (
@@ -53,4 +59,12 @@ from .mask_correction import (
 )
 from .shrinkage import (
     shrink_covariance,
+    gaussian_covariance,
 )
+from .io import (
+    Fields2Components,
+    Components2Data,
+    Data2Components,
+    Components2Fields,
+)
+
