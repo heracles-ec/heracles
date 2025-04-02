@@ -193,9 +193,6 @@ def jackknife_covariance(samples, nd=1):
     of spectra dictionaries *samples*.
     """
     cov = {}
-    # no samples means no covariance
-    if not samples:
-        return cov
     # first sample is the blueprint that rest must follow
     first, *rest = samples
     # loop over pairs of keys to compute their covariance

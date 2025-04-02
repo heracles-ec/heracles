@@ -317,3 +317,17 @@ def test_dices(data_path):
     #     d = dices_cov[key]
     #     _d = _dices_cov[key]
     #     assert np.all(d == _d)
+
+
+def test_Fields2Components(data_path):
+    data_maps = make_data_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    _cls = dices.Fields2Components(cls)
+    __cls = dices.Components2Fields(_cls)
+    assert sorted(list(cls.keys())) == list(__cls.keys())
+    for key in list(cls.keys()):
+        cl = cls[key]
+        __cl = __cls[key]
+        assert np.all(cl == __cl)

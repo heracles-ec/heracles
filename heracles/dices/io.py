@@ -19,6 +19,7 @@
 #####
 # WIP
 #####
+import copy
 import itertools
 import numpy as np
 from ..result import Result
@@ -41,7 +42,6 @@ def Fields2Components(results):
         axis = r.axis
         if len(axis) == 1:
             # We are dealing with Cls
-            a, b, i, j = key
             comps = _split_comps(key)
             for i, comp in enumerate(comps):
                 _r = np.atleast_2d(r.array)
@@ -60,7 +60,8 @@ def Fields2Components(results):
                         _a1, _b1, _i1, _j1 = comp1
                         _a2, _b2, _i2, _j2 = comp2
                         covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
-                        _results[covkey] = Result(r[..., i, j, :, :], ell)
+                        _r = r.array
+                        _results[covkey] = Result(_r[..., i, j, :, :], ell)
         else:
             raise ValueError(
                 "Results with more than 3 axes are not supported at the moment."
@@ -147,13 +148,13 @@ def Components2Fields(results):
     if naxis == 1:
         # We are dealing with Cls
         # find unique fields in comps
-        keys =set([_unsplit_comps(key) for key in keys])
+        keys = set([_unsplit_comps(key) for key in keys])
         keys = sorted(keys)
         for key in keys:
             # get comps of each unique field
             comps = _split_comps(key)
-            __cls = np.array([results[format_key(comp)] for comp in comps])
-            _results[key] = __cls
+            cls = np.array([results[format_key(comp)] for comp in comps])
+            _results[key] = cls
     elif naxis == 2:
         # We are dealing with Covariance matrices
         keys = [(k[0], k[1], k[4], k[5]) for k in keys]
@@ -169,8 +170,8 @@ def Components2Fields(results):
             #  comps1/comp2  (E, E) (B, B) (E,B)
             # (POS, E)
             # (POS, B)
-            comps1 = _split_comps(a1, b1, i1, j1)
-            comps2 = _split_comps(a2, b2, i2, j2)
+            comps1 = _split_comps(key1)
+            comps2 = _split_comps(key2)
             # Save comps in dtype metadata
             dt = np.dtype(
                 float,
@@ -198,10 +199,9 @@ def Components2Fields(results):
 
 
 def _split_comps(key):
-    a, b, i, j = key
-    if a == b == "POS":
-        keys = [(a, b, i, j)]
-    elif (a == 'POS') and (b == "SHE"):
+    _key = copy.deepcopy(key)
+    a, b, i, j = _key
+    if (a == 'POS') and (b == "SHE"):
         keys = [
             (a, "G_E", i, j),
             (a, "G_B", i, j),
@@ -220,21 +220,21 @@ def _split_comps(key):
             ("G_E", "G_B", j, i),
             ]
     else:
-        error = f"Cannot recognize the components {key}."
-        raise ValueError(error)
+        keys = [(a, b, i, j)]
     keys = [format_key(k) for k in keys]
     return keys
 
 
 def _unsplit_comps(key):
-    a, b, i, j = key
+    _key = copy.deepcopy(key)
+    a, b, i, j = _key
     if a == "G_E" or a == "G_B":
         a = "SHE"
     if b == "G_E" or b == "G_B":
         b = "SHE"
-    key = (a, b, i, j)
-    key = format_key(key)
-    return key
+    _key = (a, b, i, j)
+    _key = format_key(_key)
+    return _key
 
 
 def format_key(key):
@@ -245,14 +245,10 @@ def format_key(key):
     returns:
         Clkey: Cl key
     """
-    a, b, i, j = key
+    _key = copy.deepcopy(key)
+    a, b, i, j = _key
     if a == b and i > j:
-        Clkey = (a, b, j, i)
-    else:
-        if b == "POS":
-            Clkey = (b, a, i, j)
-        elif b == "G_E" and a == "G_B":
-            Clkey = (b, a, i, j)
-        else:
-            Clkey = (a, b, i, j)
-    return Clkey
+        i, j = j, i
+    elif (b == "POS") or (b == "G_E" and a == "G_B"):
+        a, b = b, a
+    return (a, b, i, j)

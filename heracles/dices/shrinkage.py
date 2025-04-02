@@ -122,6 +122,7 @@ def gaussian_covariance(Cls):
         # get covariance
         a1, b1, i1, j1 = key1
         a2, b2, i2, j2 = key2
+        covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
         clkey1 = format_key((a1, a2, i1, i2))
         clkey2 = format_key((b1, b2, j1, j2))
         clkey3 = format_key((a1, b2, i1, j2))
@@ -132,7 +133,6 @@ def gaussian_covariance(Cls):
         cl4 = Cls[clkey4]
         # Compute the Gaussian covariance
         _cov = cl1.array * cl2.array + cl3.array * cl4.array
-        # _cov /= (2*ell + 1)
         _cov = np.diag(_cov)
         # move ell axes last, in order
         ndim1 = result1.ndim
@@ -140,9 +140,9 @@ def gaussian_covariance(Cls):
         axis = tuple(range(-len(oldaxis), 0))
         _cov = np.moveaxis(_cov, oldaxis, axis)
         result = Result(_cov, axis=axis, ell=ell)
-        cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
+        cov[covkey] = result
     # Turn covariance back to fields
-    cov = Components2Fields(cov)
+    # cov = Components2Fields(cov)
     return cov
 
 
