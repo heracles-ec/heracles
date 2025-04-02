@@ -138,47 +138,63 @@ def Data2Components(cov):
 
 
 def Components2Fields(results):
-    _covs = {}
-    cls_keys = list(results.keys())
-    cls_keys = [(k[0], k[1], k[4], k[5]) for k in cls_keys]
-    cls_keys = list(set(cls_keys))
-    for key1, key2 in itertools.combinations_with_replacement(cls_keys, 2):
-        a1, b1, i1, j1 = key1
-        a2, b2, i2, j2 = key2
-        covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
-        ells1, ells2 = cov[covkey].ell
-        nells1, nells2 = len(ells1), len(ells2)
-        # Writes the covkeys of the spin components associated with covkey
-        # it also returns what fields go in what axis
-        #  comps1/comp2  (E, E) (B, B) (E,B)
-        # (POS, E)
-        # (POS, B)
-        comps1 = _split_comps(a1, b1, i1, j1)
-        comps2 = _split_comps(a2, b2, i2, j2)
-        # Save comps in dtype metadata
-        dt = np.dtype(
-            float,
-            metadata={
-                "fields1": comps1,
-                "fields2": comps2,
-            },
-        )
-        _cov = np.zeros((len(comps1), len(comps2), nells1, nells2), dtype=dt)
-        for i in range(len(comps1)):
-            for j in range(len(comps2)):
-                comp1 = comps1[i]
-                comp2 = comps2[j]
-                _a1, _b1, _, _ = comp1
-                _a2, _b2, _, _ = comp2
-                _covkey = _a1, _b1, _a2, _b2, i1, j1, i2, j2
-                if _covkey not in cov.keys():
-                    # This triggers if the element doesn't exist
-                    # but the symmetrical term does
-                    _cov[i, j, :, :] = np.zeros((nells2, nells1))
-                else:
-                    _cov[i, j, :, :] = cov[_covkey]
-        _covs[covkey] = Result(_cov, ell=(ells1, ells2))
-    return _covs
+    _results = {}
+    keys = list(results.keys())
+    naxis = np.unique([len(result.axis) for result in results.values()])
+    if len(naxis) != 1:
+        raise ValueError("Different types of results in the same dictionary.")
+    naxis = naxis[0]
+    if naxis == 1:
+        # We are dealing with Cls
+        # find unique fields in comps
+        keys =set([_unsplit_comps(key) for key in keys])
+        keys = sorted(keys)
+        for key in keys:
+            # get comps of each unique field
+            comps = _split_comps(key)
+            __cls = np.array([results[format_key(comp)] for comp in comps])
+            _results[key] = __cls
+    elif naxis == 2:
+        # We are dealing with Covariance matrices
+        keys = [(k[0], k[1], k[4], k[5]) for k in keys]
+        keys = list(set(keys))
+        for key1, key2 in itertools.combinations_with_replacement(keys, 2):
+            a1, b1, i1, j1 = key1
+            a2, b2, i2, j2 = key2
+            covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
+            ells1, ells2 = results[covkey].ell
+            nells1, nells2 = len(ells1), len(ells2)
+            # Writes the covkeys of the spin components associated with covkey
+            # it also returns what fields go in what axis
+            #  comps1/comp2  (E, E) (B, B) (E,B)
+            # (POS, E)
+            # (POS, B)
+            comps1 = _split_comps(a1, b1, i1, j1)
+            comps2 = _split_comps(a2, b2, i2, j2)
+            # Save comps in dtype metadata
+            dt = np.dtype(
+                float,
+                metadata={
+                    "fields1": comps1,
+                    "fields2": comps2,
+                },
+            )
+            _cov = np.zeros((len(comps1), len(comps2), nells1, nells2), dtype=dt)
+            for i in range(len(comps1)):
+                for j in range(len(comps2)):
+                    comp1 = comps1[i]
+                    comp2 = comps2[j]
+                    _a1, _b1, _, _ = comp1
+                    _a2, _b2, _, _ = comp2
+                    _covkey = _a1, _b1, _a2, _b2, i1, j1, i2, j2
+                    if _covkey not in results.keys():
+                        # This triggers if the element doesn't exist
+                        # but the symmetrical term does
+                        _cov[i, j, :, :] = np.zeros((nells2, nells1))
+                    else:
+                        _cov[i, j, :, :] = results[_covkey]
+            _results[covkey] = Result(_cov, ell=(ells1, ells2))
+    return _results
 
 
 def _split_comps(key):
