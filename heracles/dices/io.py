@@ -55,17 +55,73 @@ def Fields2Components(results):
             comps2 = _split_comps(key2)
             for i, comp1 in enumerate(comps1):
                 for j, comp2 in enumerate(comps2):
-                    #if i <= j:
-                    # Only save the upper triangle
                     _a1, _b1, _i1, _j1 = comp1
                     _a2, _b2, _i2, _j2 = comp2
-                    covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
                     _r = r.array
+                    covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
                     _results[covkey] = Result(_r[..., i, j, :, :], ell)
         else:
             raise ValueError(
                 "Results with more than 3 axes are not supported at the moment."
             )
+    return _results
+
+
+def Components2Fields(results):
+    _results = {}
+    keys = list(results.keys())
+    naxis = np.unique([len(result.axis) for result in results.values()])
+    if len(naxis) != 1:
+        raise ValueError("Different types of results in the same dictionary.")
+    naxis = naxis[0]
+    if naxis == 1:
+        # We are dealing with Cls
+        # find unique fields in comps
+        keys = set([_unsplit_comps(key) for key in keys])
+        keys = sorted(keys)
+        for key in keys:
+            # get comps of each unique field
+            comps = _split_comps(key)
+            cls = np.array([results[format_key(comp)] for comp in comps])
+            _results[key] = cls
+    elif naxis == 2:
+        # We are dealing with Covariance matrices
+        keys = list(set([(k[0], k[1], k[4], k[5]) for k in keys]))
+        keys = set([_unsplit_comps(key) for key in keys])
+        keys = sorted(keys)
+        for key1, key2 in itertools.combinations_with_replacement(keys, 2):
+            a1, b1, i1, j1 = key1
+            a2, b2, i2, j2 = key2
+            field_covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
+            comps1 = _split_comps(key1)
+            comps2 = _split_comps(key2)
+            fields_cov = []
+            for _key1, _key2 in itertools.product(comps1, comps2):
+                _a1, _b1, _i1, _j1 = _key1
+                _a2, _b2, _i2, _j2 = _key2
+                comp_covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
+                if comp_covkey in results.keys():
+                    comp_cov = results[comp_covkey]
+                    fields_cov.append(comp_cov)
+            if len(fields_cov) == 0:
+                # Happens if the BBAA exists but not AABB
+                comps1, comps2 = comps2, comps1
+                field_covkey = (a2, b2, a1, b1, i2, j2, i1, j1)
+                for _key1, _key2 in itertools.product(comps1, comps2):
+                    _a1, _b1, _i1, _j1 = _key1
+                    _a2, _b2, _i2, _j2 = _key2
+                    comp_covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
+                    if comp_covkey in results.keys():
+                        comp_cov = results[comp_covkey]
+                        fields_cov.append(comp_cov)
+            # format the covariance
+            first, *rest = fields_cov
+            ell = first.ell
+            axis = first.axis
+            nell1, nell2 = first.shape
+            n, m = len(comps1), len(comps2)
+            fields_cov = np.reshape(fields_cov, (n, m, nell1, nell2))
+            _results[field_covkey] = Result(fields_cov, ell, axis=axis)
     return _results
 
 
@@ -136,66 +192,6 @@ def Data2Components(cov):
                     j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i
                 ]
     return Cl_cov_dict
-
-
-def Components2Fields(results):
-    _results = {}
-    keys = list(results.keys())
-    naxis = np.unique([len(result.axis) for result in results.values()])
-    if len(naxis) != 1:
-        raise ValueError("Different types of results in the same dictionary.")
-    naxis = naxis[0]
-    if naxis == 1:
-        # We are dealing with Cls
-        # find unique fields in comps
-        keys = set([_unsplit_comps(key) for key in keys])
-        keys = sorted(keys)
-        for key in keys:
-            # get comps of each unique field
-            comps = _split_comps(key)
-            cls = np.array([results[format_key(comp)] for comp in comps])
-            _results[key] = cls
-    elif naxis == 2:
-        # We are dealing with Covariance matrices
-        keys = [(k[0], k[1], k[4], k[5]) for k in keys]
-        keys = list(set(keys))
-        for key1, key2 in itertools.combinations_with_replacement(keys, 2):
-            a1, b1, i1, j1 = key1
-            a2, b2, i2, j2 = key2
-            covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
-            ells1, ells2 = results[covkey].ell
-            nells1, nells2 = len(ells1), len(ells2)
-            # Writes the covkeys of the spin components associated with covkey
-            # it also returns what fields go in what axis
-            #  comps1/comp2  (E, E) (B, B) (E,B)
-            # (POS, E)
-            # (POS, B)
-            comps1 = _split_comps(key1)
-            comps2 = _split_comps(key2)
-            # Save comps in dtype metadata
-            dt = np.dtype(
-                float,
-                metadata={
-                    "fields1": comps1,
-                    "fields2": comps2,
-                },
-            )
-            _cov = np.zeros((len(comps1), len(comps2), nells1, nells2), dtype=dt)
-            for i in range(len(comps1)):
-                for j in range(len(comps2)):
-                    comp1 = comps1[i]
-                    comp2 = comps2[j]
-                    _a1, _b1, _, _ = comp1
-                    _a2, _b2, _, _ = comp2
-                    _covkey = _a1, _b1, _a2, _b2, i1, j1, i2, j2
-                    if _covkey not in results.keys():
-                        # This triggers if the element doesn't exist
-                        # but the symmetrical term does
-                        _cov[i, j, :, :] = np.zeros((nells2, nells1))
-                    else:
-                        _cov[i, j, :, :] = results[_covkey]
-            _results[covkey] = Result(_cov, ell=(ells1, ells2))
-    return _results
 
 
 def _split_comps(key):

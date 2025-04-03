@@ -247,7 +247,7 @@ def test_dices(data_path):
             assert nells == len(lgrid)
 
     # Delete1
-    cov_jk = dices.jackknife_covariance(cqs1.values())
+    cov_jk = dices.jackknife_covariance(cqs1)
     #  Shrinkage
     # target_cov = dices.gaussian_covariance(cqs0)
     # shrinkage = dices.shrinkage_factor(cqs0, cqs1, target_cov)
@@ -315,7 +315,7 @@ def test_dices(data_path):
     #     assert np.all(d == _d)
 
 
-def test_Fields2Components(data_path):
+def test_cls_io(data_path):
     data_maps = make_data_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
@@ -324,6 +324,26 @@ def test_Fields2Components(data_path):
     __cls = dices.Components2Fields(_cls)
     assert sorted(list(cls.keys())) == list(__cls.keys())
     for key in list(cls.keys()):
-        cl = cls[key]
-        __cl = __cls[key]
-        assert np.all(cl == __cl)
+        cl = cls[key].array
+        __cl = __cls[key].array
+        assert (cl == __cl).all()
+
+
+def test_cov_io(data_path):
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs1 = heracles.binned(cls1, ledges)
+    cov_jk = dices.jackknife_covariance(cqs1)
+    _cov_jk = dices.Fields2Components(cov_jk)
+    __cov_jk = dices.Components2Fields(_cov_jk)
+    assert sorted(list(cov_jk.keys())) == sorted(list(__cov_jk.keys()))
+    for key in list(cov_jk.keys()):
+        cov = cov_jk[key].array
+        __cov = __cov_jk[key].array
+        assert (cov == __cov).all()

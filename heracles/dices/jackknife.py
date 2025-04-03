@@ -187,7 +187,15 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def jackknife_covariance(samples, nd=1):
+def jackknife_covariance(dict, nd=1):
+    """
+    Compute the jackknife covariance matrix from a sequence
+    of spectra dictionaries *dict*.
+    """
+    return _jackknife_covariance(dict.values(), nd=nd)
+
+
+def _jackknife_covariance(samples, nd=1):
     """
     Compute the jackknife covariance matrix from a sequence
     of spectra dictionaries *samples*.
@@ -283,7 +291,7 @@ def delete2_correction(Cls0, Cls1, Cls2):
             _qii = Result(_qii, ell=Cls0[key].ell)
             qii[key] = _qii
             Q_ii.append(qii)
-    Q = jackknife_covariance(Q_ii, nd=2)
+    Q = _jackknife_covariance(Q_ii, nd=2)
     return Q
 
 
