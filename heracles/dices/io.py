@@ -55,13 +55,13 @@ def Fields2Components(results):
             comps2 = _split_comps(key2)
             for i, comp1 in enumerate(comps1):
                 for j, comp2 in enumerate(comps2):
-                    if i <= j:
-                        # Only save the upper triangle
-                        _a1, _b1, _i1, _j1 = comp1
-                        _a2, _b2, _i2, _j2 = comp2
-                        covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
-                        _r = r.array
-                        _results[covkey] = Result(_r[..., i, j, :, :], ell)
+                    #if i <= j:
+                    # Only save the upper triangle
+                    _a1, _b1, _i1, _j1 = comp1
+                    _a2, _b2, _i2, _j2 = comp2
+                    covkey = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
+                    _r = r.array
+                    _results[covkey] = Result(_r[..., i, j, :, :], ell)
         else:
             raise ValueError(
                 "Results with more than 3 axes are not supported at the moment."
