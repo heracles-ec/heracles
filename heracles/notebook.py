@@ -28,8 +28,6 @@ with external_dependency_explainer:
     import ipywidgets as widgets
     from IPython.display import display
 
-import sys
-from typing import List
 
 class Progress:
     """
@@ -76,4 +74,3 @@ class Progress:
 
     def task(self, label: str) -> "Progress":
         return self.__class__(label, box=self.box)
-
