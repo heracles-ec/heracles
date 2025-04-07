@@ -347,3 +347,31 @@ def test_cov_io(data_path):
         cov = cov_jk[key].array
         __cov = __cov_jk[key].array
         assert (cov == __cov).all()
+
+
+def test_gauss_cov(data_path):
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs1 = heracles.binned(cls1, ledges)
+    cqs0 = heracles.binned(cls0, ledges)
+    cov_jk = dices.jackknife_covariance(cqs1)
+    gauss_cov = dices.gaussian_covariance(cqs0)
+    _cov_jk = dices.Fields2Components(cov_jk)
+    _gauss_cov = dices.Fields2Components(gauss_cov)
+    _cqs0 = dices.Fields2Components(cqs0)
+    assert sorted(list(_cov_jk.keys())) == sorted(list(_gauss_cov.keys()))
+    for key in list(_gauss_cov.keys()):
+        a1, b1, a2, b2, i1, j1, i2, j2 = key
+        key1 = a1, b1, i1, j1
+        key2 = a2, b2, i2, j2
+        if key1 == key:
+            g = _gauss_cov[key].array
+            __g = 2*_cqs0[key1].array**2
+            assert (g == __g).all()
