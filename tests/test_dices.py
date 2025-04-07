@@ -363,6 +363,7 @@ def test_gauss_cov(data_path):
     cqs0 = heracles.binned(cls0, ledges)
     cov_jk = dices.jackknife_covariance(cqs1)
     gauss_cov = dices.gaussian_covariance(cqs0)
+    # Comp separate
     _cov_jk = dices.Fields2Components(cov_jk)
     _gauss_cov = dices.Fields2Components(gauss_cov)
     _cqs0 = dices.Fields2Components(cqs0)
@@ -371,7 +372,10 @@ def test_gauss_cov(data_path):
         a1, b1, a2, b2, i1, j1, i2, j2 = key
         key1 = a1, b1, i1, j1
         key2 = a2, b2, i2, j2
-        if key1 == key:
-            g = _gauss_cov[key].array
+        print(_gauss_cov[key].shape)
+        if (key1 == key2) and ((a1, i1) == (b1, j1)) and ((a2, i2) == (b2, j2)):
+            print(key)
+            print(key1)
+            g = np.diag(_gauss_cov[key].array)
             __g = 2*_cqs0[key1].array**2
             assert (g == __g).all()

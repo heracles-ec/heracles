@@ -129,7 +129,6 @@ def gaussian_covariance(Cls):
         ell2 = get_result_array(cl2, "ell")
         ell = ell1 + ell2
         r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
-        print(r.shape)
         # get covariance
         for i, comp1 in enumerate(comps1):
                 for j, comp2 in enumerate(comps2):
@@ -147,13 +146,7 @@ def gaussian_covariance(Cls):
                     _cov = _cl1.array * _cl2.array + _cl3.array * _cl4.array
                     _cov = np.diag(_cov)
                     r[..., i, j, :, :] = _cov
-        # reorder
-        ndim1 = cl1.ndim
-        oldaxis = cl1.axis + tuple(ndim1 + ax for ax in cl2.axis)
-        axis = tuple(range(-len(oldaxis), 0))
-        r = np.moveaxis(r, oldaxis, axis)
-        # make result
-        result = Result(r, axis=axis, ell=ell)
+        result = Result(r, axis=(0, 1), ell=ell)
         cov[covkey] = result
     return cov
 
