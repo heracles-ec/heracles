@@ -34,6 +34,7 @@ from .io import (
     Components2Data,
     Components2Fields,
     format_key,
+    _split_comps,
 )
 
 
@@ -109,40 +110,51 @@ def gaussian_covariance(Cls):
     b = bias(Cls)
     Cls = add_to_Cls(Cls, b)
     # Separate Cls into Cls
-    Cls = Fields2Components(Cls)
+    _Cls = Fields2Components(Cls)
     # Compute Gaussian covariance
     cov = {}
     for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
-        # get reference results
-        result1 = Cls[key1]
-        result2 = Cls[key2]
-        # get attributes of result
-        ell = get_result_array(result1, "ell")
-        ell += get_result_array(result2, "ell")
-        # get covariance
+        # covariance key
         a1, b1, i1, j1 = key1
         a2, b2, i2, j2 = key2
         covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
-        clkey1 = format_key((a1, a2, i1, i2))
-        clkey2 = format_key((b1, b2, j1, j2))
-        clkey3 = format_key((a1, b2, i1, j2))
-        clkey4 = format_key((b1, a2, j1, i2))
-        cl1 = Cls[clkey1]
-        cl2 = Cls[clkey2]
-        cl3 = Cls[clkey3]
-        cl4 = Cls[clkey4]
-        # Compute the Gaussian covariance
-        _cov = cl1.array * cl2.array + cl3.array * cl4.array
-        _cov = np.diag(_cov)
-        # move ell axes last, in order
-        ndim1 = result1.ndim
-        oldaxis = result1.axis + tuple(ndim1 + ax for ax in result2.axis)
+        # get reference results
+        cl1 = Cls[key1]
+        cl2 = Cls[key2]
+        # get components
+        comps1 = _split_comps(key1)
+        comps2 = _split_comps(key2)
+        # get attributes of result
+        ell1 = get_result_array(cl1, "ell")
+        ell2 = get_result_array(cl2, "ell")
+        ell = ell1 + ell2
+        r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
+        print(r.shape)
+        # get covariance
+        for i, comp1 in enumerate(comps1):
+                for j, comp2 in enumerate(comps2):
+                    _a1, _b1, _i1, _j1 = comp1
+                    _a2, _b2, _i2, _j2 = comp2
+                    _clkey1 = format_key((_a1, _a2, _i1, _i2))
+                    _clkey2 = format_key((_b1, _b2, _j1, _j2))
+                    _clkey3 = format_key((_a1, _b2, _i1, _j2))
+                    _clkey4 = format_key((_b1, _a2, _j1, _i2))
+                    _cl1 = _Cls[_clkey1]
+                    _cl2 = _Cls[_clkey2]
+                    _cl3 = _Cls[_clkey3]
+                    _cl4 = _Cls[_clkey4]
+                    # Compute the Gaussian covariance
+                    _cov = _cl1.array * _cl2.array + _cl3.array * _cl4.array
+                    _cov = np.diag(_cov)
+                    r[..., i, j, :, :] = _cov
+        # reorder
+        ndim1 = cl1.ndim
+        oldaxis = cl1.axis + tuple(ndim1 + ax for ax in cl2.axis)
         axis = tuple(range(-len(oldaxis), 0))
-        _cov = np.moveaxis(_cov, oldaxis, axis)
-        result = Result(_cov, axis=axis, ell=ell)
+        r = np.moveaxis(r, oldaxis, axis)
+        # make result
+        result = Result(r, axis=axis, ell=ell)
         cov[covkey] = result
-    # Turn covariance back to fields
-    # cov = Components2Fields(cov)
     return cov
 
 

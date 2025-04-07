@@ -82,7 +82,11 @@ def Components2Fields(results):
         for key in keys:
             # get comps of each unique field
             comps = _split_comps(key)
-            cls = np.array([results[format_key(comp)] for comp in comps])
+            cls = [results[format_key(comp)] for comp in comps]
+            first, *rest = cls
+            ell = first.ell
+            axis = first.axis
+            cls = Result(np.array(cls), ell, axis=axis)
             _results[key] = cls
     elif naxis == 2:
         # We are dealing with Covariance matrices
