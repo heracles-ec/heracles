@@ -341,3 +341,7 @@ def correct_mask(Cljk, Mljk, Mls0):
 
 def logistic(x, x0=-5, k=50):
     return 1 / (1.0 + np.exp(-k * (x - x0)))
+
+
+def l2x(lmax, sampling_factor=1):
+    return np.polynomial.legendre.leggauss(int(sampling_factor * lmax) + 1)
