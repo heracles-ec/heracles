@@ -184,24 +184,24 @@ def Components2Data(results):
 def _split_comps(key):
     _key = copy.deepcopy(key)
     a, b, i, j = _key
-    if (a == 'POS') and (b == "SHE"):
+    if (a == "POS") and (b == "SHE"):
         keys = [
             (a, "G_E", i, j),
             (a, "G_B", i, j),
-            ]
+        ]
     elif (a == b == "SHE") and (i == j):
         keys = [
             ("G_E", "G_E", i, j),
             ("G_B", "G_B", i, j),
             ("G_E", "G_B", i, j),
-            ]
+        ]
     elif (a == b == "SHE") and (i != j):
         keys = [
             ("G_E", "G_E", i, j),
             ("G_B", "G_B", i, j),
             ("G_E", "G_B", i, j),
             ("G_E", "G_B", j, i),
-            ]
+        ]
     else:
         keys = [(a, b, i, j)]
     keys = [format_key(k) for k in keys]
