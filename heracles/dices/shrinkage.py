@@ -219,7 +219,7 @@ def shrinkage_factor(cls1, target):
     Wbar = np.mean(W, axis=0)
     S = (Njk - 1) * Wbar
     target_corr = target
-    target_corr /= np.outer(np.sqrt(np.diag(target)), np.sqrt(np.diag(target)))t
+    target_corr /= np.outer(np.sqrt(np.diag(target)), np.sqrt(np.diag(target)))
     # Compute shrinkage factor
     numerator = 0.0
     denominator = 0.0
