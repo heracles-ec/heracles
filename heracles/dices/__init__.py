@@ -35,6 +35,7 @@ __all__ = [
     "corr2cl",
     # shrinkage
     "shrink_covariance",
+    "shrinkage_factor",
     "gaussian_covariance",
     # io
     "Fields2Components",
@@ -58,6 +59,7 @@ from .mask_correction import (
 )
 from .shrinkage import (
     shrink_covariance,
+    shrinkage_factor,
     gaussian_covariance,
 )
 from .io import (

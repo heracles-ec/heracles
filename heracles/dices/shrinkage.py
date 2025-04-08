@@ -85,73 +85,6 @@ def correlate_target(cov, target):
     return T
 
 
-def gaussian_covariance(Cls):
-    """
-    Computes Gaussian estimate of the target matrix.
-    input:
-        Cls: power spectra
-    returns:
-        T: target matrix
-    """
-    # Add bias to Cls
-    b = bias(Cls)
-    Cls = add_to_Cls(Cls, b)
-    # Separate Cls into Cls
-    _Cls = Fields2Components(Cls)
-    # Compute Gaussian covariance
-    cov = {}
-    for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
-        # covariance key
-        a1, b1, i1, j1 = key1
-        a2, b2, i2, j2 = key2
-        covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
-        # get reference results
-        cl1 = Cls[key1]
-        cl2 = Cls[key2]
-        # get components
-        comps1 = _split_comps(key1)
-        comps2 = _split_comps(key2)
-        # get attributes of result
-        ell1 = get_result_array(cl1, "ell")
-        ell2 = get_result_array(cl2, "ell")
-        ell = ell1 + ell2
-        r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
-        # get covariance
-        for i, comp1 in enumerate(comps1):
-            for j, comp2 in enumerate(comps2):
-                _a1, _b1, _i1, _j1 = comp1
-                _a2, _b2, _i2, _j2 = comp2
-                key = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
-                _cov = _gaussian_covariance(_Cls, key)
-                r[i, j, :, :] = np.diag(_cov)
-        result = Result(r, axis=(0, 1), ell=ell)
-        cov[covkey] = result
-    return cov
-
-
-def _gaussian_covariance(cls, key):
-    """
-    Retunrs a particular entry of the gaussian covariance matrix.
-    input:
-        cls: Cls
-        key: key of the entry
-    returns:
-        cov: covariance matrix
-    """
-    a1, b1, a2, b2, i1, j1, i2, j2 = key
-    clkey1 = format_key((a1, a2, i1, i2))
-    clkey2 = format_key((b1, b2, j1, j2))
-    clkey3 = format_key((a1, b2, i1, j2))
-    clkey4 = format_key((b1, a2, j1, i2))
-    cl1 = cls[clkey1].array
-    cl2 = cls[clkey2].array
-    cl3 = cls[clkey3].array
-    cl4 = cls[clkey4].array
-    # Compute the Gaussian covariance
-    cov = cl1 * cl2 + cl3 * cl4
-    return cov
-
-
 def get_W(x, xbar, jk=False):
     """
     Internal method to compute the W matrices.
@@ -232,3 +165,70 @@ def shrinkage_factor(cls1, target):
                 denominator += (S[i, j] - t * np.sqrt(S[i, i] * S[j, j])) ** 2
     lambda_star = numerator / denominator
     return lambda_star
+
+
+def gaussian_covariance(Cls):
+    """
+    Computes Gaussian estimate of the target matrix.
+    input:
+        Cls: power spectra
+    returns:
+        T: target matrix
+    """
+    # Add bias to Cls
+    b = bias(Cls)
+    Cls = add_to_Cls(Cls, b)
+    # Separate Cls into Cls
+    _Cls = Fields2Components(Cls)
+    # Compute Gaussian covariance
+    cov = {}
+    for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
+        # covariance key
+        a1, b1, i1, j1 = key1
+        a2, b2, i2, j2 = key2
+        covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
+        # get reference results
+        cl1 = Cls[key1]
+        cl2 = Cls[key2]
+        # get components
+        comps1 = _split_comps(key1)
+        comps2 = _split_comps(key2)
+        # get attributes of result
+        ell1 = get_result_array(cl1, "ell")
+        ell2 = get_result_array(cl2, "ell")
+        ell = ell1 + ell2
+        r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
+        # get covariance
+        for i, comp1 in enumerate(comps1):
+            for j, comp2 in enumerate(comps2):
+                _a1, _b1, _i1, _j1 = comp1
+                _a2, _b2, _i2, _j2 = comp2
+                key = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
+                _cov = _gaussian_covariance(_Cls, key)
+                r[i, j, :, :] = np.diag(_cov)
+        result = Result(r, axis=(0, 1), ell=ell)
+        cov[covkey] = result
+    return cov
+
+
+def _gaussian_covariance(cls, key):
+    """
+    Retunrs a particular entry of the gaussian covariance matrix.
+    input:
+        cls: Cls
+        key: key of the entry
+    returns:
+        cov: covariance matrix
+    """
+    a1, b1, a2, b2, i1, j1, i2, j2 = key
+    clkey1 = format_key((a1, a2, i1, i2))
+    clkey2 = format_key((b1, b2, j1, j2))
+    clkey3 = format_key((a1, b2, i1, j2))
+    clkey4 = format_key((b1, a2, j1, i2))
+    cl1 = cls[clkey1].array
+    cl2 = cls[clkey2].array
+    cl3 = cls[clkey3].array
+    cl4 = cls[clkey4].array
+    # Compute the Gaussian covariance
+    cov = cl1 * cl2 + cl3 * cl4
+    return cov

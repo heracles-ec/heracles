@@ -162,7 +162,6 @@ def Components2Data(results):
             for j, kj in enumerate(_keys):
                 if i <= j:
                     # Fill in lower triangle
-                    print(ki, kj)
                     a1, b1, i1, j1 = ki
                     a2, b2, i2, j2 = kj
                     covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
