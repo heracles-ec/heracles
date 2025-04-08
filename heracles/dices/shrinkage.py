@@ -31,7 +31,6 @@ from .utils import (
 from .io import (
     Fields2Components,
     Components2Data,
-    Components2Fields,
     format_key,
     _split_comps,
 )
