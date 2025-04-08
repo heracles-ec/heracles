@@ -349,6 +349,29 @@ def test_cov_io(data_path):
         assert (cov == __cov).all()
 
 
+def test_data_io(data_path):
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs0 = heracles.binned(cls0, ledges)
+    cqs1 = heracles.binned(cls1, ledges)
+    cov_jk = dices.jackknife_covariance(cqs1)
+    _cov_jk = dices.Fields2Components(cov_jk)
+    __cov_jk = dices.Components2Data(_cov_jk)
+    _cqs0 = dices.Fields2Components(cqs0)
+    __cqs0 = dices.Components2Data(_cqs0)
+    n, = __cqs0.shape
+    _n, _m = __cov_jk.shape
+    assert n == _n
+    assert n == _m
+
+
 def test_gauss_cov(data_path):
     nside = 128
     data_maps = make_data_maps()
@@ -372,10 +395,9 @@ def test_gauss_cov(data_path):
         a1, b1, a2, b2, i1, j1, i2, j2 = key
         key1 = a1, b1, i1, j1
         key2 = a2, b2, i2, j2
-        print(_gauss_cov[key].shape)
         if (key1 == key2) and ((a1, i1) == (b1, j1)) and ((a2, i2) == (b2, j2)):
-            print(key)
-            print(key1)
-            g = np.diag(_gauss_cov[key].array)
-            __g = 2*_cqs0[key1].array**2
+            g = 2*_cqs0[key1].array**2
+            _g = dices.shrinkage._gaussian_covariance(_cqs0, key)
+            __g = np.diag(_gauss_cov[key].array)
+            assert (g == _g).all()
             assert (g == __g).all()

@@ -38,9 +38,8 @@ __all__ = [
     "gaussian_covariance",
     # io
     "Fields2Components",
-    "Components2Data",
-    "Data2Components",
     "Components2Fields",
+    "Components2Data",
 ]
 
 from .jackknife import (
@@ -64,7 +63,6 @@ from .shrinkage import (
 from .io import (
     Fields2Components,
     Components2Data,
-    Data2Components,
     Components2Fields,
 )
 

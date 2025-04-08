@@ -132,7 +132,11 @@ def Components2Fields(results):
 def Components2Data(results):
     keys = list(results.keys())
     ells = [results[key].ell for key in keys]
-    if len(ells[0]) == 1:
+    naxis = np.unique([len(result.axis) for result in results.values()])
+    if len(naxis) != 1:
+        raise ValueError("Different types of results in the same dictionary.")
+    naxis = naxis[0]
+    if naxis == 1:
         # We are dealing with Cls
         nells = [len(ell) for ell in ells]
         nells = np.sum(nells)
@@ -141,7 +145,7 @@ def Components2Data(results):
             ell = results[key].ell
             nells = len(ell)
             data[i * nells : (i + 1) * nells] = results[key]
-    if len(ells[0]) == 2:
+    if naxis == 2:
         # We are dealing with Covariance matrices
         _keys = []
         nells = []
@@ -151,51 +155,30 @@ def Components2Data(results):
             nell = len(results[key].ell[0])
             _key = (key[0], key[1], key[4], key[5])
             if _key not in _keys:
-                _keys.append([_key])
+                _keys.append(_key)
                 nells.append(nell)
         data = np.zeros((np.sum(nells), np.sum(nells)))
-        for i, ki in enumerate(keys):
-            for j, kj in enumerate(keys):
+        for i, ki in enumerate(_keys):
+            for j, kj in enumerate(_keys):
                 if i <= j:
                     # Fill in lower triangle
-                    a1, b1, i1, j1 = ki[0], ki[1], ki[2], ki[3]
-                    a2, b2, i2, j2 = kj[0], kj[1], kj[2], kj[3]
+                    print(ki, kj)
+                    a1, b1, i1, j1 = ki
+                    a2, b2, i2, j2 = kj
                     covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
+                    c = results[covkey].array
                     size_i = nells[i]
                     size_j = nells[j]
                     data[
                         i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j
-                    ] = results[covkey]
+                    ] = c
                     if i != j:
                         data[
                             j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i
-                        ] = results[covkey].T
+                        ] = c.T
         # Fill in upper triangle
         data = np.tril(data) + np.tril(data, -1).T
     return data
-
-
-def Data2Components(cov):
-    Clkeys = list(cls.keys())
-    nells = [len(cls[key].ell) for key in Clkeys]
-    Cl_cov_dict = {}
-    for i in range(0, len(Clkeys)):
-        for j in range(i, len(Clkeys)):
-            ki = Clkeys[i]
-            kj = Clkeys[j]
-            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
-            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
-            covkey = (A, B, C, D, nA, nB, nC, nD)
-            size_i = nells[i]
-            size_j = nells[j]
-            Cl_cov_dict[covkey] = cov[
-                i * size_i : (i + 1) * size_i, j * size_j : (j + 1) * size_j
-            ]
-            if i != j:
-                Cl_cov_dict[covkey] = cov[
-                    j * size_j : (j + 1) * size_j, i * size_i : (i + 1) * size_i
-                ]
-    return Cl_cov_dict
 
 
 def _split_comps(key):

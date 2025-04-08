@@ -30,7 +30,6 @@ from .utils import (
 )
 from .io import (
     Fields2Components,
-    Data2Components,
     Components2Data,
     Components2Fields,
     format_key,
@@ -38,48 +37,36 @@ from .io import (
 )
 
 
-def shrink_covariance(Cls0, cov, target, shrinkage_factor):
+def shrink_covariance(cov, target, shrinkage_factor):
     """
     Internal method to compute the shrunk covariance.
     inputs:
-        Cls0 (dict): Dictionary of data Cls
         cov (dict): Dictionary of Jackknife covariance
         target (dict): Dictionary of target covariance
         shrinkage_factor (float): Shrinkage factor
     returns:
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
-    # Separate component Cls
-    Cqs0 = Fields2Components(Cls0)
-    # to matrices
-    cov = Components2Data(Cqs0, cov)
-    target = Components2Data(Cqs0, target)
-    # Compute scalar shrinkage intensity
-    target_corr = cov2corr(target)
-    _target = correlate_target(cov, target_corr)
-    # Apply shrinkage
-    shrunk_S = shrinkage_factor * _target + (1 - shrinkage_factor) * cov
-    # To dictionaries
-    shrunk_S = Data2Components(Cqs0, shrunk_S)
-
-    return shrunk_S
-
-
-def cov2corr(cov):
-    """
-    Produces a correlation matrix from a covariance matrix.
-    input:
-        cov: covariance matrix
-    returns:
-        corr: correlation matrix
-    """
-    corr = np.copy(cov)
-    sig = np.sqrt(np.diag(cov))
-    corr /= np.outer(sig, sig)
-    return corr
+    shrunk_cov = {}
+    for key in list(cov.keys()):
+        c = cov[key]
+        t = target[key]
+        n, m, nell1, nell1 = np.shape(c)
+        # Correlate target covariance
+        tc = np.zeros((n, m, nell1, nell1))
+        for i in range(0, n):
+            for j in range(0, m):
+                c_ij = c[i, j, :, :]
+                t_ij = t[i, j, :, :]
+                tc_ij = correlate_target(c_ij, t_ij)
+                tc[i, j, :, :] = tc_ij
+        # Shrink covariance
+        r = shrinkage_factor * tc + (1 - shrinkage_factor) * c
+        shrunk_cov[key] = Result(r, axis=(0, 1), ell=c.ell)
+    return shrunk_cov
 
 
-def correlate_target(S, rbar):
+def correlate_target(cov, target):
     """
     Computes the estimate of the target matrix.
     input:
@@ -88,13 +75,14 @@ def correlate_target(S, rbar):
     returns:
         T: correlation matrix of S
     """
-    T = np.zeros(np.shape(S))
-    for i in range(0, len(T)):
-        for j in range(0, len(T)):
+    T = np.zeros(np.shape(cov))
+    for i in range(0, len(cov)):
+        for j in range(0, len(cov)):
             if i == j:
-                T[i, j] = S[i, j]
+                T[i, j] = cov[i, j]
             else:
-                T[i, j] = rbar[i, j] * np.sqrt(S[i, i] * S[j, j])
+                T[i, j] = target[i, j] * np.sqrt(cov[i, i] * cov[j, j])
+                T[i, j] /= np.sqrt(target[i, i] * target[j, j])
     return T
 
 
@@ -131,61 +119,38 @@ def gaussian_covariance(Cls):
         r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
         # get covariance
         for i, comp1 in enumerate(comps1):
-                for j, comp2 in enumerate(comps2):
-                    _a1, _b1, _i1, _j1 = comp1
-                    _a2, _b2, _i2, _j2 = comp2
-                    _clkey1 = format_key((_a1, _a2, _i1, _i2))
-                    _clkey2 = format_key((_b1, _b2, _j1, _j2))
-                    _clkey3 = format_key((_a1, _b2, _i1, _j2))
-                    _clkey4 = format_key((_b1, _a2, _j1, _i2))
-                    _cl1 = _Cls[_clkey1]
-                    _cl2 = _Cls[_clkey2]
-                    _cl3 = _Cls[_clkey3]
-                    _cl4 = _Cls[_clkey4]
-                    # Compute the Gaussian covariance
-                    _cov = _cl1.array * _cl2.array + _cl3.array * _cl4.array
-                    _cov = np.diag(_cov)
-                    r[..., i, j, :, :] = _cov
+            for j, comp2 in enumerate(comps2):
+                _a1, _b1, _i1, _j1 = comp1
+                _a2, _b2, _i2, _j2 = comp2
+                key = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
+                _cov = _gaussian_covariance(_Cls, key)
+                r[i, j, :, :] = np.diag(_cov)
         result = Result(r, axis=(0, 1), ell=ell)
         cov[covkey] = result
     return cov
 
 
-def get_covSS(i, j, q, m, W, Wbar):
+def _gaussian_covariance(cls, key):
     """
-    Computes the covariance of the W matrices.
+    Retunrs a particular entry of the gaussian covariance matrix.
     input:
-        i, j, l, m: indices
-        W: W matrices
-        Wbar: mean W matrix
+        cls: Cls
+        key: key of the entry
     returns:
-        covSS: covariance of W matrices
+        cov: covariance matrix
     """
-    n = len(W)
-    covSS = 0.0
-    for k in range(0, len(W)):
-        covSS += (W[k][i, j] - Wbar[i, j]) * (W[k][q, m] - Wbar[q, m])
-    covSS *= n / ((n - 1) ** 3.0)
-    return covSS
-
-
-def get_f(S, W, Wbar):
-    """
-    Computes the covariance of the W matrices with the target matrix.
-    input:
-        S: Jackknife covariance matrix
-        W: W matrices
-        Wbar: mean W matrix
-    returns:
-        f: covariance of W matrices
-    """
-    f = np.zeros(np.shape(S))
-    for i in range(0, len(S)):
-        for j in range(0, len(S)):
-            f[i, j] += np.sqrt(S[j, j] / S[i, i]) * get_covSS(i, i, i, j, W, Wbar)
-            f[i, j] += np.sqrt(S[i, i] / S[j, j]) * get_covSS(j, j, i, j, W, Wbar)
-            f[i, j] *= 0.5
-    return f
+    a1, b1, a2, b2, i1, j1, i2, j2 = key
+    clkey1 = format_key((a1, a2, i1, i2))
+    clkey2 = format_key((b1, b2, j1, j2))
+    clkey3 = format_key((a1, b2, i1, j2))
+    clkey4 = format_key((b1, a2, j1, i2))
+    cl1 = cls[clkey1].array
+    cl2 = cls[clkey2].array
+    cl3 = cls[clkey3].array
+    cl4 = cls[clkey4].array
+    # Compute the Gaussian covariance
+    cov = cl1 * cl2 + cl3 * cl4
+    return cov
 
 
 def get_W(x, xbar, jk=False):
@@ -211,51 +176,60 @@ def get_W(x, xbar, jk=False):
     return W
 
 
-def shrinkage_factor(cls0, Clsjks, target):
+def covW(i1, j1, i2, j2, W, Wbar):
+    """
+    Computes the covariance of the W matrices.
+    input:
+        i, j, l, m: indices
+        W: W matrices
+        Wbar: mean W matrix
+    returns:
+        covSS: covariance of W matrices
+    """
+    n = len(W)
+    covSS = 0.0
+    for k in range(0, len(W)):
+        covSS += (W[k][i1, j1] - Wbar[i1, j1]) * (W[k][i2, j2] - Wbar[i2, j2])
+    covSS *= n / ((n - 1) ** 3.0)
+    return covSS
+
+
+def shrinkage_factor(cls1, target):
     """
     Computes the optimal linear shrinkage factor.
     input:
-        cls0: data Cls
-        Clsjks: delete1 data Cls
+        cls1: delete1 Cls
         target: target matrix
     returns:
         lambda_star: optimal linear shrinkage factor
     """
     # Separate component Cls
-    cqs0 = Fields2Components(cls0)
-    Cqsjks = {}
-    for key in list(Clsjks.keys()):
-        Clsjk = Clsjks[key]
-        Cqsjks[key] = Fields2Components(Clsjk)
-    # to matrices
-    target = Components2Data(cqs0, target)
-    # Compute correlation of target
-    target_corr = cov2corr(target)
-    # Concatenate Cls
-    Cqsjks_all = []
-    for key in Cqsjks.keys():
-        cls = Cqsjks[key]
-        cls_all = np.concatenate([cls[key] for key in list(cls.keys())])
-        Cqsjks_all.append(cls_all)
-    Cqsjks_mu_all = np.mean(np.array(Cqsjks_all), axis=0)
-
-    # W matrices
-    W = get_W(Cqsjks_all, Cqsjks_mu_all)
-    # Compute shrinkage factor
-    Njk = len(W)
+    _cls1 = {}
+    for key in list(cls1.keys()):
+        cl = cls1[key]
+        _cls1[key] = Fields2Components(cl)
+    target = Fields2Components(target)
+    # To data vector
+    cls1_all = [Components2Data(_cls1[key]) for key in list(cls1.keys())]
+    cls1_mu_all = np.mean(np.array(cls1_all), axis=0)
+    target = Components2Data(target)
+    # Ingredient for the shrinkage factor
+    Njk = len(cls1_all)
+    W = get_W(cls1_all, cls1_mu_all)
     Wbar = np.mean(W, axis=0)
     S = (Njk - 1) * Wbar
-    f = get_f(S, W, Wbar)
+    target_corr = target
+    target_corr /= np.outer(np.sqrt(np.diag(target)), np.sqrt(np.diag(target)))
+    # Compute shrinkage factor
     numerator = 0.0
     denominator = 0.0
     for i in range(0, len(S)):
         for j in range(0, len(S)):
             if i != j:
-                numerator += (
-                    get_covSS(i, j, i, j, W, Wbar) - target_corr[i, j] * f[i, j]
-                )
-                denominator += (
-                    S[i, j] - target_corr[i, j] * np.sqrt(S[i, i] * S[j, j])
-                ) ** 2.0
+                f = 0.5 * np.sqrt(Wbar[j, j] / Wbar[i, i]) * covW(i, i, i, j, W, Wbar)
+                f += 0.5 * np.sqrt(Wbar[i, i] / Wbar[j, j]) * covW(j, j, i, j, W, Wbar)
+                t = target_corr[i, j]
+                numerator += covW(i, j, i, j, W, Wbar) - t * f
+                denominator += (S[i, j] - t * np.sqrt(S[i, i] * S[j, j])) ** 2
     lambda_star = numerator / denominator
     return lambda_star
