@@ -233,12 +233,12 @@ def correct_mask(Cljk, Mljk, Mls0):
         _Mljk = Mljk[Clmm_key]
         alpha = mask_correction(_Mljk, _Mls0)
         # Grab metadata
-        dtype = Cljk[Cl_key].__array__().dtype
+        dtype = Cljk[Cl_key].array.dtype
         ell = Cljk[Cl_key].ell
         # Correct Cl by mask
         _Cljk = Cljk[Cl_key]
-        k1, k2, b1, b2 = Cl_key
-        if k1 == k2 == "POS":
+        a, b, i, j = Cl_key
+        if a == b == "POS":
             __Cljk = np.array(
                 [
                     _Cljk,
@@ -252,8 +252,8 @@ def correct_mask(Cljk, Mljk, Mls0):
             # Transform back to Cl
             __corr_Cljk = corr2cl(corr_wCljk.T).T
             _corr_Cljk = list(__corr_Cljk[0])
-        elif k1 == k2 == "SHE":
-            if b1 == b2:
+        elif a == b == "SHE":
+            if i == j:
                 __Cljk = np.array(
                     [
                         np.zeros_like(_Cljk[0]),
@@ -282,7 +282,7 @@ def correct_mask(Cljk, Mljk, Mls0):
                     __corr_Cljk[2],  # BB like spin-2
                     -__icorr_Cljk[1],  # EB like spin-0
                 ]
-            if b1 != b2:
+            if i != j:
                 __Cljk = np.array(
                     [
                         np.zeros_like(_Cljk[0]),

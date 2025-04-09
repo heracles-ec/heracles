@@ -72,10 +72,7 @@ __all__ = [
     # unmixing
     "forwards",
     "inversion",
-    "master",
     "natural_unmixing",
-    "polspice",
-    "eq90",
 ]
 
 try:
@@ -150,8 +147,5 @@ from .twopoint import (
 from .unmixing import (
     forwards,
     inversion,
-    master,
     natural_unmixing,
-    polspice,
-    eq90,
 )
