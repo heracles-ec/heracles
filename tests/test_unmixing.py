@@ -1,11 +1,7 @@
-import healpy as hp
 import numpy as np
 import heracles
 import pytest
-import heracles.dices as dices
-from heracles.healpy import HealpixMapper
 from heracles.result import Result
-from heracles.fields import Positions, Shears, Visibility, Weights
 
 
 def make_dummy_cls(x):
