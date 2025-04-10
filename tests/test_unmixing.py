@@ -26,6 +26,24 @@ def make_dummy_cls(x):
     return cls
 
 
+def make_dummy_mask(x):
+    cls = {
+        ("VIS", "VIS", 1, 1): x,
+        ("VIS", "WHT", 1, 1): x,
+        ("WHT", "WHT", 1, 1): x,
+        ("VIS", "VIS", 1, 2): x,
+        ("VIS", "WHT", 1, 2): x,
+        ("VIS", "WHT", 2, 1): x,
+        ("WHT", "WHT", 1, 2): x,
+        ("VIS", "VIS", 2, 2): x,
+        ("VIS", "WHT", 2, 2): x,
+        ("WHT", "WHT", 2, 2): x,
+    }
+    for key in list(cls.keys()):
+        cls[key] = Result(cls[key], axis=0, ell=np.arange(128))
+    return cls
+
+
 def make_dummy_m(x):
     y = np.diag(x)
     M = {
@@ -46,18 +64,34 @@ def make_dummy_m(x):
 
 
 def test_forwards():
-    x = np.random.rand(128)
+    x = np.random.rand(10)
     cls = make_dummy_cls(x)
     M = make_dummy_m(1/x)
-    fcls = heracles.forwards(cls, M)
+    _cls = heracles.forwards(cls, M)
     for key in list(cls.keys()):
-        assert fcls[key].shape == cls[key].shape
+        assert _cls[key].shape == cls[key].shape
+    for key in list(cls.keys()):
+        assert (_cls[key].array == np.ones(10)).all
 
 
 def test_inversion():
-    x = np.random.rand(128)
+    x = np.random.rand(10)
     cls = make_dummy_cls(x)
     M = make_dummy_m(x)
-    fcls = heracles.inversion(cls, M)
+    _cls = heracles.inversion(cls, M)
     for key in list(cls.keys()):
-        assert fcls[key].shape == cls[key].shape
+        assert _cls[key].shape == cls[key].shape
+    for key in list(cls.keys()):
+        print(key, _cls[key].array, np.ones(10))
+        assert (_cls[key].array == np.ones(10)).all
+
+
+def test_natural_unmixing():
+    x = np.random.rand(10)
+    cls = make_dummy_cls(x)
+    mask_cls = make_dummy_mask(x)
+    _cls = heracles.natural_unmixing(cls, mask_cls, patch_hole=False)
+    for key in list(cls.keys()):
+        assert _cls[key].shape == cls[key].shape
+    for key in list(cls.keys()):
+        assert (_cls[key].array == np.ones(10)).all

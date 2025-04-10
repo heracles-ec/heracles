@@ -23,7 +23,7 @@ from .dices.mask_correction import cl2corr, corr2cl, logistic
 
 def forwards(t, M):
     """
-    Forward model for the unmixing process.
+    Forward model for the unmixing E/B modes.
     Args:
         t: Theory Cl
         M: Mixing matrix
@@ -72,6 +72,14 @@ def forwards(t, M):
 
 
 def inversion(d, M):
+    """
+    Inversion model for the unmixing E/B modes.
+    Args:
+        d: Data Cl
+        M: Mixing matrix
+        Returns:
+        inversion_cls: inverted Cl
+    """
     inversion_cls = {}
     for key in list(d.keys()):
         a, b, i, j = key
@@ -108,6 +116,15 @@ def inversion(d, M):
 
 
 def natural_unmixing(d, m, patch_hole=True):
+    """
+    Natural unmixing of the data Cl.
+    Args:
+        d: Data Cl
+        m: Mixing matrix
+        patch_hole: If True, apply the patch hole correction
+    Returns:
+        corr_d: Corrected Cl
+    """
     corr_d = {}
     d_keys = list(d.keys())
     m_keys = list(m.keys())
