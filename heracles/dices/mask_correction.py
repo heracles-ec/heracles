@@ -115,7 +115,7 @@ def cl2corr(cls, lmax=None, sampling_factor=1):
     corrs = np.zeros((len(xvals), 4))
     lfacs = ls * (ls + 1)
     lfacs[0] = 1
-    facs = (2 * ls + 1) / (4 * np.pi) * 2 * np.pi
+    facs = (2 * ls + 1) / (4 * np.pi)
 
     ct = facs * cls[: lmax + 1, 0]
     # For polarization, all arrays start at 2
@@ -176,8 +176,7 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
 
     cls[1, :] *= 2
     cls[2:, :] = cls[2:, :]
-
-    return cls
+    return 2 * np.pi * cls
 
 
 def mask_correction(Mljk, Mls0):
@@ -342,6 +341,3 @@ def correct_mask(Cljk, Mljk, Mls0):
 def logistic(x, x0=-5, k=50):
     return 1 / (1.0 + np.exp(-k * (x - x0)))
 
-
-def l2x(lmax, sampling_factor=1):
-    return np.polynomial.legendre.leggauss(int(sampling_factor * lmax) + 1)
