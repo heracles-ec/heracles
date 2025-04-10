@@ -33,7 +33,6 @@ __all__ = [
     "correct_mask",
     "cl2corr",
     "corr2cl",
-    "l2x",
 ]
 
 from .jackknife import (
@@ -49,5 +48,4 @@ from .mask_correction import (
     correct_mask,
     cl2corr,
     corr2cl,
-    l2x,
 )

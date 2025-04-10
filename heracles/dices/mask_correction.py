@@ -340,4 +340,3 @@ def correct_mask(Cljk, Mljk, Mls0):
 
 def logistic(x, x0=-5, k=50):
     return 1 / (1.0 + np.exp(-k * (x - x0)))
-

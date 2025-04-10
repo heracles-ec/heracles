@@ -112,9 +112,8 @@ def natural_unmixing(d, m, patch_hole=True):
     d_keys = list(d.keys())
     m_keys = list(m.keys())
     for d_key, m_key in zip(d_keys, m_keys):
-        print(f"Unmixing {d_key} with {m_key}")
         a, b, i, j = d_key
-        _d = d[d_key]
+        _d = np.atleast_2d(d[d_key])
         _m = m[m_key]
         # Grab metadata
         dtype = d[d_key].array.dtype
@@ -131,23 +130,9 @@ def natural_unmixing(d, m, patch_hole=True):
         )
         wm = cl2corr(__m.T).T[0]
         if patch_hole:
-            wm *= logistic(np.log10(abs(wm)), x0=-2, k=50)
+            wm /= logistic(np.log10(abs(wm)), x0=-2, k=50)
         # Correct Cl by mask
-        if a == b == "POS":
-            __d = np.array(
-                [
-                    _d,
-                    np.zeros_like(_d),
-                    np.zeros_like(_d),
-                    np.zeros_like(_d),
-                ]
-            )
-            wd = cl2corr(__d.T).T
-            corr_wd = wd / wm
-            # Transform back to Cl
-            __corr_wd = corr2cl(corr_wd.T).T
-            _corr_d = list(__corr_wd[0])
-        elif a == b == "SHE":
+        if a == b == "SHE":
             if i == j:
                 __d = np.array(
                     [
@@ -167,15 +152,15 @@ def natural_unmixing(d, m, patch_hole=True):
                 )
                 # Correct by alpha
                 wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-                corr_wd = (wd / wd).real
-                icorr_wd = (wd / wd).imag
+                corr_wd = (wd / wm).real
+                icorr_wd = (wd / wm).imag
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 __icorr_d = corr2cl(icorr_wd.T).T
                 _corr_d = [
                     __corr_d[1],  # EE like spin-2
-                    __corr_d[2],  # BB like spin-2
-                    -__icorr_d[1],  # EB like spin-0
+                    -__corr_d[2],  # BB like spin-2
+                    __icorr_d[1],  # EB like spin-0
                 ]
             if i != j:
                 __d = np.array(
@@ -196,16 +181,16 @@ def natural_unmixing(d, m, patch_hole=True):
                 )
                 # Correct by alpha
                 wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-                corr_wd = (wd / wd).real
-                icorr_wd = (wd / wd).imag
+                corr_wd = (wd / wm).real
+                icorr_wd = (wd / wm).imag
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 __icorr_d = corr2cl(icorr_wd.T).T
                 _corr_d = [
                     __corr_d[1],  # EE like spin-2
-                    __corr_d[2],  # BB like spin-2
-                    -__icorr_d[1],  # EB like spin-0
-                    __icorr_d[2],  # BE like spin-0
+                    -__corr_d[2],  # BB like spin-2
+                    __icorr_d[1],  # EB like spin-0
+                    -__icorr_d[2],  # BE like spin-0
                 ]
         else:
             # Treat everything as spin-0
@@ -220,7 +205,7 @@ def natural_unmixing(d, m, patch_hole=True):
                     ]
                 )
                 wd = cl2corr(__d.T).T
-                corr_wd = wd / wd
+                corr_wd = wd / wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
