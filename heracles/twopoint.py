@@ -234,19 +234,7 @@ def angular_power_spectra(
 
         # compute the set of spectra from the pair of alms
         # this is stored as a block array
-        # get the size of the ell axis from the alms or lmax, if given
-        if lmax is None:
-            n = min(alm2lmax(alm1), alm2lmax(alm2)) + 1
-        else:
-            n = lmax + 1
-        # the output spectra inherit the leading axes from the alms
-        dim1 = alm1.shape[:-1]
-        dim2 = alm2.shape[:-1]
-        # create the output array
-        cl = np.empty((*dim1, *dim2, n))
-        # now fill it up by computing all combinations of alms
-        for out1, out2 in product(np.ndindex(dim1), np.ndindex(dim2)):
-            cl[(*out1, *out2)] = alm2cl(alm1[out1], alm2[out2], lmax=lmax)
+        cl = alm2cl(alm1, alm2, lmax=lmax)
 
         # build the metadata for the spectra from the alms
         # get metadata from alms
