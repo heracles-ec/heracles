@@ -121,8 +121,8 @@ def test_cls(data_path):
     data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     _data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
     for key in list(data_cls.keys()):
-        _cl = np.atleast_2d(data_cls[key])
-        _, nells = _cl.shape
+        _cl = data_cls[key]
+        *_, nells = _cl.shape
         assert nells == nside + 1
     for key in list(data_cls.keys()):
         cl = data_cls[key].__array__()
@@ -185,8 +185,8 @@ def test_polspice(data_path):
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
-            cls[("SHE", "SHE", 1, 1)][0],
-            cls[("SHE", "SHE", 1, 1)][1],
+            cls[("SHE", "SHE", 1, 1)][0, 0],
+            cls[("SHE", "SHE", 1, 1)][1, 1],
             cls[("POS", "SHE", 1, 1)][0],
         ]
     ).T
@@ -211,8 +211,8 @@ def test_dices(data_path):
     for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
         for key in list(cl.keys()):
-            _cl = np.atleast_2d(cl[key])
-            ncls, nells = _cl.shape
+            _cl = cl[key]
+            *_, nells = _cl.shape
             assert nells == nside + 1
 
     delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=2)
@@ -221,8 +221,8 @@ def test_dices(data_path):
         for jk2 in range(jk + 1, JackNjk + 1):
             cl = delete2_data_cls[(jk, jk2)]
             for key in list(cl.keys()):
-                _cl = np.atleast_2d(cl[key])
-                _, nells = _cl.shape
+                _cl = cl[key]
+                *_, nells = _cl.shape
                 assert nells == nside + 1
 
     lbins = 5
@@ -230,20 +230,20 @@ def test_dices(data_path):
     lgrid = (ledges[1:] + ledges[:-1]) / 2
     cqs0 = heracles.binned(data_cls, ledges)
     for key in list(cqs0.keys()):
-        cq = np.atleast_2d(cqs0[key])
-        ncls, nells = cq.shape
+        cq = cqs0[key]
+        *_, nells = cq.shape
         assert nells == len(lgrid)
     cqs1 = heracles.binned(delete1_data_cls, ledges)
     for key in list(cqs1.keys()):
         for k in list(cqs1[key].keys()):
-            cq = np.atleast_2d(cqs1[key][k])
-            ncls, nells = cq.shape
+            cq = cqs1[key][k]
+            *_, nells = cq.shape
             assert nells == len(lgrid)
     cqs2 = heracles.binned(delete2_data_cls, ledges)
     for key in list(cqs2.keys()):
         for k in list(cqs2[key].keys()):
-            cq = np.atleast_2d(cqs2[key][k])
-            ncls, nells = cq.shape
+            cq = cqs2[key][k]
+            *_, nells = cq.shape
             assert nells == len(lgrid)
 
     # Delete1
