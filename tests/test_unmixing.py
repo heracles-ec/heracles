@@ -45,14 +45,14 @@ def make_dummy_m(x):
     M = {
         ("POS", "POS", 1, 1): y,
         ("POS", "SHE", 1, 1): y,
-        ("SHE", "SHE", 1, 1): np.array([y/2, y/2, y]),
+        ("SHE", "SHE", 1, 1): np.array([y / 2, y / 2, y]),
         ("POS", "POS", 1, 2): y,
         ("POS", "SHE", 1, 2): y,
         ("POS", "SHE", 2, 1): y,
-        ("SHE", "SHE", 1, 2): np.array([y/2, y/2, y]),
+        ("SHE", "SHE", 1, 2): np.array([y / 2, y / 2, y]),
         ("POS", "POS", 2, 2): y,
         ("POS", "SHE", 2, 2): y,
-        ("SHE", "SHE", 2, 2): np.array([y/2, y/2, y]),
+        ("SHE", "SHE", 2, 2): np.array([y / 2, y / 2, y]),
     }
     for key in list(M.keys()):
         M[key] = Result(M[key], axis=0, ell=np.arange(128))
@@ -62,7 +62,7 @@ def make_dummy_m(x):
 def test_forwards():
     x = np.random.rand(10)
     cls = make_dummy_cls(x)
-    M = make_dummy_m(1/x)
+    M = make_dummy_m(1 / x)
     _cls = heracles.forwards(cls, M)
     for key in list(cls.keys()):
         assert _cls[key].shape == cls[key].shape

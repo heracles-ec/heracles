@@ -252,65 +252,35 @@ def correct_mask(Cljk, Mljk, Mls0):
             __corr_Cljk = corr2cl(corr_wCljk.T).T
             _corr_Cljk = list(__corr_Cljk[0])
         elif a == b == "SHE":
-            if i == j:
-                __Cljk = np.array(
-                    [
-                        np.zeros_like(_Cljk[0]),
-                        _Cljk[0],  # EE like spin-2
-                        _Cljk[1],  # BB like spin-2
-                        np.zeros_like(_Cljk[0]),
-                    ]
-                )
-                __iCljk = np.array(
-                    [
-                        np.zeros_like(_Cljk[0]),
-                        -_Cljk[2],  # EB like spin-0
-                        _Cljk[2],  # EB like spin-0
-                        np.zeros_like(_Cljk[0]),
-                    ]
-                )
-                # Correct by alpha
-                wCljk = cl2corr(__Cljk.T).T + 1j * cl2corr(__iCljk.T).T
-                corr_wCljk = (wCljk * alpha).real
-                icorr_wCljk = (wCljk * alpha).imag
-                # Transform back to Cl
-                __corr_Cljk = corr2cl(corr_wCljk.T).T
-                __icorr_Cljk = corr2cl(icorr_wCljk.T).T
-                _corr_Cljk = [
-                    __corr_Cljk[1],  # EE like spin-2
-                    __corr_Cljk[2],  # BB like spin-2
-                    -__icorr_Cljk[1],  # EB like spin-0
+            __Cljk = np.array(
+                [
+                    np.zeros_like(_Cljk[0, 0]),
+                    _Cljk[0, 0],  # EE like spin-2
+                    _Cljk[1, 1],  # BB like spin-2
+                    np.zeros_like(_Cljk[0, 0]),
                 ]
-            if i != j:
-                __Cljk = np.array(
-                    [
-                        np.zeros_like(_Cljk[0]),
-                        _Cljk[0],  # EE like spin-2
-                        _Cljk[1],  # BB like spin-2
-                        np.zeros_like(_Cljk[0]),
-                    ]
-                )
-                __iCljk = np.array(
-                    [
-                        np.zeros_like(_Cljk[0]),
-                        -_Cljk[2],  # EB like spin-0
-                        _Cljk[3],  # BE like spin-0
-                        np.zeros_like(_Cljk[0]),
-                    ]
-                )
-                # Correct by alpha
-                wCljk = cl2corr(__Cljk.T).T + 1j * cl2corr(__iCljk.T).T
-                corr_wCljk = (wCljk * alpha).real
-                icorr_wCljk = (wCljk * alpha).imag
-                # Transform back to Cl
-                __corr_Cljk = corr2cl(corr_wCljk.T).T
-                __icorr_Cljk = corr2cl(icorr_wCljk.T).T
-                _corr_Cljk = [
-                    __corr_Cljk[1],  # EE like spin-2
-                    __corr_Cljk[2],  # BB like spin-2
-                    -__icorr_Cljk[1],  # EB like spin-0
-                    __icorr_Cljk[2],  # BE like spin-0
+            )
+            __iCljk = np.array(
+                [
+                    np.zeros_like(_Cljk[0, 0]),
+                    -_Cljk[0, 1],  # BE like spin-0
+                    _Cljk[1, 0],  # EB like spin-0
+                    np.zeros_like(_Cljk[0, 0]),
                 ]
+            )
+            # Correct by alpha
+            wCljk = cl2corr(__Cljk.T).T + 1j * cl2corr(__iCljk.T).T
+            corr_wCljk = (wCljk * alpha).real
+            icorr_wCljk = (wCljk * alpha).imag
+            # Transform back to Cl
+            __corr_Cljk = corr2cl(corr_wCljk.T).T
+            __icorr_Cljk = corr2cl(icorr_wCljk.T).T
+            # Reorder
+            _corr_Cljk = np.zeros_like(_Cljk)
+            _corr_Cljk[0, 0] = __corr_Cljk[1]  # EE like spin-2
+            _corr_Cljk[1, 1] = __corr_Cljk[2]  # BB like spin-2
+            _corr_Cljk[0, 1] = -__icorr_Cljk[1]  # EB like spin-0
+            _corr_Cljk[1, 0] = __icorr_Cljk[2]  # BE like spin-0
         else:
             # Treat everything as spin-0
             _corr_Cljk = []
