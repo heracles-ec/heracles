@@ -7,7 +7,7 @@
 [![NASA/ADS](https://img.shields.io/badge/ads-2024arXiv240816903E-blueviolet)](https://ui.adsabs.harvard.edu/abs/2024arXiv240816903E)
 [![DOI](https://img.shields.io/badge/doi-10.48550/arXiv.2408.16903-blue)](https://doi.org/10.48550/arXiv.2408.16903)
 [![Tests](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml/badge.svg)](https://github.com/heracles-ec/heracles/actions/workflows/tests.yml)
-[![Coverage](https://coveralls.io/repos/github/heracles-ec/heracles/badge.svg?branch=main)](https://coveralls.io/github/heracles-ec/heracles?branch=main)
+[![Coverage](https://codecov.io/gh/heracles-ec/heracles/graph/badge.svg?token=SYAZYYFLLL)](https://codecov.io/gh/heracles-ec/heracles)
 
 This is _Heracles_, a code for harmonic-space statistics on the sphere.
 _Heracles_ can take catalogues of positions a function values on the sphere and

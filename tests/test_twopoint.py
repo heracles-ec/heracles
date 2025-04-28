@@ -100,9 +100,9 @@ def test_angular_power_spectra(mock_alms, lmax):
         ("POS", "SHE", 0, 1): (2, lmax + 1),
         ("POS", "SHE", 1, 0): (2, lmax + 1),
         ("POS", "SHE", 1, 1): (2, lmax + 1),
-        ("SHE", "SHE", 0, 0): (3, lmax + 1),
-        ("SHE", "SHE", 0, 1): (4, lmax + 1),
-        ("SHE", "SHE", 1, 1): (3, lmax + 1),
+        ("SHE", "SHE", 0, 0): (2, 2, lmax + 1),
+        ("SHE", "SHE", 0, 1): (2, 2, lmax + 1),
+        ("SHE", "SHE", 1, 1): (2, 2, lmax + 1),
     }
 
     # alms cross themselves
@@ -128,7 +128,7 @@ def test_angular_power_spectra(mock_alms, lmax):
         ("POS", "POS", 0, 1): (lmax + 1,),
         ("POS", "SHE", 0, 1): (2, lmax + 1),
         ("POS", "SHE", 1, 0): (2, lmax + 1),
-        ("SHE", "SHE", 0, 1): (4, lmax + 1),
+        ("SHE", "SHE", 0, 1): (2, 2, lmax + 1),
     }
 
     cls = angular_power_spectra(mock_alms1, mock_alms2)
