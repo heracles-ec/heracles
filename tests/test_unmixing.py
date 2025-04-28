@@ -1,6 +1,5 @@
 import numpy as np
 import heracles
-import pytest
 from heracles.result import Result
 
 
