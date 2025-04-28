@@ -268,7 +268,7 @@ def test_dices(data_path):
     # Check for correct shape
     for key in list(cov_jk.keys()):
         cov = cov_jk[key]
-        _, _, m, n = cov.shape
+        *_, m, n = cov.shape
         assert (m, n) == (lbins, lbins)
 
     debiased_cov = dices.debias_covariance(cov_jk, cqs0, cqs1, cqs2)

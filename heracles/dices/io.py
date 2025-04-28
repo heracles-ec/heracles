@@ -40,11 +40,15 @@ def Fields2Components(results):
         r = results[key]
         ell = r.ell
         axis = r.axis
+        print("axis", axis)
+        print("key", key)
+        print("shape", r.shape)
         if len(axis) == 1:
+            _r = np.atleast_2d(r.array)
+            _r = np.vstack(_r)
             # We are dealing with Cls
             comps = _split_comps(key)
             for i, comp in enumerate(comps):
-                _r = np.atleast_2d(r.array)
                 _results[comp] = Result(_r[..., i, :], ell)
         elif len(axis) == 2:
             # We are dealing with Covariance matrices
@@ -188,18 +192,12 @@ def _split_comps(key):
             (a, "G_E", i, j),
             (a, "G_B", i, j),
         ]
-    elif (a == b == "SHE") and (i == j):
-        keys = [
-            ("G_E", "G_E", i, j),
-            ("G_B", "G_B", i, j),
-            ("G_E", "G_B", i, j),
-        ]
     elif (a == b == "SHE") and (i != j):
         keys = [
             ("G_E", "G_E", i, j),
-            ("G_B", "G_B", i, j),
             ("G_E", "G_B", i, j),
-            ("G_E", "G_B", j, i),
+            ("G_B", "G_E", i, j),
+            ("G_B", "G_B", i, j),
         ]
     else:
         keys = [(a, b, i, j)]
