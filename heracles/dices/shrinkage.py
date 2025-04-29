@@ -29,10 +29,10 @@ from .utils import (
     add_to_Cls,
 )
 from .io import (
-    Fields2Components,
-    Components2Data,
+    fields2components,
+    components2data,
     format_key,
-    _split_comps,
+    _split_key,
 )
 
 
@@ -139,12 +139,12 @@ def shrinkage_factor(cls1, target):
     _cls1 = {}
     for key in list(cls1.keys()):
         cl = cls1[key]
-        _cls1[key] = Fields2Components(cl)
-    target = Fields2Components(target)
+        _cls1[key] = fields2components(cl)
+    target = fields2components(target)
     # To data vector
-    cls1_all = [Components2Data(_cls1[key]) for key in list(cls1.keys())]
+    cls1_all = [components2data(_cls1[key]) for key in list(cls1.keys())]
     cls1_mu_all = np.mean(np.array(cls1_all), axis=0)
-    target = Components2Data(target)
+    target = components2data(target)
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
     W = get_W(cls1_all, cls1_mu_all)
@@ -179,7 +179,7 @@ def gaussian_covariance(Cls):
     b = bias(Cls)
     Cls = add_to_Cls(Cls, b)
     # Separate Cls into Cls
-    _Cls = Fields2Components(Cls)
+    _Cls = fields2components(Cls)
     # Compute Gaussian covariance
     cov = {}
     for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
@@ -191,21 +191,29 @@ def gaussian_covariance(Cls):
         cl1 = Cls[key1]
         cl2 = Cls[key2]
         # get components
-        comps1 = _split_comps(key1)
-        comps2 = _split_comps(key2)
+        _a1, idx1 = _split_key(a1, pos=0)
+        _b1, idx2 = _split_key(b1, pos=0)
+        _a2, idx3 = _split_key(a2, pos=0)
+        _b2, idx4 = _split_key(b2, pos=0)
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")
         ell2 = get_result_array(cl2, "ell")
         ell = ell1 + ell2
-        r = np.zeros((len(comps1), len(comps2), len(ell1[0]), len(ell2[0])))
+        r = np.zeros(
+            (len(idx1), len(idx2), len(idx3), len(idx4), len(ell1[0]), len(ell2[0]))
+        )
         # get covariance
-        for i, comp1 in enumerate(comps1):
-            for j, comp2 in enumerate(comps2):
-                _a1, _b1, _i1, _j1 = comp1
-                _a2, _b2, _i2, _j2 = comp2
-                key = (_a1, _b1, _a2, _b2, _i1, _j1, _i2, _j2)
-                _cov = _gaussian_covariance(_Cls, key)
-                r[i, j, :, :] = np.diag(_cov)
+        for k, idx in zip(
+            itertools.product(_a1, _b1, _a2, _b2),
+            itertools.product(idx1, idx2, idx3, idx4),
+        ):
+            __a1, __b1, __a2, __b2 = k
+            _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
+            _cov = _gaussian_covariance(_Cls, _key)
+            ix1, ix2, ix3, ix4 = idx
+            r[ix1, ix2, ix3, ix4, :, :] = np.diag(_cov)
+        # Remove the extra dimensions
+        r = np.squeeze(r)
         result = Result(r, axis=(0, 1), ell=ell)
         cov[covkey] = result
     return cov

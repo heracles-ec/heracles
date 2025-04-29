@@ -326,6 +326,7 @@ def test_cls_io(data_path):
     for key in list(cls.keys()):
         cl = cls[key].array
         __cl = __cls[key].array
+        print(key, cl.shape, __cl.shape)
         assert (cl == __cl).all()
 
 

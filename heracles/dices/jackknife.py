@@ -232,11 +232,6 @@ def _jackknife_covariance(samples, nd=1):
             # add extra axis if needed
             a1, b1, i1, j1 = key1
             a2, b2, i2, j2 = key2
-            #if (a1, b1) == ("POS", "POS"):
-            #    a = np.expand_dims(a, axis=0)
-            #if (a2, b2) == ("POS", "POS"):
-            #    a = np.expand_dims(a, axis=1)
-            # wrap everything into a result instance
             result = Result(a, axis=axis, ell=ell)
             # store result
             cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
