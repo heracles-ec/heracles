@@ -100,9 +100,9 @@ def test_angular_power_spectra(mock_alms, lmax):
         ("POS", "SHE", 0, 1): (2, lmax + 1),
         ("POS", "SHE", 1, 0): (2, lmax + 1),
         ("POS", "SHE", 1, 1): (2, lmax + 1),
-        ("SHE", "SHE", 0, 0): (3, lmax + 1),
-        ("SHE", "SHE", 0, 1): (4, lmax + 1),
-        ("SHE", "SHE", 1, 1): (3, lmax + 1),
+        ("SHE", "SHE", 0, 0): (2, 2, lmax + 1),
+        ("SHE", "SHE", 0, 1): (2, 2, lmax + 1),
+        ("SHE", "SHE", 1, 1): (2, 2, lmax + 1),
     }
 
     # alms cross themselves
@@ -128,7 +128,7 @@ def test_angular_power_spectra(mock_alms, lmax):
         ("POS", "POS", 0, 1): (lmax + 1,),
         ("POS", "SHE", 0, 1): (2, lmax + 1),
         ("POS", "SHE", 1, 0): (2, lmax + 1),
-        ("SHE", "SHE", 0, 1): (4, lmax + 1),
+        ("SHE", "SHE", 0, 1): (2, 2, lmax + 1),
     }
 
     cls = angular_power_spectra(mock_alms1, mock_alms2)
@@ -156,14 +156,15 @@ def test_debias_cls():
 
     cls = {
         "a": np.zeros(100),
+        "b": np.zeros(100),
         "c": np.zeros(
             (2, 100), dtype=np.dtype(float, metadata={"bias": 4.56, "spin_2": 2})
         ),
         "d": np.zeros(
-            (4, 3, 100), dtype=np.dtype(float, metadata={"spin_1": 2, "spin_2": 2})
+            (2, 2, 3, 100), dtype=np.dtype(float, metadata={"spin_1": 2, "spin_2": 2})
         ),
         "e": np.zeros(
-            (4, 3, 100), dtype=np.dtype(float, metadata={"spin_1": 0, "spin_2": 0})
+            (2, 2, 3, 100), dtype=np.dtype(float, metadata={"spin_1": 0, "spin_2": 0})
         ),
     }
 
@@ -177,17 +178,19 @@ def test_debias_cls():
 
     np.testing.assert_array_equal(cls["a"], -1.23)
 
+    np.testing.assert_array_equal(cls["b"], 0.0)
+
     np.testing.assert_array_equal(cls["c"][:, :2], 0.0)
     np.testing.assert_array_equal(cls["c"][:, 2:], -4.56)
 
-    np.testing.assert_array_equal(cls["d"][0, :, :2], 0.0)
-    np.testing.assert_array_equal(cls["d"][0, :, 2:], -7.89)
-    np.testing.assert_array_equal(cls["d"][1, :, :2], 0.0)
-    np.testing.assert_array_equal(cls["d"][1, :, 2:], -7.89)
-    np.testing.assert_array_equal(cls["d"][2], 0.0)
-    np.testing.assert_array_equal(cls["d"][3], 0.0)
+    np.testing.assert_array_equal(cls["d"][0, 0, :, :2], 0.0)
+    np.testing.assert_array_equal(cls["d"][0, 0, :, 2:], -7.89)
+    np.testing.assert_array_equal(cls["d"][1, 1, :, :2], 0.0)
+    np.testing.assert_array_equal(cls["d"][1, 1, :, 2:], -7.89)
+    np.testing.assert_array_equal(cls["d"][0, 1, :, :], 0.0)
+    np.testing.assert_array_equal(cls["d"][1, 0, :, :], 0.0)
 
-    np.testing.assert_array_equal(cls["e"][3], -7.89)
+    np.testing.assert_array_equal(cls["e"], -7.89)
 
 
 def test_debias_cls_healpix():

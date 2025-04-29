@@ -45,15 +45,6 @@ TwoPointKey = tuple[Any, Any, Any, Any]
 logger = logging.getLogger(__name__)
 
 
-def alm_has_eb(alm: NDArray[Any]) -> bool:
-    """
-    Returns true if *alm* has a non-zero spin weight and a leading axis of size
-    2, false otherwise.
-    """
-    md = alm.dtype.metadata or {}
-    return alm.ndim > 1 and alm.shape[0] == 2 and md.get("spin", 0) != 0
-
-
 def alm2lmax(alm, mmax=None):
     """
     Returns the *lmax* value of the given *alm* array.
@@ -140,14 +131,13 @@ def _debias_cl(
 
     # this is what will be subtracted from the cl
     bl = np.zeros(cl.shape)
-    if lmin > 0 and cl.ndim > 1:
-        # spin-weighted fields:
-        # - only remove from l >= lmin
-        # - only remove from EE and BB
-        bl[:2, ..., lmin:] = bias
+    if spin1 != 0 and spin2 != 0:
+        # two spin-weighted fields: remove from EE and BB
+        assert cl.shape[:2] == (2, 2)
+        bl[[0, 1], [0, 1], ..., lmin:] = bias
     else:
-        # scalar fields: remove from everywhere
-        bl[...] = bias
+        # other fields: remove from everywhere
+        bl[..., lmin:] = bias
 
     # handle HEALPix pseudo-convolution
     for i, s in (1, spin1), (2, spin2):
@@ -241,46 +231,14 @@ def angular_power_spectra(
         else:
             alm1, alm2 = alms[k1, i1], alms2[k2, i2]
 
+        # compute the set of spectra from the pair of alms
+        # this is stored as a block array
+        cl = alm2cl(alm1, alm2, lmax=lmax)
+
+        # build the metadata for the spectra from the alms
         # get metadata from alms
         md1 = alm1.dtype.metadata or {}
         md2 = alm2.dtype.metadata or {}
-
-        # compute the set of spectra from the pair of alms
-        has_eb_1 = alm_has_eb(alm1)
-        has_eb_2 = alm_has_eb(alm2)
-        if has_eb_1 and has_eb_2:
-            # spin-spin
-            cl = np.stack(
-                [
-                    alm2cl(alm1[0], alm2[0], lmax=lmax),  # EE
-                    alm2cl(alm1[1], alm2[1], lmax=lmax),  # BB
-                    alm2cl(alm1[0], alm2[1], lmax=lmax),  # EB
-                    alm2cl(alm1[1], alm2[0], lmax=lmax),  # BE
-                ]
-            )
-            # trim BE == EB for auto-correlation
-            if k1 == k2 and i1 == i2:
-                cl = np.delete(cl, 3, axis=0)
-        elif has_eb_1:
-            # spin-scalar
-            cl = np.stack(
-                [
-                    alm2cl(alm1[0], alm2, lmax=lmax),  # TE
-                    alm2cl(alm1[1], alm2, lmax=lmax),  # TB
-                ]
-            )
-        elif has_eb_2:
-            # spin-scalar
-            cl = np.stack(
-                [
-                    alm2cl(alm1, alm2[0], lmax=lmax),  # ET
-                    alm2cl(alm1, alm2[1], lmax=lmax),  # BT
-                ]
-            )
-        else:
-            # scalar-scalar
-            cl = alm2cl(alm1, alm2, lmax=lmax)  # TT
-
         # collect metadata
         md = {}
         bias = None
