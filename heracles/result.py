@@ -169,7 +169,7 @@ def binned(result, bins, weight=None):
     dt = np.dtype(float, metadata=md)
 
     # make a copy of the array to apply the binning
-    out = np.asarray(result, dtype=dt, copy=True)
+    out = np.copy(result).view(dt)
 
     # this will hold the binned ells and weigths
     binned_ell: tuple[NDArray[Any], ...] | NDArray[Any] = ()
