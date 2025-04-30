@@ -37,33 +37,20 @@ def forwards(t, M):
         _M = M[key].array
         if a == b == "SHE":
             # Cl_EE = M_EE Cl_EE + M_BB Cl_BB
-            fcls_EE = _M[0] @ _t[0] + _M[1] @ _t[1]
+            fcls_EE = _M[0] @ _t[0, 0, :] + _M[1] @ _t[1, 1, :]
             # Cl_BB = M_EE Cl_BB + M_BB Cl_EE
-            fcls_BB = _M[0] @ _t[1] + _M[1] @ _t[0]
+            fcls_BB = _M[0] @ _t[1, 1, :] + _M[1] @ _t[0, 0, :]
             # Cl_EB = M_EB Cl_EB
-            fcls_EB = _M[2] @ _t[2]
-            if i == j:
-                fcls = np.array(
-                    [
-                        fcls_EE,
-                        fcls_BB,
-                        fcls_EB,
-                    ]
-                )
-            else:
-                # Cl_BE = M_EB Cl_BE
-                fcls_BE = _M[2] @ _t[3]
-                fcls = np.array(
-                    [
-                        fcls_EE,
-                        fcls_BB,
-                        fcls_EB,
-                        fcls_BE,
-                    ]
-                )
+            fcls_EB = _M[2] @ _t[0, 1, :]
+            # Cl_BE = M_EB Cl_BE
+            fcls_BE = _M[2] @ _t[1, 0, :]
+            fcls = np.array(
+                [[fcls_EE, fcls_EB],
+                [fcls_BE, fcls_BB]])
+
         else:
             fcls = np.array([_M @ __t for __t in _t])
-        _, m = fcls.shape
+        *_, m = fcls.shape
         # Check if fcls is a 1D array
         if len(fcls) == 1:
             fcls = fcls[0]
@@ -84,7 +71,7 @@ def inversion(d, M):
     for key in list(d.keys()):
         a, b, i, j = key
         _d = np.atleast_2d(d[key])
-        _, m = _d.shape
+        *_, m = _d.shape
         _M = M[key].array
         if a == b == "SHE":
             _, _, _m = _M.shape
@@ -94,16 +81,14 @@ def inversion(d, M):
             _M_EEBB = np.vstack((_M_EE, _M_BB))
             _inv_M_EEBB = np.linalg.pinv(_M_EEBB)
             _inv_M_EB = np.linalg.pinv(_M_EB)
-            _d_EEBB = np.hstack((_d[0], _d[1]))
+            _d_EEBB = np.hstack((_d[0, 0, :], _d[1, 1, :]))
             _id_EEBB = _inv_M_EEBB @ _d_EEBB
             _id_EE = _id_EEBB[_m:]
             _id_BB = _id_EEBB[:_m]
-            _id_EB = _inv_M_EB @ _d[2]
-            if i == j:
-                _id = np.array([_id_EE, _id_BB, _id_EB])
-            else:
-                _id_BE = _inv_M_EB @ _d[3]
-                _id = np.array([_id_EE, _id_BB, _id_EB, _id_BE])
+            _id_EB = _inv_M_EB @ _d[0, 1, :]
+            _id_BE = _inv_M_EB @ _d[1, 0, :]
+            _id = np.array([_id_EE, _id_EB],
+                           [_id_BE, _id_BB])
         else:
             _inv_M = np.linalg.pinv(_M)
             _id = np.array([_inv_M @ __d.T for __d in _d])
