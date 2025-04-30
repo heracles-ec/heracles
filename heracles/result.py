@@ -169,7 +169,7 @@ def binned(result, bins, weight=None):
     dt = np.dtype(float, metadata=md)
 
     # make a copy of the array to apply the binning
-    result = np.asarray(result, dtype=dt, copy=True)
+    out = np.asarray(result, dtype=dt, copy=True)
 
     # this will hold the binned ells and weigths
     binned_ell: tuple[NDArray[Any], ...] | NDArray[Any] = ()
@@ -199,10 +199,10 @@ def binned(result, bins, weight=None):
         for before in np.ndindex(shape[:axis]):
             for after in np.ndindex(shape[axis + 1 :]):
                 k = (*before, slice(None), *after)
-                tmp[k] = norm(np.bincount(index, w * result[k], m)[1:m], wb)
+                tmp[k] = norm(np.bincount(index, w * out[k], m)[1:m], wb)
 
         # array is now binned over axis
-        result = tmp
+        out = tmp
 
         # store outputs
         binned_ell += (ellb,)
@@ -221,7 +221,7 @@ def binned(result, bins, weight=None):
 
     # construct the result
     return Result(
-        result,
+        out,
         ell=binned_ell,
         axis=axes,
         lower=binned_lower,
