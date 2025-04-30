@@ -212,7 +212,6 @@ def mask_correction(Mljk, Mls0):
     # Compute alpha
     alpha = wMls0 / wMljk
     alpha *= logistic(np.log10(abs(wMljk)))
-    alpha *= logistic(np.log10(abs(wMls0)))
     return alpha
 
 
