@@ -306,7 +306,7 @@ def test_flatten(data_path):
     cov_jk = dices.jackknife_covariance(cls1)
     _cls0 = dices.flatten(cls0)
     _cov_jk = dices.flatten(cov_jk)
-    n, = _cls0.shape
+    (n,) = _cls0.shape
     _n, _m = _cov_jk.shape
     assert n == _n
     assert n == _m

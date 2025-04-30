@@ -55,7 +55,7 @@ def shrink_covariance(cov, target, shrinkage_factor):
         c_std = np.sqrt(c_v[..., None, :])
         t_std = np.sqrt(t_v[..., None, :])
         tc = t * (c_std * np.swapaxes(c_std, -1, -2))
-        tc /= (t_std * np.swapaxes(t_std, -1, -2))
+        tc /= t_std * np.swapaxes(t_std, -1, -2)
         r = shrinkage_factor * tc + (1 - shrinkage_factor) * c
         shrunk_cov[key] = Result(r, axis=(0, 1), ell=c.ell)
     return shrunk_cov
