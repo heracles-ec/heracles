@@ -29,8 +29,8 @@ from .utils import (
     add_to_Cls,
 )
 from .io import (
-    fields2components,
-    components2data,
+    _fields2components,
+    flatten,
     format_key,
     _split_key,
 )
@@ -50,39 +50,15 @@ def shrink_covariance(cov, target, shrinkage_factor):
     for key in list(cov.keys()):
         c = cov[key]
         t = target[key]
-        n, m, nell1, nell1 = np.shape(c)
-        # Correlate target covariance
-        tc = np.zeros((n, m, nell1, nell1))
-        for i in range(0, n):
-            for j in range(0, m):
-                c_ij = c[i, j, :, :]
-                t_ij = t[i, j, :, :]
-                tc_ij = correlate_target(c_ij, t_ij)
-                tc[i, j, :, :] = tc_ij
-        # Shrink covariance
+        c_v = np.diagonal(c, axis1=-2, axis2=-1)
+        t_v = np.diagonal(t, axis1=-2, axis2=-1)
+        c_std = np.sqrt(c_v[..., None, :])
+        t_std = np.sqrt(t_v[..., None, :])
+        tc = t * (c_std * np.swapaxes(c_std, -1, -2))
+        tc /= (t_std * np.swapaxes(t_std, -1, -2))
         r = shrinkage_factor * tc + (1 - shrinkage_factor) * c
         shrunk_cov[key] = Result(r, axis=(0, 1), ell=c.ell)
     return shrunk_cov
-
-
-def correlate_target(cov, target):
-    """
-    Computes the estimate of the target matrix.
-    input:
-        S (array): target covariance matrix
-        rbar (array): Gaussian correlation matrix
-    returns:
-        T: correlation matrix of S
-    """
-    T = np.zeros(np.shape(cov))
-    for i in range(0, len(cov)):
-        for j in range(0, len(cov)):
-            if i == j:
-                T[i, j] = cov[i, j]
-            else:
-                T[i, j] = target[i, j] * np.sqrt(cov[i, i] * cov[j, j])
-                T[i, j] /= np.sqrt(target[i, i] * target[j, j])
-    return T
 
 
 def get_W(x, xbar, jk=False):
@@ -135,16 +111,10 @@ def shrinkage_factor(cls1, target):
     returns:
         lambda_star: optimal linear shrinkage factor
     """
-    # Separate component Cls
-    _cls1 = {}
-    for key in list(cls1.keys()):
-        cl = cls1[key]
-        _cls1[key] = fields2components(cl)
-    target = fields2components(target)
     # To data vector
-    cls1_all = [components2data(_cls1[key]) for key in list(cls1.keys())]
+    cls1_all = [flatten(cls1[key]) for key in list(cls1.keys())]
     cls1_mu_all = np.mean(np.array(cls1_all), axis=0)
-    target = components2data(target)
+    target = flatten(target)
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
     W = get_W(cls1_all, cls1_mu_all)
@@ -179,7 +149,7 @@ def gaussian_covariance(Cls):
     b = bias(Cls)
     Cls = add_to_Cls(Cls, b)
     # Separate Cls into Cls
-    _Cls = fields2components(Cls)
+    _Cls = _fields2components(Cls)
     # Compute Gaussian covariance
     cov = {}
     for key1, key2 in itertools.combinations_with_replacement(Cls, 2):

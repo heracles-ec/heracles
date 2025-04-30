@@ -295,80 +295,19 @@ def test_dices(data_path):
         C2 = debiased_cov[key]
         assert C1.shape == C2.shape
 
-    # dices_cov = dices.dices_covariance(cqs0, shrunk_cov, debiased_cov)
-    # _cqs0 = dices.Fields2Components(cqs0)
-    # _cov1 = dices.Components2Data(_cqs0, shrunk_cov)
-    # _cov2 = dices.Components2Data(_cqs0, debiased_cov)
-    # _corr1 = dices.cov2corr(_cov1)
-    # _var1 = np.diag(_cov1).copy()
-    # _var2 = np.diag(_cov2).copy()
-    # cond = np.where(_var2 < 0)[0]
-    # _var2[cond] = _var1[cond]
-    # _sig2 = np.sqrt(_var2)
-    # _corr2 = np.outer(_sig2, _sig2)
-    # _D = _corr2 * _corr1
-    # _dices_cov = dices.Data2Components(_cqs0, _D)
-    # for key in list(dices_cov.keys()):
-    #     print(key)
-    #     d = dices_cov[key]
-    #     _d = _dices_cov[key]
-    #     assert np.all(d == _d)
 
-
-def test_cls_io(data_path):
-    data_maps = make_data_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    _cls = dices.Fields2Components(cls)
-    __cls = dices.Components2Fields(_cls)
-    assert sorted(list(cls.keys())) == list(__cls.keys())
-    for key in list(cls.keys()):
-        cl = cls[key].array
-        __cl = __cls[key].array
-        print(key, cl.shape, __cl.shape)
-        assert (cl == __cl).all()
-
-
-def test_cov_io(data_path):
-    nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    lbins = 5
-    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
-    cqs1 = heracles.binned(cls1, ledges)
-    cov_jk = dices.jackknife_covariance(cqs1)
-    _cov_jk = dices.Fields2Components(cov_jk)
-    __cov_jk = dices.Components2Fields(_cov_jk)
-    assert sorted(list(cov_jk.keys())) == sorted(list(__cov_jk.keys()))
-    for key in list(cov_jk.keys()):
-        cov = cov_jk[key].array
-        __cov = __cov_jk[key].array
-        assert (cov == __cov).all()
-
-
-def test_data_io(data_path):
-    nside = 128
+def test_flatten(data_path):
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
     cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    lbins = 5
-    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
-    cqs0 = heracles.binned(cls0, ledges)
-    cqs1 = heracles.binned(cls1, ledges)
-    cov_jk = dices.jackknife_covariance(cqs1)
-    _cov_jk = dices.Fields2Components(cov_jk)
-    __cov_jk = dices.Components2Data(_cov_jk)
-    _cqs0 = dices.Fields2Components(cqs0)
-    __cqs0 = dices.Components2Data(_cqs0)
-    (n,) = __cqs0.shape
-    _n, _m = __cov_jk.shape
+    cov_jk = dices.jackknife_covariance(cls1)
+    _cls0 = dices.flatten(cls0)
+    _cov_jk = dices.flatten(cov_jk)
+    n, = _cls0.shape
+    _n, _m = _cov_jk.shape
     assert n == _n
     assert n == _m
 
@@ -388,9 +327,9 @@ def test_gauss_cov(data_path):
     cov_jk = dices.jackknife_covariance(cqs1)
     gauss_cov = dices.gaussian_covariance(cqs0)
     # Comp separate
-    _cov_jk = dices.Fields2Components(cov_jk)
-    _gauss_cov = dices.Fields2Components(gauss_cov)
-    _cqs0 = dices.Fields2Components(cqs0)
+    _cov_jk = dices.io._fields2components(cov_jk)
+    _gauss_cov = dices.io._fields2components(gauss_cov)
+    _cqs0 = dices.io._fields2components(cqs0)
     assert sorted(list(_cov_jk.keys())) == sorted(list(_gauss_cov.keys()))
     for key in list(_gauss_cov.keys()):
         a1, b1, a2, b2, i1, j1, i2, j2 = key

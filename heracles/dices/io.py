@@ -33,12 +33,12 @@ def flatten(results, order=None):
         order: list of keys to use for the flattening
         remove_non_uniques: if True, removes non-unique keys from the order
     """
-    components_dict = fields2components(results)
-    data = components2data(components_dict, order=order)
+    components_dict = _fields2components(results)
+    data = _components2data(components_dict, order=order)
     return data
 
 
-def fields2components(results):
+def _fields2components(results):
     """
     Separates the SHE values into E and B modes.
     input:
@@ -91,7 +91,7 @@ def fields2components(results):
     return _results
 
 
-def components2data(results, order=None):
+def _components2data(results, order=None):
     naxis = np.unique([len(result.axis) for result in results.values()])
     if len(naxis) != 1:
         raise ValueError("Different types of results in the same dictionary.")

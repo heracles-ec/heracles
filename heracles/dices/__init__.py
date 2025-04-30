@@ -62,7 +62,5 @@ from .shrinkage import (
     gaussian_covariance,
 )
 from .io import (
-    fields2components,
-    components2data,
     flatten,
 )
