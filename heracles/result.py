@@ -32,8 +32,6 @@ if TYPE_CHECKING:
     from typing import Any
     from numpy.typing import NDArray, DTypeLike
 
-from heracles.core import update_metadata
-
 
 def normalize_result_axis(axis, result, ell):
     """Return an axis tuple for a result."""
@@ -130,9 +128,6 @@ def binned(result, bins, weight=None):
         out = np.zeros(np.broadcast(a, b).shape)
         return np.divide(a, b, where=(a != 0), out=out)
 
-    # store metadata of result to later copy it into the binned array
-    md = result.dtype.metadata
-
     # get ell values from result
     ells = get_result_array(result, "ell")
 
@@ -167,8 +162,14 @@ def binned(result, bins, weight=None):
     # flatten all bins
     bins = tuple(np.reshape(b, -1) for b in bins)
 
+    # construct output dtype with metadata
+    md = {}
+    if result.dtype.metadata:
+        md.update(result.dtype.metadata)
+    dt = np.dtype(float, metadata=md)
+
     # make a copy of the array to apply the binning
-    result = np.copy(result)
+    result = np.asarray(result, dtype=dt, copy=True)
 
     # this will hold the binned ells and weigths
     binned_ell: tuple[NDArray[Any], ...] | NDArray[Any] = ()
@@ -192,7 +193,7 @@ def binned(result, bins, weight=None):
         shape = result.shape[:axis] + (m - 1,) + result.shape[axis + 1 :]
 
         # create an empty binned output array
-        tmp = np.empty(shape, dtype=float)
+        tmp = np.empty(shape, dtype=dt)
 
         # compute the binned result axis by axis
         for before in np.ndindex(shape[:axis]):
@@ -210,10 +211,6 @@ def binned(result, bins, weight=None):
     # compute bin edges
     binned_lower = tuple(b[:-1] for b in bins)
     binned_upper = tuple(b[1:] for b in bins)
-
-    # copy the metadata from the original input
-    if md is not None:
-        update_metadata(result, **md)
 
     # return plain arrays when there is a single ell axis
     if len(axes) == 1:
