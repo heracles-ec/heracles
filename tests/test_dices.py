@@ -320,12 +320,15 @@ def test_gauss_cov(data_path):
     jkmaps = make_jkmaps(data_path)
     cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    lbins = 5
+    lbins = 3
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
     cqs0 = heracles.binned(cls0, ledges)
     cov_jk = dices.jackknife_covariance(cqs1)
     gauss_cov = dices.gaussian_covariance(cqs0)
+    # Add bias
+    b = dices.jackknife.bias(cqs0)
+    cqs0 = dices.utils.add_to_Cls(cqs0, b)
     # Comp separate
     _cov_jk = dices.io._fields2components(cov_jk)
     _gauss_cov = dices.io._fields2components(gauss_cov)

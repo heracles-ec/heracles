@@ -184,6 +184,7 @@ def gaussian_covariance(Cls):
             r[ix1, ix2, ix3, ix4, :, :] = np.diag(_cov)
         # Remove the extra dimensions
         r = np.squeeze(r)
+        # Make Result
         result = Result(r, axis=(0, 1), ell=ell)
         cov[covkey] = result
     return cov
