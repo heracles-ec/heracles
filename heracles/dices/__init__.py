@@ -38,7 +38,7 @@ __all__ = [
     "shrinkage_factor",
     "gaussian_covariance",
     # io
-    "fields2components" "components2data",
+    "fields2componentscomponents2data",
     "flatten",
 ]
 
