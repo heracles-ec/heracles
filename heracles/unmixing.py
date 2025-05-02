@@ -44,9 +44,7 @@ def forwards(t, M):
             fcls_EB = _M[2] @ _t[0, 1, :]
             # Cl_BE = M_EB Cl_BE
             fcls_BE = _M[2] @ _t[1, 0, :]
-            fcls = np.array(
-                [[fcls_EE, fcls_EB],
-                [fcls_BE, fcls_BB]])
+            fcls = np.array([[fcls_EE, fcls_EB], [fcls_BE, fcls_BB]])
 
         else:
             fcls = np.array([_M @ __t for __t in _t])
@@ -88,8 +86,7 @@ def inversion(d, M):
             _id_BE = _inv_M_EB @ _d[1, 0, :]
             _id_EB = _id_EB[:_n]
             _id_BE = _id_BE[:_n]
-            _id = np.array([[_id_EE, _id_EB],
-                           [_id_BE, _id_BB]])
+            _id = np.array([[_id_EE, _id_EB], [_id_BE, _id_BB]])
         else:
             _inv_M = np.linalg.pinv(_M)
             _id = np.array([_inv_M @ __d.T for __d in _d])
