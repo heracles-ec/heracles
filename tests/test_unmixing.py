@@ -7,14 +7,14 @@ def make_dummy_cls(x):
     cls = {
         ("POS", "POS", 1, 1): x,
         ("POS", "SHE", 1, 1): np.array([x, x]),
-        ("SHE", "SHE", 1, 1): np.array([x, x, x]),
+        ("SHE", "SHE", 1, 1): np.array([[x, x], [x, x]]),
         ("POS", "POS", 1, 2): x,
         ("POS", "SHE", 1, 2): np.array([x, x]),
         ("POS", "SHE", 2, 1): np.array([x, x]),
-        ("SHE", "SHE", 1, 2): np.array([x, x, x, x]),
+        ("SHE", "SHE", 1, 2): np.array([[x, x,], [x, x]]),
         ("POS", "POS", 2, 2): x,
         ("POS", "SHE", 2, 2): np.array([x, x]),
-        ("SHE", "SHE", 2, 2): np.array([x, x, x]),
+        ("SHE", "SHE", 2, 2): np.array([[x, x], [x, x]]),
     }
     for key in list(cls.keys()):
         cls[key] = Result(cls[key], axis=0, ell=np.arange(128))
