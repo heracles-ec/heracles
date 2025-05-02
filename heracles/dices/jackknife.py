@@ -292,10 +292,10 @@ def delete2_correction(cls0, cls1, cls2):
     # Digonaligalize the correction
     for key in Q.keys():
         q = Q[key]
-        *_, l = q.shape
+        *_, length = q.shape
         q_diag = np.diagonal(q, axis1=-2, axis2=-1)
         q_diag_exp = np.zeros_like(q)
-        diag_indices = np.arange(l)  # Indices for the diagonal
+        diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
         Q[key] = q_diag_exp
     return Q
