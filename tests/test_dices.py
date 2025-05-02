@@ -248,10 +248,6 @@ def test_dices(data_path):
 
     # Delete1
     cov_jk = dices.jackknife_covariance(cqs1)
-    #  Shrinkage
-    # target_cov = dices.gaussian_covariance(cqs0)
-    # shrinkage = dices.shrinkage_factor(cqs0, cqs1, target_cov)
-    # shrunk_cov = dices.shrink_covariance(cqs0, cov_jk, target_cov, shrinkage)
 
     # Check for correct keys)
     cls_keys = list(cqs0.keys())

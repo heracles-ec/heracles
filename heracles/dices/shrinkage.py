@@ -36,7 +36,7 @@ from .io import (
 )
 
 
-def shrink_covariance(cov, target, shrinkage_factor):
+def shrink(cov, target, shrinkage_factor):
     """
     Internal method to compute the shrunk covariance.
     inputs:
@@ -61,47 +61,6 @@ def shrink_covariance(cov, target, shrinkage_factor):
     return shrunk_cov
 
 
-def get_W(x, xbar, jk=False):
-    """
-    Internal method to compute the W matrices.
-    input:
-        x: Cl
-        xbar: mean Cl
-        jk: if True, computes the jackknife version of the W matrices
-    returns:
-        W: W matrices
-    """
-    W = []
-    _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
-    for i in range(0, len(x)):
-        _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
-        _Wk = (_xi - _xbi) * (_xj - _xbj)
-        W.append(_Wk)
-    W = np.array(W)
-    if jk:
-        n = len(x)
-        W *= ((n - 1) ** 2.0) / n
-    return W
-
-
-def covW(i1, j1, i2, j2, W, Wbar):
-    """
-    Computes the covariance of the W matrices.
-    input:
-        i, j, l, m: indices
-        W: W matrices
-        Wbar: mean W matrix
-    returns:
-        covSS: covariance of W matrices
-    """
-    n = len(W)
-    covSS = 0.0
-    for k in range(0, len(W)):
-        covSS += (W[k][i1, j1] - Wbar[i1, j1]) * (W[k][i2, j2] - Wbar[i2, j2])
-    covSS *= n / ((n - 1) ** 3.0)
-    return covSS
-
-
 def shrinkage_factor(cls1, target):
     """
     Computes the optimal linear shrinkage factor.
@@ -117,7 +76,7 @@ def shrinkage_factor(cls1, target):
     target = flatten(target)
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
-    W = get_W(cls1_all, cls1_mu_all)
+    W = _get_W(cls1_all, cls1_mu_all)
     Wbar = np.mean(W, axis=0)
     S = (Njk - 1) * Wbar
     target_corr = target
@@ -128,10 +87,10 @@ def shrinkage_factor(cls1, target):
     for i in range(0, len(S)):
         for j in range(0, len(S)):
             if i != j:
-                f = 0.5 * np.sqrt(Wbar[j, j] / Wbar[i, i]) * covW(i, i, i, j, W, Wbar)
-                f += 0.5 * np.sqrt(Wbar[i, i] / Wbar[j, j]) * covW(j, j, i, j, W, Wbar)
+                f = 0.5 * np.sqrt(Wbar[j, j] / Wbar[i, i]) * _covW(i, i, i, j, W, Wbar)
+                f += 0.5 * np.sqrt(Wbar[i, i] / Wbar[j, j]) * _covW(j, j, i, j, W, Wbar)
                 t = target_corr[i, j]
-                numerator += covW(i, j, i, j, W, Wbar) - t * f
+                numerator += _covW(i, j, i, j, W, Wbar) - t * f
                 denominator += (S[i, j] - t * np.sqrt(S[i, i] * S[j, j])) ** 2
     lambda_star = numerator / denominator
     return lambda_star
@@ -211,3 +170,44 @@ def _gaussian_covariance(cls, key):
     # Compute the Gaussian covariance
     cov = cl1 * cl2 + cl3 * cl4
     return cov
+
+
+def _get_W(x, xbar, jk=False):
+    """
+    Internal method to compute the W matrices.
+    input:
+        x: Cl
+        xbar: mean Cl
+        jk: if True, computes the jackknife version of the W matrices
+    returns:
+        W: W matrices
+    """
+    W = []
+    _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
+    for i in range(0, len(x)):
+        _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
+        _Wk = (_xi - _xbi) * (_xj - _xbj)
+        W.append(_Wk)
+    W = np.array(W)
+    if jk:
+        n = len(x)
+        W *= ((n - 1) ** 2.0) / n
+    return W
+
+
+def _covW(i1, j1, i2, j2, W, Wbar):
+    """
+    Computes the covariance of the W matrices.
+    input:
+        i, j, l, m: indices
+        W: W matrices
+        Wbar: mean W matrix
+    returns:
+        covSS: covariance of W matrices
+    """
+    n = len(W)
+    covSS = 0.0
+    for k in range(0, len(W)):
+        covSS += (W[k][i1, j1] - Wbar[i1, j1]) * (W[k][i2, j2] - Wbar[i2, j2])
+    covSS *= n / ((n - 1) ** 3.0)
+    return covSS
