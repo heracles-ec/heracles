@@ -131,14 +131,13 @@ def _debias_cl(
 
     # this is what will be subtracted from the cl
     bl = np.zeros(cl.shape)
-    if lmin > 0 and cl.ndim > 1:
-        # spin-weighted fields:
-        # - only remove from l >= lmin
-        # - only remove from EE and BB
-        bl[:2, ..., lmin:] = bias
+    if spin1 != 0 and spin2 != 0:
+        # two spin-weighted fields: remove from EE and BB
+        assert cl.shape[:2] == (2, 2)
+        bl[[0, 1], [0, 1], ..., lmin:] = bias
     else:
-        # scalar fields: remove from everywhere
-        bl[...] = bias
+        # other fields: remove from everywhere
+        bl[..., lmin:] = bias
 
     # handle HEALPix pseudo-convolution
     for i, s in (1, spin1), (2, spin2):
