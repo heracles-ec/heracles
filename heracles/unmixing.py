@@ -71,10 +71,9 @@ def inversion(d, M):
     for key in list(d.keys()):
         a, b, i, j = key
         _d = np.atleast_2d(d[key])
-        *_, m = _d.shape
         _M = M[key].array
+        *_, _n, _m = _M.shape
         if a == b == "SHE":
-            _, _, _m = _M.shape
             _M_EB = _M[2]
             _M_EE = np.hstack((_M[0], _M[2]))
             _M_BB = np.hstack((_M[2], _M[1]))
@@ -83,17 +82,18 @@ def inversion(d, M):
             _inv_M_EB = np.linalg.pinv(_M_EB)
             _d_EEBB = np.hstack((_d[0, 0, :], _d[1, 1, :]))
             _id_EEBB = _inv_M_EEBB @ _d_EEBB
-            _id_EE = _id_EEBB[_m:]
-            _id_BB = _id_EEBB[:_m]
+            _id_EE = _id_EEBB[:_m][:_n]
+            _id_BB = _id_EEBB[_m:][:_n]
             _id_EB = _inv_M_EB @ _d[0, 1, :]
             _id_BE = _inv_M_EB @ _d[1, 0, :]
-            _id = np.array([_id_EE, _id_EB],
-                           [_id_BE, _id_BB])
+            _id_EB = _id_EB[:_n]
+            _id_BE = _id_BE[:_n]
+            _id = np.array([[_id_EE, _id_EB],
+                           [_id_BE, _id_BB]])
         else:
             _inv_M = np.linalg.pinv(_M)
             _id = np.array([_inv_M @ __d.T for __d in _d])
-        # Check if fcls is a 1D array
-        _id = _id[:, :m]
+            _id = _id[:, :_n]
         if len(_id) == 1:
             _id = _id[0]
         inversion_cls[key] = Result(_id, axis=d[key].axis, ell=d[key].ell)
@@ -135,65 +135,35 @@ def natural_unmixing(d, m, patch_hole=True):
             wm /= logistic(np.log10(abs(wm)), x0=-2, k=50)
         # Correct Cl by mask
         if a == b == "SHE":
-            if i == j:
-                __d = np.array(
-                    [
-                        np.zeros_like(_d[0]),
-                        _d[0],  # EE like spin-2
-                        _d[1],  # BB like spin-2
-                        np.zeros_like(_d[0]),
-                    ]
-                )
-                __id = np.array(
-                    [
-                        np.zeros_like(_d[0]),
-                        -_d[2],  # EB like spin-0
-                        _d[2],  # EB like spin-0
-                        np.zeros_like(_d[0]),
-                    ]
-                )
-                # Correct by alpha
-                wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-                corr_wd = (wd / wm).real
-                icorr_wd = (wd / wm).imag
-                # Transform back to Cl
-                __corr_d = corr2cl(corr_wd.T).T
-                __icorr_d = corr2cl(icorr_wd.T).T
-                _corr_d = [
-                    __corr_d[1],  # EE like spin-2
-                    -__corr_d[2],  # BB like spin-2
-                    __icorr_d[1],  # EB like spin-0
+            __d = np.array(
+                [
+                    np.zeros_like(_d[0, 0]),
+                    _d[0, 0],  # EE like spin-2
+                    _d[1, 1],  # BB like spin-2
+                    np.zeros_like(_d[0, 0]),
                 ]
-            if i != j:
-                __d = np.array(
-                    [
-                        np.zeros_like(_d[0]),
-                        _d[0],  # EE like spin-2
-                        _d[1],  # BB like spin-2
-                        np.zeros_like(_d[0]),
-                    ]
-                )
-                __id = np.array(
-                    [
-                        np.zeros_like(_d[0]),
-                        -_d[2],  # EB like spin-0
-                        _d[3],  # BE like spin-0
-                        np.zeros_like(_d[0]),
-                    ]
-                )
-                # Correct by alpha
-                wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-                corr_wd = (wd / wm).real
-                icorr_wd = (wd / wm).imag
-                # Transform back to Cl
-                __corr_d = corr2cl(corr_wd.T).T
-                __icorr_d = corr2cl(icorr_wd.T).T
-                _corr_d = [
-                    __corr_d[1],  # EE like spin-2
-                    -__corr_d[2],  # BB like spin-2
-                    __icorr_d[1],  # EB like spin-0
-                    -__icorr_d[2],  # BE like spin-0
+            )
+            __id = np.array(
+                [
+                    np.zeros_like(_d[0, 0]),
+                    -_d[0, 1],  # EB like spin-0
+                    _d[1, 0],  # EB like spin-0
+                    np.zeros_like(_d[0, 0]),
                 ]
+            )
+            # Correct by alpha
+            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
+            corr_wd = (wd / wm).real
+            icorr_wd = (wd / wm).imag
+            # Transform back to Cl
+            __corr_d = corr2cl(corr_wd.T).T
+            __icorr_d = corr2cl(icorr_wd.T).T
+            # reorder
+            _corr_d = np.zeros_like(_d)
+            _corr_d[0, 0] = __corr_d[0]  # EE like spin-2
+            _corr_d[1, 1] = __corr_d[1]  # BB like spin-2
+            _corr_d[0, 1] = -__icorr_d[0]  # EB like spin-0
+            _corr_d[1, 0] = __icorr_d[1]  # EB like spin-0
         else:
             # Treat everything as spin-0
             _corr_d = []
@@ -212,9 +182,8 @@ def natural_unmixing(d, m, patch_hole=True):
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
 
-        # Undo at least2D
-        if len(_corr_d) == 1:
-            _corr_d = _corr_d[0]
+        # remove extra axis
+        _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(_corr_d, dtype=dtype)
         corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
