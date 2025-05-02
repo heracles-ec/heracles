@@ -343,6 +343,84 @@ def test_debiasing(data_path):
         assert C1.shape == C2.shape
 
 
+def test_shrinkage(data_path):
+    JackNjk = 5
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+
+    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    assert len(delete1_data_cls) == JackNjk
+    for key in delete1_data_cls.keys():
+        cl = delete1_data_cls[key]
+        for key in list(cl.keys()):
+            _cl = cl[key]
+            *_, nells = _cl.shape
+            assert nells == nside + 1
+
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    lgrid = (ledges[1:] + ledges[:-1]) / 2
+    cqs0 = heracles.binned(data_cls, ledges)
+    for key in list(cqs0.keys()):
+        cq = cqs0[key]
+        *_, nells = cq.shape
+        assert nells == len(lgrid)
+    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    for key in list(cqs1.keys()):
+        for k in list(cqs1[key].keys()):
+            cq = cqs1[key][k]
+            *_, nells = cq.shape
+            assert nells == len(lgrid)
+
+    # Delete1
+    cov_jk = dices.jackknife_covariance(cqs1)
+
+    # Fake target
+    unit_matrix = {}
+    for key in cov_jk.keys():
+        g = cov_jk[key]
+        s = g.shape
+        *_, i = s
+        single_diag = np.eye(i)  # Shape: (i, j)
+        # Expand to the desired shape using broadcasting
+        a = np.broadcast_to(single_diag, s)
+        unit_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
+
+    # Random matrix
+    random_matrix = {}
+    for key in cov_jk.keys():
+        g = cov_jk[key]
+        s = g.shape
+        a = np.abs(np.random.rand(*s))
+        random_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
+
+    # Shrinkage factor
+    # To do: is there a way of checking the shrinkage factor?
+    shrinkage_factor = dices.shrinkage_factor(cqs1, unit_matrix)
+
+    # Check that the shrinkage factor is between 0 and 1
+    assert 0 <= shrinkage_factor <= 1
+
+    # Shrinkage
+    shrunk_cov = dices.shrink(unit_matrix, random_matrix, shrinkage_factor)
+
+    # Test that diagonals are not touched
+    for key in list(shrunk_cov.keys()):
+        c = shrunk_cov[key]
+        _c = unit_matrix[key]
+        c_diag = np.diagonal(c, axis1=-2, axis2=-1)
+        _c_diag = np.diagonal(_c, axis1=-2, axis2=-1)
+        c_diag = np.nan_to_num(c_diag)
+        _c_diag = np.nan_to_num(_c_diag)
+        print(key, c_diag, _c_diag)
+        assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
+
+
 def test_flatten(data_path):
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
