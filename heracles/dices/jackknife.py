@@ -263,7 +263,7 @@ def sample_covariance(samples, samples2=None):
     return cov
 
 
-def delete2_correction(Cls0, Cls1, Cls2):
+def delete2_correction(cls0, cls1, cls2):
     """
     Internal method to compute the delete2 correction.
     inputs:
@@ -273,38 +273,49 @@ def delete2_correction(Cls0, Cls1, Cls2):
     returns:
         Q (dict): Dictionary of delete2 correction
     """
+    # Compute the ensemble for the correction
     Q_ii = []
-    Njk = len(Cls1)
-    for kk in Cls2.keys():
+    Njk = len(cls1)
+    for kk in cls2.keys():
         k1, k2 = kk
         qii = {}
-        for key in Cls2[kk].keys():
-            _qii = Njk * Cls0[key].array
-            _qii -= (Njk - 1) * Cls1[(k1,)][key].array
-            _qii -= (Njk - 1) * Cls1[(k2,)][key].array
-            _qii += (Njk - 2) * Cls2[kk][key].array
-            _qii = Result(_qii, ell=Cls0[key].ell)
+        for key in cls2[kk].keys():
+            _qii = Njk * cls0[key].array
+            _qii -= (Njk - 1) * cls1[(k1,)][key].array
+            _qii -= (Njk - 1) * cls1[(k2,)][key].array
+            _qii += (Njk - 2) * cls2[kk][key].array
+            _qii = Result(_qii, ell=cls0[key].ell)
             qii[key] = _qii
             Q_ii.append(qii)
+    # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
+    # Digonaligalize the correction
+    for key in Q.keys():
+        q = Q[key]
+        *_, l = q.shape
+        q_diag = np.diagonal(q, axis1=-2, axis2=-1)
+        q_diag_exp = np.zeros_like(q)
+        diag_indices = np.arange(l)  # Indices for the diagonal
+        q_diag_exp[..., diag_indices, diag_indices] = q_diag
+        Q[key] = q_diag_exp
     return Q
 
 
-def debias_covariance(cov_jk, Cls0, Clsjks, Clsjk2s):
+def debias_covariance(cov_jk, cls0, cls1, cls2):
     """
     Debiases the Jackknife covariance using the delete2 ensemble.
     inputs:
         cov_jk (dict): Dictionary of delete1 covariance
-        Cls0 (dict): Dictionary of data Cls
-        Clsjks (dict): Dictionary of delete1 data Cls
-        Clsjk2s (dict): Dictionary of delete2 data Cls
+        cls0 (dict): Dictionary of data Cls
+        cls1 (dict): Dictionary of delete1 data Cls
+        cls2 (dict): Dictionary of delete2 data Cls
     returns:
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
-    Q = delete2_correction(Cls0, Clsjks, Clsjk2s)
+    Q = delete2_correction(cls0, cls1, cls2)
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array
+        c = cov_jk[key].array - Q[key]
         debiased_cov[key] = Result(
             c,
             ell=cov_jk[key].ell,

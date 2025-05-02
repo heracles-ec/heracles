@@ -196,7 +196,63 @@ def test_polspice(data_path):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_dices(data_path):
+def test_jackknife(data_path):
+    JackNjk = 5
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+
+    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    assert len(delete1_data_cls) == JackNjk
+    for key in delete1_data_cls.keys():
+        cl = delete1_data_cls[key]
+        for key in list(cl.keys()):
+            _cl = cl[key]
+            *_, nells = _cl.shape
+            assert nells == nside + 1
+
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    lgrid = (ledges[1:] + ledges[:-1]) / 2
+    cqs0 = heracles.binned(data_cls, ledges)
+    for key in list(cqs0.keys()):
+        cq = cqs0[key]
+        *_, nells = cq.shape
+        assert nells == len(lgrid)
+    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    for key in list(cqs1.keys()):
+        for k in list(cqs1[key].keys()):
+            cq = cqs1[key][k]
+            *_, nells = cq.shape
+            assert nells == len(lgrid)
+
+    # Delete1
+    cov_jk = dices.jackknife_covariance(cqs1)
+
+    # Check for correct keys)
+    cls_keys = list(cqs0.keys())
+    k = 0
+    for i in range(0, len(cls_keys)):
+        for j in range(i, len(cls_keys)):
+            ki = cls_keys[i]
+            kj = cls_keys[j]
+            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
+            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
+            _covkey = (A, B, C, D, nA, nB, nC, nD)
+            assert _covkey in list(cov_jk.keys())
+
+    # Check for correct shape
+    for key in list(cov_jk.keys()):
+        cov = cov_jk[key]
+        *_, m, n = cov.shape
+        assert (m, n) == (lbins, lbins)
+
+
+def test_debiasing(data_path):
     JackNjk = 5
     nside = 128
     data_maps = make_data_maps()
@@ -249,24 +305,7 @@ def test_dices(data_path):
     # Delete1
     cov_jk = dices.jackknife_covariance(cqs1)
 
-    # Check for correct keys)
-    cls_keys = list(cqs0.keys())
-    k = 0
-    for i in range(0, len(cls_keys)):
-        for j in range(i, len(cls_keys)):
-            ki = cls_keys[i]
-            kj = cls_keys[j]
-            A, B, nA, nB = ki[0], ki[1], ki[2], ki[3]
-            C, D, nC, nD = kj[0], kj[1], kj[2], kj[3]
-            _covkey = (A, B, C, D, nA, nB, nC, nD)
-            assert _covkey in list(cov_jk.keys())
-
-    # Check for correct shape
-    for key in list(cov_jk.keys()):
-        cov = cov_jk[key]
-        *_, m, n = cov.shape
-        assert (m, n) == (lbins, lbins)
-
+    # Debias
     debiased_cov = dices.debias_covariance(cov_jk, cqs0, cqs1, cqs2)
     Q = dices.delete2_correction(
         cqs0,
@@ -275,10 +314,22 @@ def test_dices(data_path):
     )
     _debiased_cov = {}
     for key in list(cov_jk.keys()):
-        _debiased_cov[key] = cov_jk[key].array - Q[key].array
+        _debiased_cov[key] = cov_jk[key].array - Q[key]
 
+    # Check diagonal
     for key in list(debiased_cov.keys()):
         assert (debiased_cov[key] == _debiased_cov[key]).all()
+
+    # Check off-diagonal
+    for key in list(dices.io._fields2components(debiased_cov).keys()):
+        c = dices.io._fields2components(debiased_cov)[key]
+        _c = dices.io._fields2components(cov_jk)[key]
+        offd_mask = ~np.eye(c.shape[0], dtype=bool)
+        # Extract off-diagonal elements
+        offd = c[offd_mask]
+        _offd = _c[offd_mask]
+        print(key, offd, _offd)
+        assert np.allclose(offd, _offd)
 
     # Check keys
     keys1 = set(cov_jk.keys())
