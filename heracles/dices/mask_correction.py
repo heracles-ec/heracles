@@ -2,6 +2,7 @@ import numpy as np
 from heracles.transforms import cl2corr, corr2cl
 from heracles.result import Result
 
+
 def mask_correction(Mljk, Mls0):
     """
     Internal method to compute the mask correction.

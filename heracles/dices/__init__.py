@@ -31,8 +31,6 @@ __all__ = [
     "delete2_correction",
     # mask_correction
     "correct_mask",
-    "cl2corr",
-    "corr2cl",
 ]
 
 from .jackknife import (
@@ -45,7 +43,5 @@ from .jackknife import (
     delete2_correction,
 )
 from .mask_correction import (
-    correct_mask,
-    cl2corr,
-    corr2cl,
+    correct_mask
 )
