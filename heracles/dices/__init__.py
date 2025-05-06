@@ -42,6 +42,4 @@ from .jackknife import (
     debias_covariance,
     delete2_correction,
 )
-from .mask_correction import (
-    correct_mask
-)
+from .mask_correction import correct_mask
