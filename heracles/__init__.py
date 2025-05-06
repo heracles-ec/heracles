@@ -69,10 +69,9 @@ __all__ = [
     "angular_power_spectra",
     "debias_cls",
     "mixing_matrices",
-    # unmixing
-    "forwards",
-    "inversion",
-    "natural_unmixing",
+    # transforms
+    "cl2corr",
+    "corr2cl",
 ]
 
 try:
@@ -144,8 +143,7 @@ from .twopoint import (
     mixing_matrices,
 )
 
-from .unmixing import (
-    forwards,
-    inversion,
-    natural_unmixing,
+from .transforms import (
+    cl2corr,
+    corr2cl,
 )
