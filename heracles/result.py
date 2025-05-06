@@ -134,25 +134,6 @@ def binned(result, bins, weight=None):
     # get normalised axis tuple from result
     axes = normalize_result_axis(getattr(result, "axis", None), result, ells)
 
-    # combine weights of result with weights from string or given array
-    weights = []
-    if not isinstance(weight, tuple):
-        weight = (weight,) * len(axes)
-    for ell, ww, w in zip(ells, weight, get_result_array(result, "weight")):
-        if ww is None:
-            pass
-        elif isinstance(ww, str):
-            if ww == "l(l+1)":
-                w = ell * (ell + 1) * w
-            elif ww == "2l+1":
-                w = (2 * ell + 1) * w
-            else:
-                msg = f"unknown weights string: {ww}"
-                raise ValueError(msg)
-        else:
-            w = ww[: w.size] * w
-        weights.append(w)
-
     # normalise bins into a tuple if a single set is given
     if not isinstance(bins, tuple):
         bins = (bins,) * len(axes)
@@ -161,8 +142,33 @@ def binned(result, bins, weight=None):
     if len(bins) != len(axes):
         raise ValueError("result and bins have different number of ell axes")
 
-    # flatten all bins
-    bins = tuple(np.reshape(b, -1) for b in bins)
+    # normalise weight into a tuple if a single weight is given
+    if not isinstance(weight, tuple):
+        weight = (weight,) * len(axes)
+
+    # make sure length of given weight matches ell axes
+    if len(weight) != len(axes):
+        raise ValueError("result and weight have different number of ell axes")
+
+    # get existing weights from result
+    result_weight = get_result_array(result, "weight")
+
+    # combine weights of result with weights from string or given array
+    combined_weight = []
+    for ell, w1, w2 in zip(ells, weight, result_weight):
+        if w1 is None:
+            w = w2
+        elif isinstance(w1, str):
+            if w1 == "l(l+1)":
+                w = ell * (ell + 1) * w2
+            elif w1 == "2l+1":
+                w = (2 * ell + 1) * w2
+            else:
+                msg = f"unknown weights string: {w1}"
+                raise ValueError(msg)
+        else:
+            w = w1[: w2.size] * w2
+        combined_weight.append(w)
 
     # construct output dtype with metadata
     md = {}
@@ -178,7 +184,7 @@ def binned(result, bins, weight=None):
     binned_weight: tuple[NDArray[Any], ...] | NDArray[Any] = ()
 
     # apply binning over each axis
-    for axis, ell, w, b in zip(axes, ells, weights, bins):
+    for axis, ell, w, b in zip(axes, ells, combined_weight, bins):
         # number of bins for this axis
         m = b.size
 
@@ -196,6 +202,7 @@ def binned(result, bins, weight=None):
 
         # create an empty binned output array
         tmp = np.empty(shape, dtype=dt)
+
         # compute the binned result axis by axis
         for before in np.ndindex(shape[:axis]):
             for after in np.ndindex(shape[axis + 1 :]):
