@@ -77,8 +77,9 @@ def shrinkage_factor(cls1, target):
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
     W = _get_W(cls1_all, cls1_mu_all)
+    W *= (Njk - 1)**2 / Njk
     Wbar = np.mean(W, axis=0)
-    S = (Njk - 1) * Wbar
+    S = (Njk/(Njk - 1)) * Wbar
     target_corr = target
     target_corr /= np.outer(np.sqrt(np.diag(target)), np.sqrt(np.diag(target)))
     # Compute shrinkage factor
@@ -172,7 +173,7 @@ def _gaussian_covariance(cls, key):
     return cov
 
 
-def _get_W(x, xbar, jk=False):
+def _get_W(x, xbar):
     """
     Internal method to compute the W matrices.
     input:
@@ -188,11 +189,7 @@ def _get_W(x, xbar, jk=False):
         _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
         _Wk = (_xi - _xbi) * (_xj - _xbj)
         W.append(_Wk)
-    W = np.array(W)
-    if jk:
-        n = len(x)
-        W *= ((n - 1) ** 2.0) / n
-    return W
+    return np.array(W)
 
 
 def _covW(i1, j1, i2, j2, W, Wbar):
