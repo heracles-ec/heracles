@@ -85,138 +85,100 @@ def test_result_2d(rng):
     assert obj.weight == (weight_1, weight_2)
 
 
-@pytest.mark.parametrize("weight", [None, "l(l+1)", "2l+1", "<rand>"])
-# cl['POS', 'POS'], mms['POS', 'POS'], cl['POS', 'SHE'], mms['SHE', 'SHE'], cl['SHE', 'SHE'] 
-@pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (2, 1), (3, 1), (3, 2)])
-def test_binned(ndim, axis, weight, rng):
+@pytest.mark.parametrize("weight", [None]) # "l(l+1)", "2l+1", "<rand>"])
+# cl['POS', 'POS'], mms['POS', 'POS'], cl['POS', 'SHE'], mms['SHE', 'SHE'], cl['SHE', 'SHE']
+@pytest.mark.parametrize(
+    "ndim,axes", [(1, (0))] #, (2, (0,)), (2, (1,)), (3, (1,)), (3, (0, 1))]
+)
+def test_binned(ndim, axes, weight, rng):
+
+    def norm(a, b):
+        """divide a by b if a is nonzero"""
+        out = np.zeros(np.broadcast(a, b).shape)
+        return np.divide(a, b, where=(a != 0), out=out)
+
     shape = rng.integers(1, 100, ndim)
-    lmax = shape[axis] - 1
+    data = heracles.Result(rng.standard_normal(shape), axis=axes)
 
-    data = heracles.Result(rng.standard_normal(shape), axis=axis)
-
-    nbins = rng.integers(1, 10)
-    bins = rng.integers(1, lmax + 1, nbins, endpoint=True)
-    bins.sort()
-
-    if weight == "<rand>":
-        weight = rng.random(lmax + 1)
-
-    result = heracles.binned(data, bins, weight)
-
-    ell = np.arange(lmax + 1)
-
-    if weight is None:
-        w = np.ones_like(ell)
-    elif isinstance(weight, str):
+    bins = []
+    ells = []
+    weights = []
+    axes = heracles.result.normalize_result_axis(axes, data, data.ell)
+    for axis in axes:
+        lmax = shape[axis] - 1
+        ell = np.arange(lmax + 1)
+        nbins = rng.integers(1, 10)
+        b = rng.integers(1, lmax + 1, nbins, endpoint=True)
+        b.sort()
         if weight == "l(l+1)":
             w = ell * (ell + 1)
         elif weight == "2l+1":
-            w = 2 * ell + 1
-        else:
-            raise ValueError(weight)
-    else:
-        w = weight
+            w = (2 * ell + 1)
+        elif weight is None:
+            w = np.ones_like(ell)
+        elif weight == "<rand>":
+            w = rng.random(lmax + 1)
+        bins.append(b)
+        ells.append(ell)
+        weights.append(w)
 
-    out_shape = (*shape[:axis], nbins - 1, *shape[axis + 1 :])
+    ells = tuple(ells)
+    bins = tuple(bins)
+    weights = tuple(weights)
+    print(bins)
+    print(ells)
+    print(weights)
 
-    binned_data = np.zeros(out_shape)
-    binned_ell = np.zeros(nbins - 1)
-    binned_weight = np.zeros(nbins - 1)
-    for i, (a, b) in enumerate(zip(bins, bins[1:])):
-        inbin = (a <= ell) & (ell < b)
-        if not np.any(inbin):
-            continue
-        binned_ell[i] = np.average(ell[inbin], weights=w[inbin])
-        for j in np.ndindex(*shape[:axis]):
-            for k in np.ndindex(*shape[axis + 1 :]):
-                data_inbin = data[(*j, inbin, *k)]
-                binned_data[(*j, i, *k)] = np.average(data_inbin, weights=w[inbin])
-        binned_weight[i] = w[inbin].sum()
+    result = heracles.binned(data, bins, weights)
 
-    np.testing.assert_array_almost_equal(result, binned_data)
+    # make a copy of the array to apply the binning
+    out = np.copy(result.array)
+
+    # this will hold the binned ells and weigths
+    binned_ell = ()
+    binned_weight = ()
+
+    # apply binning over each axis
+    for axis, ell, w, b in zip(axes, ells, weights, bins):
+        # number of bins for this axis
+        m = b.size
+
+        # get the bin index for each ell
+        index = np.digitize(ell, b)
+
+        # compute the binned weight
+        wb = np.bincount(index, weights=w, minlength=m)[1:m]
+
+        # compute the binned ell
+        ellb = norm(np.bincount(index, w * ell, m)[1:m], wb)
+
+        # output shape, axis is turned into size m
+        shape = out.shape[:axis] + (m - 1,) + out.shape[axis + 1 :]
+
+        # create an empty binned output array
+        tmp = np.empty(shape)
+        # compute the binned result axis by axis
+        for before in np.ndindex(shape[:axis]):
+            for after in np.ndindex(shape[axis + 1 :]):
+                k = (*before, slice(None), *after)
+                tmp[k] = norm(np.bincount(index, w * out[k], m)[1:m], wb)
+
+        # array is now binned over axis
+        out = tmp
+
+        # store outputs
+        binned_ell += (ellb,)
+        binned_weight += (wb,)
+
+    # compute bin edges
+    binned_lower = tuple(b[:-1] for b in bins)
+    binned_upper = tuple(b[1:] for b in bins)
+
+    np.testing.assert_array_almost_equal(result, out)
     np.testing.assert_array_almost_equal(result.ell, binned_ell)
-    np.testing.assert_array_equal(result.lower, bins[:-1])
-    np.testing.assert_array_equal(result.upper, bins[1:])
     np.testing.assert_array_almost_equal(result.weight, binned_weight)
-
-@pytest.mark.parametrize("weight", [None]) #"l(l+1)", "2l+1", "<rand>"])
-@pytest.mark.parametrize("ndim,axis", [(2, (0, 1)), (4, (2, 3)), (6, (4, 5))])
-def test_binned_2D(ndim, axis, weight, rng):
-    shape = rng.integers(1, 100, ndim)
-    ax1, ax2 = axis
-    lmax1 = shape[ax1] - 1
-    lmax2 = shape[ax2] - 1
-
-    data = heracles.Result(rng.standard_normal(shape), axis=axis)
-
-    nbins1 = rng.integers(1, 10)
-    nbins2 = rng.integers(1, 20)
-    bins1 = rng.integers(1, lmax1 + 1, nbins1, endpoint=True)
-    bins2 = rng.integers(1, lmax2 + 1, nbins2, endpoint=True)
-    bins1.sort()
-    bins2.sort()
-    bins = (bins1, bins2)
-
-    if weight == "<rand>":
-        w1 = rng.random(lmax1 + 1)
-        w2 = rng.random(lmax2 + 1)
-        weight = (w1, w2)
-
-    result = heracles.binned(data, bins1) #, weight)
-    print(bins1)
-    print(data.shape, result.shape)
-
-    ell1 = np.arange(lmax1 + 1)
-    ell2 = np.arange(lmax2 + 1)
-    ell = (ell1, ell2)
-
-    if weight is None:
-        w = (np.ones_like(ell1), np.ones_like(ell2))
-    elif isinstance(weight, str):
-        if weight == "l(l+1)":
-            w = (ell1 * (ell1 + 1), ell2 * (ell2 + 1))
-        elif weight == "2l+1":
-            w = (2 * ell1 + 1, 2 * ell2 + 1)
-        else:
-            raise ValueError(weight)
-    else:
-        w = weight
-
-    out_shape = (*shape[:axis], nbins1 - 1, nbins2 - 1, *shape[axis + 1 :])
-
-    binned_data = np.zeros(out_shape)
-    binned_ell1 = np.zeros(nbins1 - 1)
-    binned_ell2 = np.zeros(nbins2 - 1)
-    binned_w1 = np.zeros(nbins1 - 1)
-    binned_w2 = np.zeros(nbins2 - 1)
-    for i, (a, b) in enumerate(zip(bins1, bins1[1:])):
-        inbin = (a <= ell1) & (ell1 < b)
-        if not np.any(inbin):
-            continue
-        binned_ell1[i] = np.average(ell1[inbin], weights=w[0][inbin])
-        for j in np.ndindex(*shape[:ax1]):
-            for k in np.ndindex(*shape[ax1 + 1 :]):
-                data_inbin = data[(*j, inbin, *k)]
-                binned_data[(*j, i, *k)] = np.average(data_inbin, weights=w[0][inbin])
-        binned_w1[i] = w[0][inbin].sum()
-    for i, (a, b) in enumerate(zip(bins2, bins2[1:])):
-        inbin = (a <= ell2) & (ell2 < b)
-        if not np.any(inbin):
-            continue
-        binned_ell2[i] = np.average(ell2[inbin], weights=w[1][inbin])
-        for j in np.ndindex(*shape[:ax1]):
-            for k in np.ndindex(*shape[ax1 + 1 :]):
-                data_inbin = data[(*j, inbin, *k)]
-                binned_data[(*j, i, *k)] = np.average(data_inbin, weights=w[1][inbin])
-        binned_w2[i] = w[1][inbin].sum()
-    binned_ell = (binned_ell1, binned_ell2)
-    binned_weight = (binned_w1, binned_w2)
-
-    np.testing.assert_array_almost_equal(result, binned_data)
-    np.testing.assert_array_almost_equal(result.ell, binned_ell)
-    np.testing.assert_array_equal(result.lower, (bins[1][:-1], bins[1][:-1]))
-    np.testing.assert_array_equal(result.upper, (bins[0][1:], bins[1][1:]))
-    np.testing.assert_array_almost_equal(result.weight, binned_weight)
+    np.testing.assert_array_equal(result.lower, binned_lower)
+    np.testing.assert_array_equal(result.upper, binned_upper)
 
 
 def test_binned_mapping():

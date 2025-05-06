@@ -136,19 +136,21 @@ def binned(result, bins, weight=None):
 
     # combine weights of result with weights from string or given array
     weights = []
-    for ell, w in zip(ells, get_result_array(result, "weight")):
-        if weight is None:
+    if not isinstance(weight, tuple):
+        weight = (weight,) * len(axes)
+    for ell, ww, w in zip(ells, weight, get_result_array(result, "weight")):
+        if ww is None:
             pass
-        elif isinstance(weight, str):
-            if weight == "l(l+1)":
+        elif isinstance(ww, str):
+            if ww == "l(l+1)":
                 w = ell * (ell + 1) * w
-            elif weight == "2l+1":
+            elif ww == "2l+1":
                 w = (2 * ell + 1) * w
             else:
-                msg = f"unknown weights string: {weight}"
+                msg = f"unknown weights string: {ww}"
                 raise ValueError(msg)
         else:
-            w = weight[: w.size] * w
+            w = ww[: w.size] * w
         weights.append(w)
 
     # normalise bins into a tuple if a single set is given
@@ -190,11 +192,10 @@ def binned(result, bins, weight=None):
         ellb = norm(np.bincount(index, w * ell, m)[1:m], wb)
 
         # output shape, axis is turned into size m
-        shape = result.shape[:axis] + (m - 1,) + result.shape[axis + 1 :]
+        shape = out.shape[:axis] + (m - 1,) + out.shape[axis + 1 :]
 
         # create an empty binned output array
         tmp = np.empty(shape, dtype=dt)
-
         # compute the binned result axis by axis
         for before in np.ndindex(shape[:axis]):
             for after in np.ndindex(shape[axis + 1 :]):
