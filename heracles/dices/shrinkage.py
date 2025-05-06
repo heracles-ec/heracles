@@ -47,7 +47,7 @@ def shrink(cov, target, shrinkage_factor):
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
     shrunk_cov = {}
-    for key in list(cov.keys()):
+    for key in cov:
         c = cov[key]
         t = target[key]
         c_v = np.diagonal(c, axis1=-2, axis2=-1)
@@ -84,8 +84,8 @@ def shrinkage_factor(cls1, target):
     # Compute shrinkage factor
     numerator = 0.0
     denominator = 0.0
-    for i in range(0, len(S)):
-        for j in range(0, len(S)):
+    for i in range(len(S)):
+        for j in range(len(S)):
             if i != j:
                 f = 0.5 * np.sqrt(Wbar[j, j] / Wbar[i, i]) * _covW(i, i, i, j, W, Wbar)
                 f += 0.5 * np.sqrt(Wbar[i, i] / Wbar[j, j]) * _covW(j, j, i, j, W, Wbar)
@@ -184,7 +184,7 @@ def _get_W(x, xbar, jk=False):
     """
     W = []
     _xbi, _xbj = np.meshgrid(xbar, xbar, indexing="ij")
-    for i in range(0, len(x)):
+    for i in range(len(x)):
         _xi, _xj = np.meshgrid(x[i], x[i], indexing="ij")
         _Wk = (_xi - _xbi) * (_xj - _xbj)
         W.append(_Wk)
@@ -207,7 +207,7 @@ def _covW(i1, j1, i2, j2, W, Wbar):
     """
     n = len(W)
     covSS = 0.0
-    for k in range(0, len(W)):
+    for k in range(len(W)):
         covSS += (W[k][i1, j1] - Wbar[i1, j1]) * (W[k][i2, j2] - Wbar[i2, j2])
     covSS *= n / ((n - 1) ** 3.0)
     return covSS

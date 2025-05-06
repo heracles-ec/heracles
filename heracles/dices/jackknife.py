@@ -276,10 +276,10 @@ def delete2_correction(cls0, cls1, cls2):
     # Compute the ensemble for the correction
     Q_ii = []
     Njk = len(cls1)
-    for kk in cls2.keys():
+    for kk in cls2:
         k1, k2 = kk
         qii = {}
-        for key in cls2[kk].keys():
+        for key in cls2[kk]:
             _qii = Njk * cls0[key].array
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
@@ -290,7 +290,7 @@ def delete2_correction(cls0, cls1, cls2):
     # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
     # Digonaligalize the correction
-    for key in Q.keys():
+    for key in Q:
         q = Q[key]
         *_, length = q.shape
         q_diag = np.diagonal(q, axis1=-2, axis2=-1)
