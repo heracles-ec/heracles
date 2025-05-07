@@ -422,19 +422,44 @@ def test_shrinkage(data_path):
 
 
 def test_flatten(data_path):
+    nside = 128
+    lbins = 2
     data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
     cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    cov_jk = dices.jackknife_covariance(cls1)
-    _cls0 = dices.flatten(cls0)
-    _cov_jk = dices.flatten(cov_jk)
-    (n,) = _cls0.shape
-    _n, _m = _cov_jk.shape
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs0 = heracles.binned(cls0, ledges)
+    comp_cqs0 = dices.io._fields2components(cqs0)
+    order = list(comp_cqs0.keys())
+    cov = dices.gaussian_covariance(cqs0)
+    # Flatten
+    _cqs0 = dices.flatten(cqs0, order=order)
+    __cqs0 = np.array([comp_cqs0[key].array for key in order]).flatten()
+    flat_cov = dices.flatten(cov, order=order)
+    (n,) = _cqs0.shape
+    _n, _m = flat_cov.shape
     assert n == _n
     assert n == _m
+    assert (_cqs0 == __cqs0).all()
+    d_flat_cov = np.diag(flat_cov)
+    _d_flat_cov = []
+    comp_cov = dices.io._fields2components(cov)
+    for key in order:
+        a, b, i, j = key
+        cov_key = (a, b, a, b, i, j, i, j)
+        c = comp_cov[cov_key]
+        d = np.diag(c)
+        _d_flat_cov.append(d)
+    _d_flat_cov = np.array(_d_flat_cov).flatten()
+    assert d_flat_cov.shape == _d_flat_cov.shape
+    for i, o in enumerate(order):
+        print(
+            o,
+            d_flat_cov[i * lbins : (1 + i) * lbins],
+            _d_flat_cov[i * lbins : (i + 1) * lbins],
+        )
+    assert (_d_flat_cov == d_flat_cov).all()
 
 
 def test_gauss_cov(data_path):

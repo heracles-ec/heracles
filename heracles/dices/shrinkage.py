@@ -71,9 +71,13 @@ def shrinkage_factor(cls1, target):
         lambda_star: optimal linear shrinkage factor
     """
     # To data vector
+    cls1_first = cls1[list(cls1.keys())[0]]
+    cls1_first = _fields2components(cls1_first)
+    order = list(cls1_first.keys())
+
     cls1_all = [flatten(cls1[key]) for key in list(cls1.keys())]
     cls1_mu_all = np.mean(np.array(cls1_all), axis=0)
-    target = flatten(target)
+    target = flatten(target, order=order)
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
     W = _get_W(cls1_all, cls1_mu_all)
