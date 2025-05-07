@@ -39,6 +39,8 @@ __all__ = [
     "gaussian_covariance",
     # io
     "flatten",
+    # utils
+    "impose_correlation",
 ]
 
 from .jackknife import (
@@ -62,4 +64,7 @@ from .shrinkage import (
 )
 from .io import (
     flatten,
+)
+from .utils import (
+    impose_correlation,
 )
