@@ -134,23 +134,6 @@ def binned(result, bins, weight=None):
     # get normalised axis tuple from result
     axes = normalize_result_axis(getattr(result, "axis", None), result, ells)
 
-    # combine weights of result with weights from string or given array
-    weights = []
-    for ell, w in zip(ells, get_result_array(result, "weight")):
-        if weight is None:
-            pass
-        elif isinstance(weight, str):
-            if weight == "l(l+1)":
-                w = ell * (ell + 1) * w
-            elif weight == "2l+1":
-                w = (2 * ell + 1) * w
-            else:
-                msg = f"unknown weights string: {weight}"
-                raise ValueError(msg)
-        else:
-            w = weight[: w.size] * w
-        weights.append(w)
-
     # normalise bins into a tuple if a single set is given
     if not isinstance(bins, tuple):
         bins = (bins,) * len(axes)
@@ -159,8 +142,33 @@ def binned(result, bins, weight=None):
     if len(bins) != len(axes):
         raise ValueError("result and bins have different number of ell axes")
 
-    # flatten all bins
-    bins = tuple(np.reshape(b, -1) for b in bins)
+    # normalise weight into a tuple if a single weight is given
+    if not isinstance(weight, tuple):
+        weight = (weight,) * len(axes)
+
+    # make sure length of given weight matches ell axes
+    if len(weight) != len(axes):
+        raise ValueError("result and weight have different number of ell axes")
+
+    # get existing weights from result
+    result_weight = get_result_array(result, "weight")
+
+    # combine weights of result with weights from string or given array
+    combined_weight = []
+    for ell, w1, w2 in zip(ells, weight, result_weight):
+        if w1 is None:
+            w = w2
+        elif isinstance(w1, str):
+            if w1 == "l(l+1)":
+                w = ell * (ell + 1) * w2
+            elif w1 == "2l+1":
+                w = (2 * ell + 1) * w2
+            else:
+                msg = f"unknown weights string: {w1}"
+                raise ValueError(msg)
+        else:
+            w = w1[: w2.size] * w2
+        combined_weight.append(w)
 
     # construct output dtype with metadata
     md = {}
@@ -176,7 +184,7 @@ def binned(result, bins, weight=None):
     binned_weight: tuple[NDArray[Any], ...] | NDArray[Any] = ()
 
     # apply binning over each axis
-    for axis, ell, w, b in zip(axes, ells, weights, bins):
+    for axis, ell, w, b in zip(axes, ells, combined_weight, bins):
         # number of bins for this axis
         m = b.size
 
@@ -190,7 +198,7 @@ def binned(result, bins, weight=None):
         ellb = norm(np.bincount(index, w * ell, m)[1:m], wb)
 
         # output shape, axis is turned into size m
-        shape = result.shape[:axis] + (m - 1,) + result.shape[axis + 1 :]
+        shape = out.shape[:axis] + (m - 1,) + out.shape[axis + 1 :]
 
         # create an empty binned output array
         tmp = np.empty(shape, dtype=dt)
