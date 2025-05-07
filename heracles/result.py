@@ -128,50 +128,47 @@ def binned(result, bins, weight=None):
         out = np.zeros(np.broadcast(a, b).shape)
         return np.divide(a, b, where=(a != 0), out=out)
 
-    # flatten list of bins
-    bins = np.reshape(bins, -1)
-    m = bins.size
+    # get ell values from result
+    ells = get_result_array(result, "ell")
 
-    # shape of the data
-    ellaxis = getattr(result, "axis", None)
-    if ellaxis is None:
-        ellaxis = (result.ndim - 1,)
-    if len(ellaxis) != 1:
-        # multi-binning not implemented yet
-        raise NotImplementedError("only 1D binning is supported")
-    axis = ellaxis[0]
-    shape = result.shape
-    n = shape[axis]
+    # get normalised axis tuple from result
+    axes = normalize_result_axis(getattr(result, "axis", None), result, ells)
 
-    # get ell from results or assume [0, n)
-    ell = getattr(result, "ell", None)
-    if ell is None:
-        ell = np.arange(n)
+    # normalise bins into a tuple if a single set is given
+    if not isinstance(bins, tuple):
+        bins = (bins,) * len(axes)
+
+    # make sure length of given bins matches ell axes
+    if len(bins) != len(axes):
+        raise ValueError("result and bins have different number of ell axes")
+
+    # normalise weight into a tuple if a single weight is given
+    if not isinstance(weight, tuple):
+        weight = (weight,) * len(axes)
+
+    # make sure length of given weight matches ell axes
+    if len(weight) != len(axes):
+        raise ValueError("result and weight have different number of ell axes")
+
+    # get existing weights from result
+    result_weight = get_result_array(result, "weight")
 
     # combine weights of result with weights from string or given array
-    w = getattr(result, "weight", None)
-    if w is None:
-        w = np.ones(n)
-    if weight is None:
-        pass
-    elif isinstance(weight, str):
-        if weight == "l(l+1)":
-            w *= ell * (ell + 1)
-        elif weight == "2l+1":
-            w *= 2 * ell + 1
+    combined_weight = []
+    for ell, w1, w2 in zip(ells, weight, result_weight):
+        if w1 is None:
+            w = w2
+        elif isinstance(w1, str):
+            if w1 == "l(l+1)":
+                w = ell * (ell + 1) * w2
+            elif w1 == "2l+1":
+                w = (2 * ell + 1) * w2
+            else:
+                msg = f"unknown weights string: {w1}"
+                raise ValueError(msg)
         else:
-            msg = f"unknown weights string: {weight}"
-            raise ValueError(msg)
-    else:
-        w *= weight[:n]
-
-    # get the bin index for each ell
-    index = np.digitize(ell, bins)
-
-    assert index.size == ell.size
-
-    # compute the binned weight
-    wb = np.bincount(index, weights=w, minlength=m)[1:m]
+            w = w1[: w2.size] * w2
+        combined_weight.append(w)
 
     # construct output dtype with metadata
     md = {}
@@ -179,25 +176,63 @@ def binned(result, bins, weight=None):
         md.update(result.dtype.metadata)
     dt = np.dtype(float, metadata=md)
 
-    # create an empty binned output array
-    sh = shape[:axis] + (m - 1,) + shape[axis + 1 :]
-    out = np.empty(sh, dtype=dt)
+    # make a copy of the array to apply the binning
+    out = np.copy(result).view(dt)
 
-    # compute the binned result axis by axis
-    for i in np.ndindex(shape[:axis]):
-        for j in np.ndindex(shape[axis + 1 :]):
-            k = (*i, slice(None), *j)
-            out[k] = norm(np.bincount(index, w * result[k], m)[1:m], wb)
+    # this will hold the binned ells and weigths
+    binned_ell: tuple[NDArray[Any], ...] | NDArray[Any] = ()
+    binned_weight: tuple[NDArray[Any], ...] | NDArray[Any] = ()
 
-    # compute the binned ell
-    ell = norm(np.bincount(index, w * ell, m)[1:m], wb)
+    # apply binning over each axis
+    for axis, ell, w, b in zip(axes, ells, combined_weight, bins):
+        # number of bins for this axis
+        m = b.size
+
+        # get the bin index for each ell
+        index = np.digitize(ell, b)
+
+        # compute the binned weight
+        wb = np.bincount(index, weights=w, minlength=m)[1:m]
+
+        # compute the binned ell
+        ellb = norm(np.bincount(index, w * ell, m)[1:m], wb)
+
+        # output shape, axis is turned into size m
+        shape = out.shape[:axis] + (m - 1,) + out.shape[axis + 1 :]
+
+        # create an empty binned output array
+        tmp = np.empty(shape, dtype=dt)
+
+        # compute the binned result axis by axis
+        for before in np.ndindex(shape[:axis]):
+            for after in np.ndindex(shape[axis + 1 :]):
+                k = (*before, slice(None), *after)
+                tmp[k] = norm(np.bincount(index, w * out[k], m)[1:m], wb)
+
+        # array is now binned over axis
+        out = tmp
+
+        # store outputs
+        binned_ell += (ellb,)
+        binned_weight += (wb,)
+
+    # compute bin edges
+    binned_lower = tuple(b[:-1] for b in bins)
+    binned_upper = tuple(b[1:] for b in bins)
+
+    # return plain arrays when there is a single ell axis
+    if len(axes) == 1:
+        binned_ell = binned_ell[0]
+        binned_lower = binned_lower[0]
+        binned_upper = binned_upper[0]
+        binned_weight = binned_weight[0]
 
     # construct the result
     return Result(
         out,
-        ell=ell,
-        axis=axis,
-        lower=bins[:-1],
-        upper=bins[1:],
-        weight=wb,
+        ell=binned_ell,
+        axis=axes,
+        lower=binned_lower,
+        upper=binned_upper,
+        weight=binned_weight,
     )
