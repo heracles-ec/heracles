@@ -177,25 +177,6 @@ def test_mask_correction(data_path):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_polspice(data_path):
-    data_maps = make_data_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    cls = np.array(
-        [
-            cls[("POS", "POS", 1, 1)],
-            cls[("SHE", "SHE", 1, 1)][0, 0],
-            cls[("SHE", "SHE", 1, 1)][1, 1],
-            cls[("POS", "SHE", 1, 1)][0],
-        ]
-    ).T
-    corrs = dices.cl2corr(cls)
-    _cls = dices.corr2cl(corrs)
-    for cl, _cl in zip(cls.T, _cls.T):
-        assert np.isclose(cl[2:], _cl[2:]).all()
-
-
 def test_dices(data_path):
     JackNjk = 5
     nside = 128
