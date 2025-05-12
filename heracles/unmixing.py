@@ -114,10 +114,8 @@ def master(t, d, M, ledges=None):
         for key in M.keys():
             m = M[key]
             ax = m.axis[0]
-            m = np.swapaxes(m, ax, ax+1)
-            M[key] = Result(
-                m, axis=M[key].axis, ell=M[key].ell
-            )
+            m = np.swapaxes(m, ax, ax + 1)
+            M[key] = Result(m, axis=M[key].axis, ell=M[key].ell)
         M = binned(M, ledges)
     mt = inversion(ft, M)
     md = inversion(d, M)
