@@ -31,6 +31,16 @@ __all__ = [
     "delete2_correction",
     # mask_correction
     "correct_mask",
+    "cl2corr",
+    "corr2cl",
+    # shrinkage
+    "shrink",
+    "shrinkage_factor",
+    "gaussian_covariance",
+    # io
+    "flatten",
+    # utils
+    "impose_correlation",
 ]
 
 from .jackknife import (
@@ -42,4 +52,20 @@ from .jackknife import (
     debias_covariance,
     delete2_correction,
 )
-from .mask_correction import correct_mask
+
+from .mask_correction import (
+    correct_mask,
+    cl2corr,
+    corr2cl,
+)
+from .shrinkage import (
+    shrink,
+    shrinkage_factor,
+    gaussian_covariance,
+)
+from .io import (
+    flatten,
+)
+from .utils import (
+    impose_correlation,
+)
