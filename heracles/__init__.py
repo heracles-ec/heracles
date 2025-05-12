@@ -75,6 +75,7 @@ __all__ = [
     # unmixing
     "forwards",
     "inversion",
+    "master",
     "natural_unmixing",
 ]
 
@@ -155,5 +156,6 @@ from .transforms import (
 from .unmixing import (
     forwards,
     inversion,
+    master,
     natural_unmixing,
 )

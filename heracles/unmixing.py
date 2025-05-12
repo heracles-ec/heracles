@@ -19,6 +19,7 @@
 import numpy as np
 from .result import Result
 from .dices.mask_correction import cl2corr, corr2cl, logistic
+from .result import binned
 
 
 def forwards(t, M):
@@ -95,6 +96,32 @@ def inversion(d, M):
             _id = _id[0]
         inversion_cls[key] = Result(_id, axis=d[key].axis, ell=d[key].ell)
     return inversion_cls
+
+
+def master(t, d, M, ledges=None):
+    """
+    Master method for unmixing E/B modes
+    Args:
+        t: theory cl
+        d: data cl
+        M: mixing matrix
+    """
+    ft = forwards(t, M)
+    if ledges is not None:
+        ft = binned(ft, ledges)
+        d = binned(d, ledges)
+        M = binned(M, ledges)
+        for key in M.keys():
+            m = M[key]
+            ax = m.axis[0]
+            m = np.swapaxes(m, ax, ax+1)
+            M[key] = Result(
+                m, axis=M[key].axis, ell=M[key].ell
+            )
+        M = binned(M, ledges)
+    mt = inversion(ft, M)
+    md = inversion(d, M)
+    return mt, md
 
 
 def natural_unmixing(d, m, patch_hole=True):
