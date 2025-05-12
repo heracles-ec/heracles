@@ -289,7 +289,7 @@ def delete2_correction(cls0, cls1, cls2):
             Q_ii.append(qii)
     # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
-    # Digonaligalize the correction
+    # Diagonalise the correction
     for key in Q:
         q = Q[key]
         *_, length = q.shape

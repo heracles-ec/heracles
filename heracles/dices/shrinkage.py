@@ -39,7 +39,7 @@ from .io import (
 
 def shrink(cov, target, shrinkage_factor):
     """
-    Internal method to compute the shrunk covariance.
+    Compute the shrunk covariance.
     inputs:
         cov (dict): Dictionary of Jackknife covariance
         target (dict): Dictionary of target covariance
@@ -152,7 +152,7 @@ def gaussian_covariance(Cls):
 
 def _gaussian_covariance(cls, key):
     """
-    Retunrs a particular entry of the gaussian covariance matrix.
+    Returns a particular entry of the gaussian covariance matrix.
     input:
         cls: Cls
         key: key of the entry

@@ -31,7 +31,6 @@ def flatten(results, order=None):
     input:
         results: dictionary of Cl values
         order: list of keys to use for the flattening
-        remove_non_uniques: if True, removes non-unique keys from the order
     """
     components_dict = _fields2components(results)
     data = _components2data(components_dict, order=order)
@@ -40,11 +39,7 @@ def flatten(results, order=None):
 
 def _fields2components(results):
     """
-    Separates the SHE values into E and B modes.
-    input:
-        Cls: dictionary of Cl values
-    returns:
-        Cls_unraveled: dictionary of Cl values
+    Separates the SHE values in *results* into E and B modes.
     """
     # It feels like all of this should be able to be done programmatically
     # but I don't know how to do that yet.
