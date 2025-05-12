@@ -187,15 +187,20 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def jackknife_covariance(samples, nd=1):
+def jackknife_covariance(dict, nd=1):
+    """
+    Compute the jackknife covariance matrix from a sequence
+    of spectra dictionaries *dict*.
+    """
+    return _jackknife_covariance(dict.values(), nd=nd)
+
+
+def _jackknife_covariance(samples, nd=1):
     """
     Compute the jackknife covariance matrix from a sequence
     of spectra dictionaries *samples*.
     """
     cov = {}
-    # no samples means no covariance
-    if not samples:
-        return cov
     # first sample is the blueprint that rest must follow
     first, *rest = samples
     # loop over pairs of keys to compute their covariance
@@ -224,11 +229,11 @@ def jackknife_covariance(samples, nd=1):
             # get attributes of result
             ell = get_result_array(result1, "ell")
             ell += get_result_array(result2, "ell")
-            # wrap everything into a result instance
-            result = Result(a, axis=axis, ell=ell)
-            # store result
+            # add extra axis if needed
             a1, b1, i1, j1 = key1
             a2, b2, i2, j2 = key2
+            result = Result(a, axis=axis, ell=ell)
+            # store result
             cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
     return cov
 
@@ -258,7 +263,7 @@ def sample_covariance(samples, samples2=None):
     return cov
 
 
-def delete2_correction(Cls0, Cls1, Cls2):
+def delete2_correction(cls0, cls1, cls2):
     """
     Internal method to compute the delete2 correction.
     inputs:
@@ -268,38 +273,49 @@ def delete2_correction(Cls0, Cls1, Cls2):
     returns:
         Q (dict): Dictionary of delete2 correction
     """
+    # Compute the ensemble for the correction
     Q_ii = []
-    Njk = len(Cls1)
-    for kk in Cls2.keys():
+    Njk = len(cls1)
+    for kk in cls2:
         k1, k2 = kk
         qii = {}
-        for key in Cls2[kk].keys():
-            _qii = Njk * Cls0[key].array
-            _qii -= (Njk - 1) * Cls1[(k1,)][key].array
-            _qii -= (Njk - 1) * Cls1[(k2,)][key].array
-            _qii += (Njk - 2) * Cls2[kk][key].array
-            _qii = Result(_qii, ell=Cls0[key].ell)
+        for key in cls2[kk]:
+            _qii = Njk * cls0[key].array
+            _qii -= (Njk - 1) * cls1[(k1,)][key].array
+            _qii -= (Njk - 1) * cls1[(k2,)][key].array
+            _qii += (Njk - 2) * cls2[kk][key].array
+            _qii = Result(_qii, ell=cls0[key].ell)
             qii[key] = _qii
             Q_ii.append(qii)
-    Q = jackknife_covariance(Q_ii, nd=2)
+    # Compute the correction from the ensemble
+    Q = _jackknife_covariance(Q_ii, nd=2)
+    # Diagonalise the correction
+    for key in Q:
+        q = Q[key]
+        *_, length = q.shape
+        q_diag = np.diagonal(q, axis1=-2, axis2=-1)
+        q_diag_exp = np.zeros_like(q)
+        diag_indices = np.arange(length)  # Indices for the diagonal
+        q_diag_exp[..., diag_indices, diag_indices] = q_diag
+        Q[key] = q_diag_exp
     return Q
 
 
-def debias_covariance(cov_jk, Cls0, Clsjks, Clsjk2s):
+def debias_covariance(cov_jk, cls0, cls1, cls2):
     """
     Debiases the Jackknife covariance using the delete2 ensemble.
     inputs:
         cov_jk (dict): Dictionary of delete1 covariance
-        Cls0 (dict): Dictionary of data Cls
-        Clsjks (dict): Dictionary of delete1 data Cls
-        Clsjk2s (dict): Dictionary of delete2 data Cls
+        cls0 (dict): Dictionary of data Cls
+        cls1 (dict): Dictionary of delete1 data Cls
+        cls2 (dict): Dictionary of delete2 data Cls
     returns:
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
-    Q = delete2_correction(Cls0, Clsjks, Clsjk2s)
+    Q = delete2_correction(cls0, cls1, cls2)
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array
+        c = cov_jk[key].array - Q[key]
         debiased_cov[key] = Result(
             c,
             ell=cov_jk[key].ell,
