@@ -18,6 +18,7 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import itertools
+import healpy as hp
 from copy import deepcopy
 from itertools import combinations
 from .mask_correction import correct_mask
@@ -71,10 +72,6 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     """
     # grab metadata
     print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
-    _m = maps[list(maps.keys())[0]]
-    meta = _m.dtype.metadata
-    lmax = meta["lmax"]
-    ell = np.arange(lmax + 1)
     # deep copy to avoid modifying the original maps
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
@@ -91,9 +88,6 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     alms = transform(fields, _maps)
     # compute cls
     cls = angular_power_spectra(alms)
-    # Result
-    for key in cls.keys():
-        cls[key] = Result(cls[key], ell=ell)
     return cls
 
 
@@ -180,10 +174,9 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     cls = sub_to_Cls(cls, b_jk)
     # Update metadata
     for key in cls.keys():
-        cl = cls[key].__array__()
-        ell = cls[key].ell
+        cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl, ell=ell)
+        cls[key] = Result(cl)
     return cls
 
 
