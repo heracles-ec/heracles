@@ -122,7 +122,7 @@ def master(t, d, M, ledges=None):
     return mt, md
 
 
-def natural_unmixing(d, m, patch_hole=True):
+def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -154,7 +154,9 @@ def natural_unmixing(d, m, patch_hole=True):
         )
         wm = cl2corr(__m.T).T[0]
         if patch_hole:
-            wm /= logistic(np.log10(abs(wm)), x0=-2, k=50)
+            print("x0: ", x0)
+            print("k: ", k)
+            wm /= logistic(np.log10(abs(wm)), x0=x0, k=k)
         # Correct Cl by mask
         if a == b == "SHE":
             __d = np.array(
