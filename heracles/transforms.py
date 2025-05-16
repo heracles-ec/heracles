@@ -1,25 +1,23 @@
-from scipy.special import lpn as legendrep
+# DICES: Euclid code for harmonic-space statistics on the sphere
+#
+# Copyright (C) 2023-2024 Euclid Science Ground Segment
+#
+# This file is part of DICES.
+#
+# DICES is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# DICES is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-
-gauss_legendre = None
-_gauss_legendre_cache = {}
-
-
-def _cached_gauss_legendre(npoints, cache=True):
-    if cache and npoints in _gauss_legendre_cache:
-        return _gauss_legendre_cache[npoints]
-    else:
-        if gauss_legendre is not None:
-            xvals = np.empty(npoints)
-            weights = np.empty(npoints)
-            gauss_legendre(xvals, weights, npoints)
-            xvals.flags.writeable = False
-            weights.flags.writeable = False
-        else:
-            xvals, weights = np.polynomial.legendre.leggauss(npoints)
-        if cache:
-            _gauss_legendre_cache[npoints] = xvals, weights
-        return xvals, weights
+from scipy.special import lpn as legendrep
 
 
 def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
@@ -107,13 +105,13 @@ def cl2corr(cls, lmax=None, sampling_factor=1):
     if lmax is None:
         lmax = cls.shape[0] - 1
 
-    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
+    xvals, weights = l2x(lmax, sampling_factor=sampling_factor)
 
     ls = np.arange(0, lmax + 1, dtype=np.float64)
     corrs = np.zeros((len(xvals), 4))
     lfacs = ls * (ls + 1)
     lfacs[0] = 1
-    facs = (2 * ls + 1) / (4 * np.pi)
+    facs = (2 * ls + 1) / (4 * np.pi) #* 2 * np.pi
 
     ct = facs * cls[: lmax + 1, 0]
     # For polarization, all arrays start at 2
@@ -132,7 +130,7 @@ def cl2corr(cls, lmax=None, sampling_factor=1):
         corrs[i, 1] = np.dot(cp, d22)  # Q+U
         corrs[i, 2] = np.dot(cm, d2m2)  # Q-U
         corrs[i, 3] = np.dot(cc, d20)  # cross
-    corrs[:, 0] += corrs[:, 0][0] / (4 * np.pi)
+    #corrs[:, 0] += cls[:, 0][0] / (4 * np.pi)
     return corrs
 
 
@@ -149,12 +147,9 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     :return: array of power spectra, cl[L, ix], where L starts at zero and ix=0,1,2,3 in order TT, EE, BB, TE.
       They include :math:`\ell(\ell+1)/2\pi` factors.
     """
-
     if lmax is None:
         lmax = corrs.shape[0] - 1
-
-    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
-
+    xvals, weights = l2x(lmax, sampling_factor=sampling_factor)
     # For polarization, all arrays start at 2
     ls = np.arange(2, lmax + 1, dtype=np.float64)
     lfacs = ls * (ls + 1)
@@ -171,7 +166,10 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
         cls[2:, 1] += T2 + T4
         cls[2:, 2] += T2 - T4
         cls[2:, 3] += (weight * corrs[i, 3]) * d20
-
     cls[1, :] *= 2
     cls[2:, :] = cls[2:, :]
     return 2 * np.pi * cls
+
+
+def l2x(lmax, sampling_factor=1):
+    return np.polynomial.legendre.leggauss(int(sampling_factor * lmax) + 1)

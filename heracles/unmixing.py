@@ -74,8 +74,8 @@ def inversion(d, M):
         *_, _n, _m = _M.shape
         if a == b == "SHE":
             _M_EB = _M[2]
-            _M_EE = np.hstack((_M[0], _M[2]))
-            _M_BB = np.hstack((_M[2], _M[1]))
+            _M_EE = np.hstack((_M[0], _M[1]))
+            _M_BB = np.hstack((_M[1], _M[0]))
             _M_EEBB = np.vstack((_M_EE, _M_BB))
             _inv_M_EEBB = np.linalg.pinv(_M_EEBB)
             _inv_M_EB = np.linalg.pinv(_M_EB)
@@ -154,8 +154,6 @@ def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
         )
         wm = cl2corr(__m.T).T[0]
         if patch_hole:
-            print("x0: ", x0)
-            print("k: ", k)
             wm /= logistic(np.log10(abs(wm)), x0=x0, k=k)
         # Correct Cl by mask
         if a == b == "SHE":
@@ -184,10 +182,10 @@ def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
             __icorr_d = corr2cl(icorr_wd.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
-            _corr_d[0, 0] = __corr_d[0]  # EE like spin-2
-            _corr_d[1, 1] = __corr_d[1]  # BB like spin-2
-            _corr_d[0, 1] = -__icorr_d[0]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[1]  # EB like spin-0
+            _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
+            _corr_d[1, 1] = -__corr_d[2]  # BB like spin-2
+            _corr_d[0, 1] = __icorr_d[1]  # EB like spin-0
+            _corr_d[1, 0] = -__icorr_d[2]  # EB like spin-0
         else:
             # Treat everything as spin-0
             _corr_d = []
@@ -205,9 +203,8 @@ def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
-
-        # remove extra axis
-        _corr_d = np.squeeze(_corr_d)
+            # remove extra axis
+            _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(_corr_d, dtype=dtype)
         corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
