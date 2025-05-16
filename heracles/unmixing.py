@@ -182,10 +182,10 @@ def natural_unmixing(d, m, patch_hole=True):
             __icorr_d = corr2cl(icorr_wd.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
-            _corr_d[0, 0] = __corr_d[0]  # EE like spin-2
-            _corr_d[1, 1] = __corr_d[1]  # BB like spin-2
-            _corr_d[0, 1] = -__icorr_d[0]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[1]  # EB like spin-0
+            _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
+            _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
+            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
+            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
         else:
             # Treat everything as spin-0
             _corr_d = []
@@ -204,8 +204,8 @@ def natural_unmixing(d, m, patch_hole=True):
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
 
-        # remove extra axis
-        _corr_d = np.squeeze(_corr_d)
+            # remove extra axis
+            _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(_corr_d, dtype=dtype)
         corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
