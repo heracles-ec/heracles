@@ -104,6 +104,9 @@ def cl2corr(cls, lmax=None, sampling_factor=1):
     :return: 2D array of corrs[i, ix], where ix=0,1,2,3 are T, Q+U, Q-U and cross
     """
 
+    if cls.ndim == 1:
+            cls = np.array([cls, np.zeros_like(cls), np.zeros_like(cls), np.zeros_like(cls)]).T
+
     if lmax is None:
         lmax = cls.shape[0] - 1
 

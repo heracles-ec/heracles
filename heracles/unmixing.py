@@ -49,11 +49,10 @@ def forwards(t, M):
 
         else:
             fcls = np.array([_M @ __t for __t in _t])
-        *_, m = fcls.shape
         # Check if fcls is a 1D array
         if len(fcls) == 1:
             fcls = fcls[0]
-        forward_cls[key] = Result(fcls, axis=t[key].axis, ell=t[key].ell[:m])
+        forward_cls[key] = Result(fcls, axis=t[key].axis)
     return forward_cls
 
 
@@ -74,8 +73,8 @@ def inversion(d, M):
         *_, _n, _m = _M.shape
         if a == b == "SHE":
             _M_EB = _M[2]
-            _M_EE = np.hstack((_M[0], _M[2]))
-            _M_BB = np.hstack((_M[2], _M[1]))
+            _M_EE = np.hstack((_M[0], _M[1]))
+            _M_BB = np.hstack((_M[1], _M[0]))
             _M_EEBB = np.vstack((_M_EE, _M_BB))
             _inv_M_EEBB = np.linalg.pinv(_M_EEBB)
             _inv_M_EB = np.linalg.pinv(_M_EB)
@@ -94,7 +93,7 @@ def inversion(d, M):
             _id = _id[:, :_n]
         if len(_id) == 1:
             _id = _id[0]
-        inversion_cls[key] = Result(_id, axis=d[key].axis, ell=d[key].ell)
+        inversion_cls[key] = Result(_id, axis=d[key].axis)
     return inversion_cls
 
 
@@ -115,7 +114,7 @@ def master(t, d, M, ledges=None):
             m = M[key]
             ax = m.axis[0]
             m = np.swapaxes(m, ax, ax + 1)
-            M[key] = Result(m, axis=M[key].axis, ell=M[key].ell)
+            M[key] = Result(m, axis=M[key].axis)
         M = binned(M, ledges)
     mt = inversion(ft, M)
     md = inversion(d, M)
@@ -127,7 +126,7 @@ def natural_unmixing(d, m, patch_hole=True):
     Natural unmixing of the data Cl.
     Args:
         d: Data Cl
-        m: Mixing matrix
+        m: mask cls
         patch_hole: If True, apply the patch hole correction
     Returns:
         corr_d: Corrected Cl
@@ -138,20 +137,12 @@ def natural_unmixing(d, m, patch_hole=True):
     for d_key, m_key in zip(d_keys, m_keys):
         a, b, i, j = d_key
         _d = np.atleast_2d(d[d_key])
-        _m = m[m_key]
+        _m = m[m_key].array
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
         # transform mask
-        __m = np.array(
-            [
-                _m,
-                np.zeros_like(_m),
-                np.zeros_like(_m),
-                np.zeros_like(_m),
-            ]
-        )
-        wm = cl2corr(__m.T).T[0]
+        wm = cl2corr(_m).T[0]
         if patch_hole:
             wm /= logistic(np.log10(abs(wm)), x0=-2, k=50)
         # Correct Cl by mask
@@ -189,15 +180,7 @@ def natural_unmixing(d, m, patch_hole=True):
             # Treat everything as spin-0
             _corr_d = []
             for cl in _d:
-                __d = np.array(
-                    [
-                        cl,
-                        np.zeros_like(cl),
-                        np.zeros_like(cl),
-                        np.zeros_like(cl),
-                    ]
-                )
-                wd = cl2corr(__d.T).T
+                wd = cl2corr(cl).T
                 corr_wd = wd / wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T

@@ -12,26 +12,10 @@ def mask_correction(Mljk, Mls0):
     returns:
         alpha (Float64): Mask correction factor
     """
-    _Mls0 = np.array(
-        [
-            Mls0,
-            np.zeros_like(Mls0),
-            np.zeros_like(Mls0),
-            np.zeros_like(Mls0),
-        ]
-    )
-    _Mljk = np.array(
-        [
-            Mljk,
-            np.zeros_like(Mljk),
-            np.zeros_like(Mljk),
-            np.zeros_like(Mljk),
-        ]
-    )
     # Transform to real space
-    wMls0 = cl2corr(_Mls0.T)
+    wMls0 = cl2corr(Mls0)
     wMls0 = wMls0.T[0]
-    wMljk = cl2corr(_Mljk.T)
+    wMljk = cl2corr(Mljk)
     wMljk = wMljk.T[0]
     # Compute alpha
     alpha = wMls0 / wMljk
@@ -93,15 +77,7 @@ def correct_mask(Cljk, Mljk, Mls0):
             # Treat everything as spin-0
             _corr_Cljk = []
             for cl in _Cljk:
-                __Cljk = np.array(
-                    [
-                        cl,
-                        np.zeros_like(cl),
-                        np.zeros_like(cl),
-                        np.zeros_like(cl),
-                    ]
-                )
-                wCljk = cl2corr(__Cljk.T).T
+                wCljk = cl2corr(cl).T
                 corr_wCljk = wCljk * alpha
                 # Transform back to Cl
                 __corr_Cljk = corr2cl(corr_wCljk.T).T
