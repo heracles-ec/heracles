@@ -25,7 +25,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _natural_unmixing
+from ..unmixing import natural_unmixing
 from ..transforms import cl2corr, logistic
 
 
@@ -51,8 +51,9 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        alphas = mask_correction(_cls_mm, mls0)
-        _cls = _natural_unmixing(_cls, alphas)
+        #alphas = mask_correction(_cls_mm, mls0)
+        #_cls = _natural_unmixing(_cls, alphas)
+        _cls = natural_unmixing(_cls, mls0)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
