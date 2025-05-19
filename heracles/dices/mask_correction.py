@@ -56,7 +56,6 @@ def correct_mask(Cljk, Mljk, Mls0):
         alpha = mask_correction(_Mljk, _Mls0)
         # Grab metadata
         dtype = Cljk[Cl_key].array.dtype
-        ell = Cljk[Cl_key].ell
         # Correct Cl by mask
         _Cljk = Cljk[Cl_key]
         a, b, i, j = Cl_key
@@ -127,7 +126,7 @@ def correct_mask(Cljk, Mljk, Mls0):
             _corr_Cljk = _corr_Cljk[0]
         # Add metadata back
         _corr_Cljk = np.array(_corr_Cljk, dtype=dtype)
-        corr_Cljk[Cl_key] = Result(_corr_Cljk, ell=ell)
+        corr_Cljk[Cl_key] = Result(_corr_Cljk)
     return corr_Cljk
 
 

@@ -74,7 +74,6 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     _m = maps[list(maps.keys())[0]]
     meta = _m.dtype.metadata
     lmax = meta["lmax"]
-    ell = np.arange(lmax + 1)
     # deep copy to avoid modifying the original maps
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
@@ -93,7 +92,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     cls = angular_power_spectra(alms)
     # Result
     for key in cls.keys():
-        cls[key] = Result(cls[key], ell=ell)
+        cls[key] = Result(cls[key])
     return cls
 
 
@@ -180,10 +179,9 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     cls = sub_to_Cls(cls, b_jk)
     # Update metadata
     for key in cls.keys():
-        cl = cls[key].__array__()
-        ell = cls[key].ell
+        cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl, ell=ell)
+        cls[key] = Result(cl)
     return cls
 
 
@@ -284,7 +282,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
             _qii += (Njk - 2) * cls2[kk][key].array
-            _qii = Result(_qii, ell=cls0[key].ell)
+            _qii = Result(_qii)
             qii[key] = _qii
             Q_ii.append(qii)
     # Compute the correction from the ensemble
