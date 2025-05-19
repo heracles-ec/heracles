@@ -50,30 +50,16 @@ def correct_mask(Cljk, Mljk, Mls0):
     Cl_keys = list(Cljk.keys())
     Clmm_keys = list(Mljk.keys())
     for Cl_key, Clmm_key in zip(Cl_keys, Clmm_keys):
-        # get alpha
+        a, b, i, j = Cl_key
         _Mls0 = Mls0[Clmm_key]
         _Mljk = Mljk[Clmm_key]
-        alpha = mask_correction(_Mljk, _Mls0)
+        _Cljk = Cljk[Cl_key]
         # Grab metadata
         dtype = Cljk[Cl_key].array.dtype
-        # Correct Cl by mask
-        _Cljk = Cljk[Cl_key]
-        a, b, i, j = Cl_key
-        if a == b == "POS":
-            __Cljk = np.array(
-                [
-                    _Cljk,
-                    np.zeros_like(_Cljk),
-                    np.zeros_like(_Cljk),
-                    np.zeros_like(_Cljk),
-                ]
-            )
-            wCljk = cl2corr(__Cljk.T).T
-            corr_wCljk = wCljk * alpha
-            # Transform back to Cl
-            __corr_Cljk = corr2cl(corr_wCljk.T).T
-            _corr_Cljk = list(__corr_Cljk[0])
-        elif a == b == "SHE":
+        # Compute mask correction
+        alpha = mask_correction(_Mljk, _Mls0)
+        _Cljk = np.atleast_2d(_Cljk)
+        if a == b == "SHE":
             __Cljk = np.array(
                 [
                     np.zeros_like(_Cljk[0, 0]),
@@ -120,12 +106,10 @@ def correct_mask(Cljk, Mljk, Mls0):
                 # Transform back to Cl
                 __corr_Cljk = corr2cl(corr_wCljk.T).T
                 _corr_Cljk.append(__corr_Cljk[0])
-
-        # Undo at least2D
-        if len(_corr_Cljk) == 1:
-            _corr_Cljk = _corr_Cljk[0]
+            # remove extra axis
+            _corr_Cljk = np.squeeze(_corr_Cljk)
         # Add metadata back
-        _corr_Cljk = np.array(_corr_Cljk, dtype=dtype)
+        _corr_Cljk = np.array(list(_corr_Cljk), dtype=dtype)
         corr_Cljk[Cl_key] = Result(_corr_Cljk)
     return corr_Cljk
 

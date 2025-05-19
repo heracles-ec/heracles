@@ -141,7 +141,6 @@ def natural_unmixing(d, m, patch_hole=True):
         _m = m[m_key]
         # Grab metadata
         dtype = d[d_key].array.dtype
-        ell = d[d_key].ell
         axis = d[d_key].axis
         # transform mask
         __m = np.array(
@@ -208,5 +207,5 @@ def natural_unmixing(d, m, patch_hole=True):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(_corr_d, dtype=dtype)
-        corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
+        corr_d[d_key] = Result(_corr_d, axis=axis)
     return corr_d
