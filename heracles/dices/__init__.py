@@ -29,10 +29,6 @@ __all__ = [
     "jackknife_covariance",
     "debias_covariance",
     "delete2_correction",
-    # mask_correction
-    "correct_mask",
-    "cl2corr",
-    "corr2cl",
     # shrinkage
     "shrink",
     "shrinkage_factor",
@@ -53,11 +49,6 @@ from .jackknife import (
     delete2_correction,
 )
 
-from .mask_correction import (
-    correct_mask,
-    cl2corr,
-    corr2cl,
-)
 from .shrinkage import (
     shrink,
     shrinkage_factor,

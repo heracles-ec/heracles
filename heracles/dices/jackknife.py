@@ -20,12 +20,13 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
-from .mask_correction import correct_mask
 from .utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
+from ..unmixing import _natural_unmixing
+from ..transforms import cl2corr, logistic
 
 
 def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
@@ -50,7 +51,8 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        _cls = correct_mask(_cls, _cls_mm, mls0)
+        alphas = mask_correction(_cls_mm, mls0)
+        _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
@@ -69,11 +71,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     returns:
         cls (dict): Dictionary of data Cls
     """
-    # grab metadata
     print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
-    _m = maps[list(maps.keys())[0]]
-    meta = _m.dtype.metadata
-    lmax = meta["lmax"]
     # deep copy to avoid modifying the original maps
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
@@ -183,6 +181,31 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
         update_metadata(cl, bias=b_jk[key])
         cls[key] = Result(cl)
     return cls
+
+
+def mask_correction(Mljk, Mls0):
+    """
+    Internal method to compute the mask correction.
+    input:
+        Mljk (np.array): mask of delete1 Cls
+        Mls0 (np.array): mask Cls
+    returns:
+        alpha (Float64): Mask correction factor
+    """
+    alphas = {}
+    for key in list(Mljk.keys()):
+        mljk = Mljk[key]
+        mls0 = Mls0[key]
+        # Transform to real space
+        wmls0 = cl2corr(mls0)
+        wmls0 = wmls0.T[0]
+        wmljk = cl2corr(mljk)
+        wmljk = wmljk.T[0]
+        # Compute alpha
+        alpha = wmljk / wmls0
+        alpha *= logistic(np.log10(abs(wmljk)))
+        alphas[key] = alpha
+    return alphas
 
 
 def jackknife_covariance(dict, nd=1):

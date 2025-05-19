@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import Result
-from .dices.mask_correction import cl2corr, corr2cl, logistic
+from .transforms import cl2corr, corr2cl, logistic
 from .result import binned
 
 
@@ -122,6 +122,18 @@ def master(t, d, M, ledges=None):
 
 
 def natural_unmixing(d, m, patch_hole=True):
+    wm = {}
+    m_keys = list(m.keys())
+    for m_key in m_keys:
+        _m = m[m_key].array
+        _wm = cl2corr(_m).T[0]
+        if patch_hole:
+            _wm /= logistic(np.log10(abs(_wm)), x0=-2, k=50)
+        wm[m_key] = _wm
+    return _natural_unmixing(d, wm)
+
+
+def _natural_unmixing(d, wm):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -133,19 +145,14 @@ def natural_unmixing(d, m, patch_hole=True):
     """
     corr_d = {}
     d_keys = list(d.keys())
-    m_keys = list(m.keys())
-    for d_key, m_key in zip(d_keys, m_keys):
+    wm_keys = list(wm.keys())
+    for d_key, wm_key in zip(d_keys, wm_keys):
         a, b, i, j = d_key
-        _d = np.atleast_2d(d[d_key])
-        _m = m[m_key].array
+        _wm = wm[wm_key]
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
-        # transform mask
-        wm = cl2corr(_m).T[0]
-        if patch_hole:
-            wm /= logistic(np.log10(abs(wm)), x0=-2, k=50)
-        # Correct Cl by mask
+        _d = np.atleast_2d(d[d_key])
         if a == b == "SHE":
             __d = np.array(
                 [
@@ -165,8 +172,8 @@ def natural_unmixing(d, m, patch_hole=True):
             )
             # Correct by alpha
             wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd / wm).real
-            icorr_wd = (wd / wm).imag
+            corr_wd = (wd / _wm).real
+            icorr_wd = (wd / _wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
@@ -181,14 +188,13 @@ def natural_unmixing(d, m, patch_hole=True):
             _corr_d = []
             for cl in _d:
                 wd = cl2corr(cl).T
-                corr_wd = wd / wm
+                corr_wd = wd / _wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
-
             # remove extra axis
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
-        _corr_d = np.array(_corr_d, dtype=dtype)
+        _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[d_key] = Result(_corr_d, axis=axis)
     return corr_d

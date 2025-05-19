@@ -170,7 +170,8 @@ def test_mask_correction(data_path):
     jkmaps = make_jkmaps(data_path)
     cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     mls = dices.jackknife.get_cls(vis_maps, jkmaps, fields)
-    _cls = dices.correct_mask(cls, mls, mls)
+    alphas = dices.mask_correction.mask_correction(mls, mls)
+    _cls = dices.correct_mask(cls, alphas)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
         _cl = _cls[key].__array__()

@@ -178,3 +178,7 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     cls[1, :] *= 2
     cls[2:, :] = cls[2:, :]
     return 2 * np.pi * cls
+
+
+def logistic(x, x0=-5, k=50):
+    return 1.0 + np.exp(-k * (x - x0))
