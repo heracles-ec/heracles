@@ -26,6 +26,7 @@ __all__ = [
     "jackknife_fsky",
     "jackknife_bias",
     "correct_bias",
+    "jackknife_maps",
     "mask_correction",
     "jackknife_covariance",
     "debias_covariance",
@@ -42,6 +43,7 @@ __all__ = [
 
 from .jackknife import (
     jackknife_cls,
+    jackknife_maps,
     jackknife_fsky,
     jackknife_bias,
     correct_bias,

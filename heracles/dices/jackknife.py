@@ -25,7 +25,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import natural_unmixing
+from ..unmixing import _natural_unmixing
 from ..transforms import cl2corr, logistic
 
 
@@ -51,9 +51,8 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        #alphas = mask_correction(_cls_mm, mls0)
-        #_cls = _natural_unmixing(_cls, alphas)
-        _cls = natural_unmixing(_cls, mls0)
+        alphas = mask_correction(_cls_mm, mls0)
+        _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
@@ -73,7 +72,29 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
         cls (dict): Dictionary of data Cls
     """
     print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
-    # deep copy to avoid modifying the original maps
+    # remove the region from the maps
+    _maps = jackknife_maps(maps, jkmaps, jk=jk, jk2=jk2)
+    # compute alms
+    alms = transform(fields, _maps)
+    # compute cls
+    cls = angular_power_spectra(alms)
+    # Result
+    for key in cls.keys():
+        cls[key] = Result(cls[key])
+    return cls
+
+
+def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
+    """
+    Internal method to remove a region from the maps.
+    inputs:
+        maps (dict): Dictionary of data maps
+        jkmaps (dict): Dictionary of mask maps
+        jk (int): Jackknife region to remove
+        jk2 (int): Jackknife region to remove
+    returns:
+        maps (dict): Dictionary of data maps
+    """
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
@@ -85,14 +106,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
         _mask[cond] = 0.0
         # Apply mask
         _map *= _mask
-    # compute alms
-    alms = transform(fields, _maps)
-    # compute cls
-    cls = angular_power_spectra(alms)
-    # Result
-    for key in cls.keys():
-        cls[key] = Result(cls[key])
-    return cls
+    return _maps
 
 
 def bias(cls):
