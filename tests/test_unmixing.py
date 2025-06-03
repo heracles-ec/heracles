@@ -93,7 +93,7 @@ def test_natural_unmixing():
     x = np.random.rand(10)
     cls = make_dummy_cls(x)
     mask_cls = make_dummy_mask(x)
-    _cls = heracles.natural_unmixing(cls, mask_cls, patch_hole=False)
+    _cls = heracles.PolSpice(cls, mask_cls, patch_hole=False)
     for key in list(cls.keys()):
         assert _cls[key].shape == cls[key].shape
     for key in list(cls.keys()):

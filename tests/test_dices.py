@@ -171,7 +171,7 @@ def test_mask_correction(data_path):
     cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     mls = dices.jackknife.get_cls(vis_maps, jkmaps, fields)
     alphas = dices.mask_correction(mls, mls)
-    _cls = heracles.unmixing._natural_unmixing(cls, alphas)
+    _cls = heracles.unmixing._PolSpice(cls, alphas)
     for key in list(cls.keys()):
         cl = cls[key].__array__()
         _cl = _cls[key].__array__()

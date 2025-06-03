@@ -182,5 +182,10 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     return 2 * np.pi * cls
 
 
+def l2x(l):
+    xvals, _ = _cached_gauss_legendre(int(l[-1]) + 1)
+    return xvals
+
+
 def logistic(x, x0=-5, k=50):
     return 1.0 + np.exp(-k * (x - x0))

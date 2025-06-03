@@ -76,7 +76,7 @@ __all__ = [
     "forwards",
     "inversion",
     "master",
-    "natural_unmixing",
+    "PolSpice",
 ]
 
 try:
@@ -157,5 +157,5 @@ from .unmixing import (
     forwards,
     inversion,
     master,
-    natural_unmixing,
+    PolSpice,
 )
