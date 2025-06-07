@@ -182,21 +182,27 @@ def _PolSpice(d, wm, mode="natural"):
                 x = l2x(ell)
                 xi_p = wd[1].real
                 xi_dec_plus = Eq90_plus(x, xi_p)
-                wd = np.array([
-                    np.zeros_like(_d[0, 0]),
-                    xi_p,
-                    xi_dec_plus,
-                    np.zeros_like(_d[0, 0])])
+                wd = np.array(
+                    [
+                        np.zeros_like(_d[0, 0]),
+                        xi_p,
+                        xi_dec_plus,
+                        np.zeros_like(_d[0, 0]),
+                    ]
+                )
             elif mode == "minus":
                 x = l2x(ell)
                 xi_p = wd[1].real
                 xi_m = wd[2].real
                 xi_dec_minus = Eq90_minus(x, xi_m)
-                wd = np.array([
-                    np.zeros_like(_d[0, 0]),
-                    xi_p,
-                    xi_dec_minus,
-                    np.zeros_like(_d[0, 0])])
+                wd = np.array(
+                    [
+                        np.zeros_like(_d[0, 0]),
+                        xi_p,
+                        xi_dec_minus,
+                        np.zeros_like(_d[0, 0]),
+                    ]
+                )
             corr_wd = (wd / _wm).real
             icorr_wd = (wd / _wm).imag
             # Transform back to Cl
@@ -226,52 +232,52 @@ def _PolSpice(d, wm, mode="natural"):
 
 
 def Eq90_plus(cos_theta, xi_p):
-    xi_pi = interp1d(cos_theta, xi_p, kind='linear', fill_value="extrapolate")
+    xi_pi = interp1d(cos_theta, xi_p, kind="linear", fill_value="extrapolate")
     x = np.linspace(-0.99999999999, 0.9999999999, 10_000_000)
     xi_p = xi_pi(x)
     dx = x[1] - x[0]
 
-    prefac1 = 8*(2+x)/(1-x)**2
-    integ1 = (1-x)/(1+x)**2
+    prefac1 = 8 * (2 + x) / (1 - x) ** 2
+    integ1 = (1 - x) / (1 + x) ** 2
     integ1 *= dx * xi_p
     int1 = np.cumsum(integ1[::-1])[::-1]
     int1 = np.append(int1[1:], 0)
     t1 = prefac1 * int1
 
-    prefac2 = 8/(1-x)
-    integ2 = 1/(1+x)**2
+    prefac2 = 8 / (1 - x)
+    integ2 = 1 / (1 + x) ** 2
     integ2 *= dx * xi_p
     int2 = np.cumsum(integ2[::-1])[::-1]
     int2 = np.append(int2[1:], 0)
     t2 = prefac2 * int2
 
     eq90 = xi_p - t1 + t2
-    eq90_i = interp1d(x, eq90, kind='linear', fill_value="extrapolate")
+    eq90_i = interp1d(x, eq90, kind="linear", fill_value="extrapolate")
     eq90 = eq90_i(cos_theta)
     return eq90
 
 
 def Eq90_minus(cos_theta, xi_m):
-    xi_mi = interp1d(cos_theta, xi_m, kind='linear', fill_value="extrapolate")
+    xi_mi = interp1d(cos_theta, xi_m, kind="linear", fill_value="extrapolate")
     x = np.linspace(-0.99999999999, 0.99999999999, 10_000_000)
     xi_m = xi_mi(x)
     dx = x[1] - x[0]
 
-    prefac1 = 8*(2-x)/(1+x)**2
-    integ1 = (1+x)/(1-x)**2
+    prefac1 = 8 * (2 - x) / (1 + x) ** 2
+    integ1 = (1 + x) / (1 - x) ** 2
     integ1 *= dx * xi_m
     int1 = np.cumsum(integ1)
     int1 = np.append(int1[1:], 0)
     t1 = prefac1 * int1
 
-    prefac2 = 8/(1+x)
-    integ2 = 1/(1-x)**2
+    prefac2 = 8 / (1 + x)
+    integ2 = 1 / (1 - x) ** 2
     integ2 *= dx * xi_m
     int2 = np.cumsum(integ2)
     int2 = np.append(int2[1:], 0)
     t2 = prefac2 * int2
 
     eq90 = xi_m - t1 + t2
-    eq90_i = interp1d(x, eq90, kind='linear', fill_value="extrapolate")
+    eq90_i = interp1d(x, eq90, kind="linear", fill_value="extrapolate")
     eq90 = eq90_i(cos_theta)
     return eq90
