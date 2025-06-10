@@ -25,7 +25,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _PolSpice
+from ..unmixing import _natural_unmixing
 from ..transforms import cl2corr, logistic
 
 
@@ -52,7 +52,7 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
         alphas = mask_correction(_cls_mm, mls0)
-        _cls = _PolSpice(_cls, alphas, mode="natural")
+        _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
@@ -253,9 +253,9 @@ def _jackknife_covariance(samples, nd=1):
             a = sample_covariance(samples1, samples2)
             if nd == 1:
                 njk = m
-                a *= (njk - 1)**2 / njk
+                a *= (njk - 1) ** 2 / njk
             elif nd == 2:
-                njk = (1+np.sqrt(1+8*m))/2
+                njk = (1 + np.sqrt(1 + 8 * m)) / 2
                 a *= (njk * (njk - 1) - 2) / (2 * njk * (njk + 1))
             elif nd > 2:
                 raise ValueError("number of deletions must be 0, 1, or 2")

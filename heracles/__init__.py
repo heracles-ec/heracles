@@ -72,11 +72,6 @@ __all__ = [
     # transforms
     "cl2corr",
     "corr2cl",
-    # unmixing
-    "forwards",
-    "inversion",
-    "master",
-    "PolSpice",
 ]
 
 try:
@@ -151,11 +146,4 @@ from .twopoint import (
 from .transforms import (
     cl2corr,
     corr2cl,
-)
-
-from .unmixing import (
-    forwards,
-    inversion,
-    master,
-    PolSpice,
 )
