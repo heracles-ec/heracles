@@ -50,10 +50,10 @@ def shrink(cov, target, shrinkage_factor):
     shrunk_cov = {}
     correlated_target = impose_correlation(target, cov)
     for key in cov:
-        c = cov[key]
-        tc = correlated_target[key]
+        c = cov[key].array
+        tc = correlated_target[key].array
         sc = shrinkage_factor * tc + (1 - shrinkage_factor) * c
-        shrunk_cov[key] = Result(sc, axis=(0, 1), ell=c.ell)
+        shrunk_cov[key] = Result(sc, axis=cov[key].axis, ell=cov[key].ell)
     return shrunk_cov
 
 
@@ -145,7 +145,7 @@ def gaussian_covariance(Cls):
         # Remove the extra dimensions
         r = np.squeeze(r)
         # Make Result
-        result = Result(r, axis=(0, 1), ell=ell)
+        result = Result(r, ell=ell)
         cov[covkey] = result
     return cov
 
