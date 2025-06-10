@@ -182,8 +182,8 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     return 2 * np.pi * cls
 
 
-def l2x(l):
-    xvals, _ = _cached_gauss_legendre(int(l[-1]) + 1)
+def l2x(ell):
+    xvals, _ = _cached_gauss_legendre(int(ell[-1]) + 1)
     return xvals
 
 
