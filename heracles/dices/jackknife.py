@@ -335,7 +335,7 @@ def delete2_correction(cls0, cls1, cls2):
         q_diag_exp = np.zeros_like(q)
         diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = q_diag_exp
+        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
     return Q
 
 
@@ -351,9 +351,17 @@ def debias_covariance(cov_jk, cls0, cls1, cls2):
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
     Q = delete2_correction(cls0, cls1, cls2)
+    return _debias_covariance(cov_jk, Q)
+
+
+def _debias_covariance(cov_jk, Q):
+    """
+    Internal method to debias the Jackknife covariance.
+    Useful when the delete2 correction is already computed.
+    """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key]
+        c = cov_jk[key].array - Q[key].array
         debiased_cov[key] = Result(
             c,
             ell=cov_jk[key].ell,
