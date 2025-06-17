@@ -21,6 +21,7 @@ from scipy.interpolate import interp1d
 from .result import Result
 from .transforms import cl2corr, corr2cl, logistic, l2x
 from .result import binned
+from scipy.integrate import cumulative_simpson
 
 
 def forwards(t, M):
@@ -233,22 +234,20 @@ def _PolSpice(d, wm, mode="natural"):
 
 def Eq90_plus(cos_theta, xi_p):
     xi_pi = interp1d(cos_theta, xi_p, kind="linear", fill_value="extrapolate")
-    x = np.linspace(-0.99999999999, 0.9999999999, 10_000_000)
-    xi_p = xi_pi(x)
+    x = np.linspace(-0.9999995, 0.9999995, 10_000_000)
     dx = x[1] - x[0]
+    xi_p = xi_pi(x)
 
     prefac1 = 8 * (2 + x) / (1 - x) ** 2
     integ1 = (1 - x) / (1 + x) ** 2
-    integ1 *= dx * xi_p
-    int1 = np.cumsum(integ1[::-1])[::-1]
-    int1 = np.append(int1[1:], 0)
+    integ1 *= xi_p
+    int1 = cumulative_simpson(integ1[::-1], dx=dx, initial=0)[::-1]
     t1 = prefac1 * int1
 
     prefac2 = 8 / (1 - x)
     integ2 = 1 / (1 + x) ** 2
-    integ2 *= dx * xi_p
-    int2 = np.cumsum(integ2[::-1])[::-1]
-    int2 = np.append(int2[1:], 0)
+    integ2 *= xi_p
+    int2 = cumulative_simpson(integ2[::-1], dx=dx, initial=0)[::-1]
     t2 = prefac2 * int2
 
     eq90 = xi_p - t1 + t2
@@ -259,22 +258,20 @@ def Eq90_plus(cos_theta, xi_p):
 
 def Eq90_minus(cos_theta, xi_m):
     xi_mi = interp1d(cos_theta, xi_m, kind="linear", fill_value="extrapolate")
-    x = np.linspace(-0.99999999999, 0.99999999999, 10_000_000)
-    xi_m = xi_mi(x)
+    x = np.linspace(-0.9999995, 0.9999995, 10_000_000)
     dx = x[1] - x[0]
+    xi_m = xi_mi(x)
 
     prefac1 = 8 * (2 - x) / (1 + x) ** 2
     integ1 = (1 + x) / (1 - x) ** 2
-    integ1 *= dx * xi_m
-    int1 = np.cumsum(integ1)
-    int1 = np.append(int1[1:], 0)
+    integ1 *= xi_m
+    int1 = cumulative_simpson(integ1, dx=dx, initial=0)
     t1 = prefac1 * int1
 
     prefac2 = 8 / (1 + x)
     integ2 = 1 / (1 - x) ** 2
-    integ2 *= dx * xi_m
-    int2 = np.cumsum(integ2)
-    int2 = np.append(int2[1:], 0)
+    integ2 *= xi_m
+    int2 = cumulative_simpson(integ2, dx=dx, initial=0)
     t2 = prefac2 * int2
 
     eq90 = xi_m - t1 + t2
