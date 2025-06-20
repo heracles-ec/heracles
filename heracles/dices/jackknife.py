@@ -20,12 +20,13 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
-from .mask_correction import correct_mask
 from .utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
+from ..unmixing import _PolSpice
+from ..transforms import cl2corr, logistic
 
 
 def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
@@ -50,7 +51,8 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        _cls = correct_mask(_cls, _cls_mm, mls0)
+        alphas = mask_correction(_cls_mm, mls0)
+        _cls = _PolSpice(_cls, alphas, mode="natural")
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
@@ -69,13 +71,30 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     returns:
         cls (dict): Dictionary of data Cls
     """
-    # grab metadata
     print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
-    _m = maps[list(maps.keys())[0]]
-    meta = _m.dtype.metadata
-    lmax = meta["lmax"]
-    ell = np.arange(lmax + 1)
-    # deep copy to avoid modifying the original maps
+    # remove the region from the maps
+    _maps = jackknife_maps(maps, jkmaps, jk=jk, jk2=jk2)
+    # compute alms
+    alms = transform(fields, _maps)
+    # compute cls
+    cls = angular_power_spectra(alms)
+    # Result
+    for key in cls.keys():
+        cls[key] = Result(cls[key])
+    return cls
+
+
+def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
+    """
+    Internal method to remove a region from the maps.
+    inputs:
+        maps (dict): Dictionary of data maps
+        jkmaps (dict): Dictionary of mask maps
+        jk (int): Jackknife region to remove
+        jk2 (int): Jackknife region to remove
+    returns:
+        maps (dict): Dictionary of data maps
+    """
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
@@ -87,14 +106,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
         _mask[cond] = 0.0
         # Apply mask
         _map *= _mask
-    # compute alms
-    alms = transform(fields, _maps)
-    # compute cls
-    cls = angular_power_spectra(alms)
-    # Result
-    for key in cls.keys():
-        cls[key] = Result(cls[key], ell=ell)
-    return cls
+    return _maps
 
 
 def bias(cls):
@@ -180,11 +192,35 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     cls = sub_to_Cls(cls, b_jk)
     # Update metadata
     for key in cls.keys():
-        cl = cls[key].__array__()
-        ell = cls[key].ell
+        cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl, ell=ell)
+        cls[key] = Result(cl)
     return cls
+
+
+def mask_correction(Mljk, Mls0):
+    """
+    Internal method to compute the mask correction.
+    input:
+        Mljk (np.array): mask of delete1 Cls
+        Mls0 (np.array): mask Cls
+    returns:
+        alpha (Float64): Mask correction factor
+    """
+    alphas = {}
+    for key in list(Mljk.keys()):
+        mljk = Mljk[key]
+        mls0 = Mls0[key]
+        # Transform to real space
+        wmls0 = cl2corr(mls0)
+        wmls0 = wmls0.T[0]
+        wmljk = cl2corr(mljk)
+        wmljk = wmljk.T[0]
+        # Compute alpha
+        alpha = wmljk / wmls0
+        alpha *= logistic(np.log10(abs(wmljk)))
+        alphas[key] = alpha
+    return alphas
 
 
 def jackknife_covariance(dict, nd=1):
@@ -212,12 +248,14 @@ def _jackknife_covariance(samples, nd=1):
         samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
         samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
         # if there are multiple samples, compute covariance
-        if (njk := len(samples1)) > 1:
+        if (m := len(samples1)) > 1:
             # compute jackknife covariance matrix
             a = sample_covariance(samples1, samples2)
             if nd == 1:
-                a *= njk - 1
+                njk = m
+                a *= (njk - 1)**2 / njk
             elif nd == 2:
+                njk = (1+np.sqrt(1+8*m))/2
                 a *= (njk * (njk - 1) - 2) / (2 * njk * (njk + 1))
             elif nd > 2:
                 raise ValueError("number of deletions must be 0, 1, or 2")
@@ -284,7 +322,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
             _qii += (Njk - 2) * cls2[kk][key].array
-            _qii = Result(_qii, ell=cls0[key].ell)
+            _qii = Result(_qii)
             qii[key] = _qii
             Q_ii.append(qii)
     # Compute the correction from the ensemble
@@ -297,7 +335,7 @@ def delete2_correction(cls0, cls1, cls2):
         q_diag_exp = np.zeros_like(q)
         diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = q_diag_exp
+        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
     return Q
 
 
@@ -313,9 +351,17 @@ def debias_covariance(cov_jk, cls0, cls1, cls2):
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
     Q = delete2_correction(cls0, cls1, cls2)
+    return _debias_covariance(cov_jk, Q)
+
+
+def _debias_covariance(cov_jk, Q):
+    """
+    Internal method to debias the Jackknife covariance.
+    Useful when the delete2 correction is already computed.
+    """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key]
+        c = cov_jk[key].array - Q[key].array
         debiased_cov[key] = Result(
             c,
             ell=cov_jk[key].ell,

@@ -71,5 +71,5 @@ def impose_correlation(cov_a, cov_b):
         b_std = np.sqrt(b_v[..., None, :])
         c = a * (b_std * np.swapaxes(b_std, -1, -2))
         c /= a_std * np.swapaxes(a_std, -1, -2)
-        cov_c[key] = Result(c, axis=(0, 1), ell=a.ell)
+        cov_c[key] = Result(c, axis=a.axis, ell=a.ell)
     return cov_c
