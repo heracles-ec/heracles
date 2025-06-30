@@ -69,13 +69,30 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     returns:
         cls (dict): Dictionary of data Cls
     """
-    # grab metadata
     print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
-    _m = maps[list(maps.keys())[0]]
-    meta = _m.dtype.metadata
-    lmax = meta["lmax"]
-    ell = np.arange(lmax + 1)
-    # deep copy to avoid modifying the original maps
+    # remove the region from the maps
+    _maps = jackknife_maps(maps, jkmaps, jk=jk, jk2=jk2)
+    # compute alms
+    alms = transform(fields, _maps)
+    # compute cls
+    cls = angular_power_spectra(alms)
+    # Result
+    for key in cls.keys():
+        cls[key] = Result(cls[key])
+    return cls
+
+
+def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
+    """
+    Internal method to remove a region from the maps.
+    inputs:
+        maps (dict): Dictionary of data maps
+        jkmaps (dict): Dictionary of mask maps
+        jk (int): Jackknife region to remove
+        jk2 (int): Jackknife region to remove
+    returns:
+        maps (dict): Dictionary of data maps
+    """
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
@@ -87,14 +104,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
         _mask[cond] = 0.0
         # Apply mask
         _map *= _mask
-    # compute alms
-    alms = transform(fields, _maps)
-    # compute cls
-    cls = angular_power_spectra(alms)
-    # Result
-    for key in cls.keys():
-        cls[key] = Result(cls[key], ell=ell)
-    return cls
+    return _maps
 
 
 def bias(cls):
