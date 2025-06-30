@@ -20,12 +20,13 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
-from .mask_correction import correct_mask
 from .utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
+from ..unmixing import _natural_unmixing, logistic
+from ..transforms import cl2corr
 
 
 def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
@@ -50,7 +51,8 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        _cls = correct_mask(_cls, _cls_mm, mls0)
+        alphas = mask_correction(_cls_mm, mls0)
+        _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
@@ -196,6 +198,31 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
+def mask_correction(Mljk, Mls0):
+    """
+    Internal method to compute the mask correction.
+    input:
+        Mljk (np.array): mask of delete1 Cls
+        Mls0 (np.array): mask Cls
+    returns:
+        alpha (Float64): Mask correction factor
+    """
+    alphas = {}
+    for key in list(Mljk.keys()):
+        mljk = Mljk[key]
+        mls0 = Mls0[key]
+        # Transform to real space
+        wmls0 = cl2corr(mls0)
+        wmls0 = wmls0.T[0]
+        wmljk = cl2corr(mljk)
+        wmljk = wmljk.T[0]
+        # Compute alpha
+        alpha = wmljk / wmls0
+        alpha *= logistic(np.log10(abs(wmljk)))
+        alphas[key] = alpha
+    return alphas
+
+
 def jackknife_covariance(dict, nd=1):
     """
     Compute the jackknife covariance matrix from a sequence
@@ -324,6 +351,14 @@ def debias_covariance(cov_jk, cls0, cls1, cls2):
         debiased_cov (dict): Dictionary of debiased Jackknife covariance
     """
     Q = delete2_correction(cls0, cls1, cls2)
+    return _debias_covariance(cov_jk, Q)
+
+
+def _debias_covariance(cov_jk, Q):
+    """
+    Internal method to debias the Jackknife covariance.
+    Useful when the delete2 correction is already computed.
+    """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
         c = cov_jk[key].array - Q[key].array

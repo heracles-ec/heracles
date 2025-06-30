@@ -32,7 +32,7 @@ def add_to_Cls(Cls, x):
     _Cls = {}
     for key in Cls.keys():
         ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].__array__() + x[key], ell)
+        _Cls[key] = Result(Cls[key].array + x[key], ell)
     return _Cls
 
 
@@ -48,7 +48,7 @@ def sub_to_Cls(Cls, x):
     _Cls = {}
     for key in Cls.keys():
         ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].__array__() - x[key], ell)
+        _Cls[key] = Result(Cls[key].array - x[key], ell)
     return _Cls
 
 
