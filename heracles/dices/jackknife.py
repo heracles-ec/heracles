@@ -212,12 +212,14 @@ def _jackknife_covariance(samples, nd=1):
         samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
         samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
         # if there are multiple samples, compute covariance
-        if (njk := len(samples1)) > 1:
+        if (m := len(samples1)) > 1:
             # compute jackknife covariance matrix
             a = sample_covariance(samples1, samples2)
             if nd == 1:
-                a *= njk - 1
+                njk = m
+                a *= (njk - 1) ** 2 / njk
             elif nd == 2:
+                njk = (1 + np.sqrt(1 + 8 * m)) / 2
                 a *= (njk * (njk - 1) - 2) / (2 * njk * (njk + 1))
             elif nd > 2:
                 raise ValueError("number of deletions must be 0, 1, or 2")
