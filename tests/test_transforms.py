@@ -1,5 +1,5 @@
 import numpy as np
-import heracles.dices as dices
+import heracles
 
 
 def test_cl2corr():
@@ -13,7 +13,7 @@ def test_cl2corr():
             np.zeros(10),
         ]
     )
-    corr = dices.cl2corr(cl.T).T
+    corr = heracles.cl2corr(cl.T).T
     assert corr.shape == cl.shape
 
 
@@ -26,5 +26,5 @@ def test_corr2cl():
             np.zeros(10),
         ]
     )
-    cl = dices.corr2cl(corr.T).T
+    cl = heracles.corr2cl(corr.T).T
     assert corr.shape == cl.shape
