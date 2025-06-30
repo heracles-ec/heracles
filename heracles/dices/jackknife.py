@@ -180,10 +180,9 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     cls = sub_to_Cls(cls, b_jk)
     # Update metadata
     for key in cls.keys():
-        cl = cls[key].__array__()
-        ell = cls[key].ell
+        cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl, ell=ell)
+        cls[key] = Result(cl)
     return cls
 
 
@@ -284,7 +283,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
             _qii += (Njk - 2) * cls2[kk][key].array
-            _qii = Result(_qii, ell=cls0[key].ell)
+            _qii = Result(_qii)
             qii[key] = _qii
             Q_ii.append(qii)
     # Compute the correction from the ensemble
@@ -297,7 +296,7 @@ def delete2_correction(cls0, cls1, cls2):
         q_diag_exp = np.zeros_like(q)
         diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = q_diag_exp
+        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
     return Q
 
 
@@ -315,7 +314,7 @@ def debias_covariance(cov_jk, cls0, cls1, cls2):
     Q = delete2_correction(cls0, cls1, cls2)
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key]
+        c = cov_jk[key].array - Q[key].array
         debiased_cov[key] = Result(
             c,
             ell=cov_jk[key].ell,
