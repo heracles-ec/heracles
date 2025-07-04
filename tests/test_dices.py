@@ -324,7 +324,7 @@ def test_debiasing(data_path):
         # Indices for the diagonal
         diag_indices = np.arange(length)
         # abs is only needed when too few Jackknife regions are used
-        c[..., diag_indices, diag_indices] = abs(c_diag-q_diag)
+        c[..., diag_indices, diag_indices] = abs(c_diag - q_diag)
         _debiased_cov[key] = c
 
     # Check diagonal

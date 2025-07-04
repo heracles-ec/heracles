@@ -360,6 +360,6 @@ def _debias_covariance(cov_jk, Q):
         # Indices for the diagonal
         diag_indices = np.arange(length)
         # abs is only needed when too few Jackknife regions are used
-        c[..., diag_indices, diag_indices] = abs(c_diag-q_diag)
+        c[..., diag_indices, diag_indices] = abs(c_diag - q_diag)
         debiased_cov[key] = Result(c, axis=cov_jk[key].axis, ell=cov_jk[key].ell)
     return debiased_cov
