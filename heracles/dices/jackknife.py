@@ -324,7 +324,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii += (Njk - 2) * cls2[kk][key].array
             _qii = Result(_qii)
             qii[key] = _qii
-            Q_ii.append(qii)
+        Q_ii.append(qii)
     # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
     # Diagonalise the correction
