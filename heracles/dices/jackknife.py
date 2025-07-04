@@ -327,15 +327,6 @@ def delete2_correction(cls0, cls1, cls2):
             Q_ii.append(qii)
     # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
-    # Diagonalise the correction
-    for key in Q:
-        q = Q[key]
-        *_, length = q.shape
-        q_diag = np.diagonal(q, axis1=-2, axis2=-1)
-        q_diag_exp = np.zeros_like(q)
-        diag_indices = np.arange(length)  # Indices for the diagonal
-        q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
     return Q
 
 
@@ -359,12 +350,16 @@ def _debias_covariance(cov_jk, Q):
     Internal method to debias the Jackknife covariance.
     Useful when the delete2 correction is already computed.
     """
-    debiased_cov = {}
-    for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array
-        debiased_cov[key] = Result(
-            c,
-            ell=cov_jk[key].ell,
-            axis=cov_jk[key].axis,
-        )
+    debiased_cov = deepcopy(cov_jk)
+    for key in Q:
+        q = Q[key].array
+        c = debiased_cov[key].array
+        *_, length = q.shape
+        q_diag = np.diagonal(q, axis1=-2, axis2=-1)
+        c_diag = np.diagonal(c, axis1=-2, axis2=-1)
+        # Indices for the diagonal
+        diag_indices = np.arange(length)
+        # abs is only needed when too few Jackknife regions are used
+        c[..., diag_indices, diag_indices] = abs(c_diag-q_diag)
+        debiased_cov[key] = Result(c, axis=cov_jk[key].axis, ell=cov_jk[key].ell)
     return debiased_cov
