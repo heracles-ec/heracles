@@ -5,6 +5,7 @@ import pytest
 import heracles.dices as dices
 from heracles.healpy import HealpixMapper
 from heracles.fields import Positions, Shears, Visibility, Weights
+from copy import deepcopy
 
 
 def make_data_maps():
@@ -313,9 +314,18 @@ def test_debiasing(data_path):
         cqs1,
         cqs2,
     )
-    _debiased_cov = {}
+    _debiased_cov = deepcopy(cov_jk)
     for key in list(cov_jk.keys()):
-        _debiased_cov[key] = cov_jk[key].array - Q[key]
+        q = Q[key].array
+        c = _debiased_cov[key].array
+        *_, length = q.shape
+        q_diag = np.diagonal(q, axis1=-2, axis2=-1)
+        c_diag = np.diagonal(c, axis1=-2, axis2=-1)
+        # Indices for the diagonal
+        diag_indices = np.arange(length)
+        # abs is only needed when too few Jackknife regions are used
+        c[..., diag_indices, diag_indices] = abs(c_diag-q_diag)
+        _debiased_cov[key] = c
 
     # Check diagonal
     for key in list(debiased_cov.keys()):
