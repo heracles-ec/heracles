@@ -118,7 +118,7 @@ def test_jackknife_maps(data_path):
     jk_maps = make_jkmaps(data_path)
     # multiply maps by jk footprint
     vmap = jk_maps[("VIS", 1)]
-    vmap[vmap>0] = vmap[vmap>0] / vmap[vmap>0]
+    vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
     for key in list(data_maps.keys()):
         data_maps[key] *= vmap
     # test null case
@@ -132,7 +132,7 @@ def test_jackknife_maps(data_path):
             for i in range(1, Njk + 1)
         ]
     )
-    __data_map = np.sum(__data_maps, axis=0) / (Njk-1)
+    __data_map = np.sum(__data_maps, axis=0) / (Njk - 1)
     assert np.all(__data_map == data_maps[("POS", 1)])
     ___data_map = np.prod(__data_maps, axis=0)
     assert np.all(___data_map == np.zeros_like(data_maps[("POS", 1)]))
