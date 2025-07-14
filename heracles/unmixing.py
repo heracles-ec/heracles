@@ -158,33 +158,32 @@ def _natural_unmixing(d, wm):
         # Check if ell is None
         if ell is None:
             ell = np.arange(len(_wm))
-        _d = np.atleast_2d(d[d_key])
         if a == b == "SHE":
-            __d = np.array(
+            _d = np.array(
                 [
-                    np.zeros_like(_d[0, 0]),
-                    _d[0, 0],  # EE like spin-2
-                    _d[1, 1],  # BB like spin-2
-                    np.zeros_like(_d[0, 0]),
+                    np.zeros(len(ell)),
+                    d[d_key][0, 0],  # EE like spin-2
+                    d[d_key][1, 1],  # BB like spin-2
+                    np.zeros(len(ell)),
                 ]
             )
-            __id = np.array(
+            _id = np.array(
                 [
-                    np.zeros_like(_d[0, 0]),
-                    -_d[0, 1],  # EB like spin-0
-                    _d[1, 0],  # EB like spin-0
-                    np.zeros_like(_d[0, 0]),
+                    np.zeros(len(ell)),
+                    -d[d_key][0, 1],  # EB like spin-0
+                    d[d_key][1, 0],  # EB like spin-0
+                    np.zeros(len(ell)),
                 ]
             )
             # Correct by alpha
-            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
+            wd = cl2corr(_d.T).T + 1j * cl2corr(_id.T).T
             corr_wd = (wd / _wm).real
             icorr_wd = (wd / _wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
             # reorder
-            _corr_d = np.zeros_like(_d)
+            _corr_d = np.zeros_like(d[d_key])
             _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
             _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
             _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
@@ -192,6 +191,7 @@ def _natural_unmixing(d, wm):
         else:
             # Treat everything as spin-0
             _corr_d = []
+            _d = np.atleast_2d(d[d_key])
             for cl in _d:
                 wd = cl2corr(cl).T
                 corr_wd = wd / _wm
@@ -241,72 +241,59 @@ def _polspice(d, wm, mode="minus"):
         # Check if ell is None
         if ell is None:
             ell = np.arange(len(_wm))
-        _d = np.atleast_2d(d[d_key])
         if a == b == "SHE":
-            __d = np.array(
+            _d = np.array(
                 [
-                    np.zeros_like(_d[0, 0]),
-                    _d[0, 0],  # EE like spin-2
-                    _d[1, 1],  # BB like spin-2
-                    np.zeros_like(_d[0, 0]),
+                    np.zeros(len(ell)),
+                    d[d_key][0, 0],
+                    d[d_key][1, 1],
+                    np.zeros(len(ell)),
                 ]
             )
-            __id = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    -_d[0, 1],  # EB like spin-0
-                    _d[1, 0],  # EB like spin-0
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            # Correct by alpha
-            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            xi_p = _wm[1].real
-            xi_m = _wm[2].real
+            # Transform to correlation space
+            wd = cl2corr(_d.T).T
+            xi_p = _wm[1]
+            xi_m = _wm[2]
             x = l2x(ell)
             if mode == "plus":
-                xi_dec_plus = Eq90_plus(x, xi_p)
-                pols_plus_corrs_1 = np.array([
-                    np.zeros_like(_d[0, 0]),
-                    np.zeros_like(_d[0, 0]),
-                    xi_dec_plus/_wm,
-                    np.zeros_like(_d[0, 0])])
-                pols_plus_1_cls_list = corr2cl(pols_plus_corrs_1.T).T
-                pols_plus_corrs_2 = np.array([
-                    np.zeros_like(_d[0, 0]),
-                    np.zeros_like(_d[0, 0]),
+                xi_dec_plus = Eq90_plus(x, xi_p)/_wm
+                pp1_corrs = np.array([
+                    np.zeros(len(ell)),
+                    np.zeros(len(ell)),
+                    xi_dec_plus,
+                    np.zeros(len(ell))])
+                pp1_cls = corr2cl(pp1_corrs.T).T
+                pp2_corrs = np.array([
+                    np.zeros(len(ell)),
+                    np.zeros(len(ell)),
                     xi_m/_wm,
-                    np.zeros_like(_d[0, 0])])
-                pols_plus_2_cls_list = corr2cl(pols_plus_corrs_2.T).T
+                    np.zeros(len(ell))])
+                pp2_cls = corr2cl(pp2_corrs.T).T
                 # reorder
-                _corr_d = np.zeros_like(_d)
-                _corr_d[0, 0] = -(pols_plus_1_cls_list[2]+pols_plus_2_cls_list[2])  # EE like spin-2
-                _corr_d[1, 1] = (pols_plus_1_cls_list[2]-pols_plus_2_cls_list[2])  # BB like spin-2
+                _corr_d = np.zeros_like(d[d_key])
+                _corr_d[0, 0] = -(pp1_cls[2] + pp2_cls[2])
+                _corr_d[1, 1] = (pp1_cls[2] - pp2_cls[2])
             elif mode == "minus":
-                xi_dec_minus = Eq90_minus(x, xi_m)
-                pols_minus_corrs_1 = np.array([
-                    np.zeros_like(_d[0, 0]),
+                xi_dec_minus = Eq90_minus(x, xi_m)/_wm
+                pm1_corrs = np.array([
+                    np.zeros(len(ell)),
                     xi_p/_wm,
-                    np.zeros_like(_d[0, 0]),
-                    np.zeros_like(_d[0, 0])])
-                pols_minus_1_cls_list = corr2cl(pols_minus_corrs_1.T).T
-                pols_minus_corrs_2 = np.array([
-                    np.zeros_like(_d[0, 0]),
-                    xi_dec_minus/_wm,
-                    np.zeros_like(_d[0, 0]),
-                    np.zeros_like(_d[0, 0])])
-                pols_minus_2_cls_list = corr2cl(pols_minus_corrs_2.T).T
+                    np.zeros(len(ell)),
+                    np.zeros(len(ell))])
+                pm1_cls = corr2cl(pm1_corrs.T).T
+                pm2_corrs = np.array([
+                    np.zeros(len(ell)),
+                    xi_dec_minus,
+                    np.zeros(len(ell)),
+                    np.zeros(len(ell))])
+                pm2_cls = corr2cl(pm2_corrs.T).T
                 # reorder
-                _corr_d = np.zeros_like(_d)
-                _corr_d[0, 0] = (pols_minus_1_cls_list[2]+pols_minus_2_cls_list[2])  # EE like spin-2
-                _corr_d[1, 1] = (pols_minus_1_cls_list[2]-pols_minus_2_cls_list[2])  # BB like spin-2
-            # off-diagonal terms
-            icorr_wd = (wd / _wm).imag
-            # Transform back to Cl
-            __icorr_d = corr2cl(icorr_wd.T).T
-            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
+                _corr_d = np.zeros_like(d[d_key])
+                _corr_d[0, 0] = (pm1_cls[1] + pm2_cls[1])
+                _corr_d[1, 1] = (pm1_cls[1] - pm2_cls[1])
         else:
+            # Treat everything as spin-0
+            _d = np.atleast_2d(d[d_key])
             # Treat everything as spin-0
             _corr_d = []
             for cl in _d:
@@ -357,5 +344,5 @@ def Eq90_minus(x, xi_m):
     return eq90
 
 
-def logistic(x, x0=-5, k=50):
+def logistic(x, x0=-2, k=50):
     return 1.0 + np.exp(-k * (x - x0))
