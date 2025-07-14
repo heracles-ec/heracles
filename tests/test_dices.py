@@ -133,9 +133,9 @@ def test_jackknife_maps(data_path):
         ]
     )
     __data_map = np.sum(__data_maps, axis=0) / (Njk - 1)
-    np.testing.assert_allclose(__data_map == data_maps[("POS", 1)])
+    np.testing.assert_allclose(__data_map, data_maps[("POS", 1)])
     ___data_map = np.prod(__data_maps, axis=0)
-    np.testing.assert_allclose(___data_map == np.zeros_like(data_maps[("POS", 1)]))
+    np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
 
 
 def test_cls(data_path):
