@@ -78,9 +78,6 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     alms = transform(fields, _maps)
     # compute cls
     cls = angular_power_spectra(alms)
-    # Result
-    for key in cls.keys():
-        cls[key] = Result(cls[key])
     return cls
 
 
@@ -324,7 +321,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii += (Njk - 2) * cls2[kk][key].array
             _qii = Result(_qii)
             qii[key] = _qii
-            Q_ii.append(qii)
+        Q_ii.append(qii)
     # Compute the correction from the ensemble
     Q = _jackknife_covariance(Q_ii, nd=2)
     # Diagonalise the correction
