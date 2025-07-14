@@ -154,7 +154,7 @@ from .transforms import (
     corr2cl,
 )
 
-from unmixing import (
+from .unmixing import (
     forwards,
     inversion,
     master,

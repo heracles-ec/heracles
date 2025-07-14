@@ -356,5 +356,6 @@ def Eq90_minus(x, xi_m):
     eq90 = xi_m - t1 + t2
     return eq90
 
+
 def logistic(x, x0=-5, k=50):
     return 1.0 + np.exp(-k * (x - x0))
