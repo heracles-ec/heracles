@@ -267,16 +267,16 @@ def _polspice(d, wm, mode="minus"):
             if mode == "plus":
                 xi_dec_plus = Eq90_plus(x, xi_p)
                 pols_plus_corrs_1 = np.array([
-                    np.zeros(_d[0, 0]),
-                    np.zeros(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
                     xi_dec_plus/_wm,
-                    np.zeros(_d[0, 0])])
+                    np.zeros_like(_d[0, 0])])
                 pols_plus_1_cls_list = corr2cl(pols_plus_corrs_1.T).T
                 pols_plus_corrs_2 = np.array([
-                    np.zeros(_d[0, 0]),
-                    np.zeros(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
                     xi_m/_wm,
-                    np.zeros(_d[0, 0])])
+                    np.zeros_like(_d[0, 0])])
                 pols_plus_2_cls_list = corr2cl(pols_plus_corrs_2.T).T
                 # reorder
                 _corr_d = np.zeros_like(_d)
@@ -285,16 +285,16 @@ def _polspice(d, wm, mode="minus"):
             elif mode == "minus":
                 xi_dec_minus = Eq90_minus(x, xi_m)
                 pols_minus_corrs_1 = np.array([
-                    np.zeros(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
                     xi_p/_wm,
-                    np.zeros(_d[0, 0]),
-                    np.zeros(_d[0, 0])])
+                    np.zeros_like(_d[0, 0]),
+                    np.zeros_like(_d[0, 0])])
                 pols_minus_1_cls_list = corr2cl(pols_minus_corrs_1.T).T
                 pols_minus_corrs_2 = np.array([
-                    np.zeros(_d[0, 0]),
+                    np.zeros_like(_d[0, 0]),
                     xi_dec_minus/_wm,
-                    np.zeros(_d[0, 0]),
-                    np.zeros(_d[0, 0])])
+                    np.zeros_like(_d[0, 0]),
+                    np.zeros_like(_d[0, 0])])
                 pols_minus_2_cls_list = corr2cl(pols_minus_corrs_2.T).T
                 # reorder
                 _corr_d = np.zeros_like(_d)
