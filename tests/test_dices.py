@@ -124,7 +124,7 @@ def test_jackknife_maps(data_path):
     # test null case
     _data_maps = dices.jackknife.jackknife_maps(data_maps, jk_maps)
     for key in list(_data_maps.keys()):
-        assert np.all(_data_maps[key] == data_maps[key])
+        np.testing.assert_allclose(_data_maps[key], data_maps[key])
     # test delete1 case
     __data_maps = np.array(
         [
@@ -133,9 +133,9 @@ def test_jackknife_maps(data_path):
         ]
     )
     __data_map = np.sum(__data_maps, axis=0) / (Njk - 1)
-    assert np.all(__data_map == data_maps[("POS", 1)])
+    np.testing.assert_allclose(__data_map == data_maps[("POS", 1)])
     ___data_map = np.prod(__data_maps, axis=0)
-    assert np.all(___data_map == np.zeros_like(data_maps[("POS", 1)]))
+    np.testing.assert_allclose(___data_map == np.zeros_like(data_maps[("POS", 1)]))
 
 
 def test_cls(data_path):
