@@ -21,6 +21,47 @@ from .result import Result
 from .transforms import cl2corr, corr2cl
 
 
+def inversion(d, M):
+    """
+    Inversion model for the unmixing E/B modes.
+    Args:
+        d: Data Cl
+        M: Mixing matrix
+        Returns:
+        inversion_cls: inverted Cl
+    """
+    inversion_cls = {}
+    for key in list(d.keys()):
+        a, b, i, j = key
+        _d = np.atleast_2d(d[key])
+        _M = M[key].array
+        *_, _n, _m = _M.shape
+        if a == b == "SHE":
+            _M_EB = _M[2]
+            _M_EE = np.hstack((_M[0], _M[1]))
+            _M_BB = np.hstack((_M[1], _M[0]))
+            _M_EEBB = np.vstack((_M_EE, _M_BB))
+            _inv_M_EEBB = np.linalg.pinv(_M_EEBB)
+            _inv_M_EB = np.linalg.pinv(_M_EB)
+            _d_EEBB = np.hstack((_d[0, 0, :], _d[1, 1, :]))
+            _id_EEBB = _inv_M_EEBB @ _d_EEBB
+            _id_EE = _id_EEBB[:_m][:_n]
+            _id_BB = _id_EEBB[_m:][:_n]
+            _id_EB = _inv_M_EB @ _d[0, 1, :]
+            _id_BE = _inv_M_EB @ _d[1, 0, :]
+            _id_EB = _id_EB[:_n]
+            _id_BE = _id_BE[:_n]
+            _id = np.array([[_id_EE, _id_EB], [_id_BE, _id_BB]])
+        else:
+            _inv_M = np.linalg.pinv(_M)
+            _id = np.array([_inv_M @ __d.T for __d in _d])
+            _id = _id[:, :_n]
+        if len(_id) == 1:
+            _id = _id[0]
+        inversion_cls[key] = Result(_id, axis=d[key].axis, ell=d[key].ell)
+    return inversion_cls
+
+
 def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
     wm = {}
     m_keys = list(m.keys())
