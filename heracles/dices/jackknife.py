@@ -297,8 +297,9 @@ def sample_covariance(samples, samples2=None):
         delta = x - mu
         mu += delta / (i + 1)
         mu2 += (y - mu2) / (i + 1)
-        if i > 0:
-            cov += (np.multiply.outer(delta, y - mu2) - cov) / i
+        cov += (np.multiply.outer(delta, y - mu2) - cov) / (i + 1)
+    # Renormalize covariance
+    cov *= n / (n - 1)
     return cov
 
 
