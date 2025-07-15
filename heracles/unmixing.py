@@ -19,7 +19,7 @@
 import numpy as np
 from .result import Result
 from .result import binned
-from .transforms import cl2corr, corr2cl, l2x
+from .transforms import cl2corr, corr2cl, _cached_gauss_legendre
 from scipy.integrate import cumulative_simpson
 
 
@@ -250,13 +250,21 @@ def _polspice(d, wm, mode="minus"):
                     np.zeros(len(ell)),
                 ]
             )
+            _id = np.array(
+                [
+                    np.zeros(len(ell)),
+                    -d[d_key][0, 1],
+                    d[d_key][1, 0],
+                    np.zeros(len(ell)),
+                ]
+            )
             # Transform to correlation space
-            wd = cl2corr(_d.T).T
-            xi_p = _wm[1]
-            xi_m = _wm[2]
-            x = l2x(ell)
+            wd = cl2corr(_d.T).T + 1j * cl2corr(_id.T).T
+            xi_p = wd[1].real
+            xi_m = wd[2].real
+            corr_x, _ = _cached_gauss_legendre(ell[-1]+1)
             if mode == "plus":
-                xi_dec_plus = Eq90_plus(x, xi_p)/_wm
+                xi_dec_plus = Eq90_plus(corr_x, xi_p)/_wm
                 pp1_corrs = np.array([
                     np.zeros(len(ell)),
                     np.zeros(len(ell)),
@@ -274,7 +282,7 @@ def _polspice(d, wm, mode="minus"):
                 _corr_d[0, 0] = -(pp1_cls[2] + pp2_cls[2])
                 _corr_d[1, 1] = (pp1_cls[2] - pp2_cls[2])
             elif mode == "minus":
-                xi_dec_minus = Eq90_minus(x, xi_m)/_wm
+                xi_dec_minus = Eq90_minus(corr_x, xi_m)/_wm
                 pm1_corrs = np.array([
                     np.zeros(len(ell)),
                     xi_p/_wm,
@@ -291,6 +299,12 @@ def _polspice(d, wm, mode="minus"):
                 _corr_d = np.zeros_like(d[d_key])
                 _corr_d[0, 0] = (pm1_cls[1] + pm2_cls[1])
                 _corr_d[1, 1] = (pm1_cls[1] - pm2_cls[1])
+            # off-diagonal terms 
+            icorr_wd = (wd / _wm).imag
+            # Transform back to Cl
+            __icorr_d = corr2cl(icorr_wd.T).T
+            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
+            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
         else:
             # Treat everything as spin-0
             _d = np.atleast_2d(d[d_key])
