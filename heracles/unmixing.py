@@ -262,44 +262,56 @@ def _polspice(d, wm, mode="minus"):
             wd = cl2corr(_d.T).T + 1j * cl2corr(_id.T).T
             xi_p = wd[1].real
             xi_m = wd[2].real
-            corr_x, _ = _cached_gauss_legendre(ell[-1]+1)
+            corr_x, _ = _cached_gauss_legendre(ell[-1] + 1)
             if mode == "plus":
-                xi_dec_plus = Eq90_plus(corr_x, xi_p)/_wm
-                pp1_corrs = np.array([
-                    np.zeros(len(ell)),
-                    np.zeros(len(ell)),
-                    xi_dec_plus,
-                    np.zeros(len(ell))])
+                xi_dec_plus = Eq90_plus(corr_x, xi_p) / _wm
+                pp1_corrs = np.array(
+                    [
+                        np.zeros(len(ell)),
+                        np.zeros(len(ell)),
+                        xi_dec_plus,
+                        np.zeros(len(ell)),
+                    ]
+                )
                 pp1_cls = corr2cl(pp1_corrs.T).T
-                pp2_corrs = np.array([
-                    np.zeros(len(ell)),
-                    np.zeros(len(ell)),
-                    xi_m/_wm,
-                    np.zeros(len(ell))])
+                pp2_corrs = np.array(
+                    [
+                        np.zeros(len(ell)),
+                        np.zeros(len(ell)),
+                        xi_m / _wm,
+                        np.zeros(len(ell)),
+                    ]
+                )
                 pp2_cls = corr2cl(pp2_corrs.T).T
                 # reorder
                 _corr_d = np.zeros_like(d[d_key])
                 _corr_d[0, 0] = -(pp1_cls[2] + pp2_cls[2])
-                _corr_d[1, 1] = (pp1_cls[2] - pp2_cls[2])
+                _corr_d[1, 1] = pp1_cls[2] - pp2_cls[2]
             elif mode == "minus":
-                xi_dec_minus = Eq90_minus(corr_x, xi_m)/_wm
-                pm1_corrs = np.array([
-                    np.zeros(len(ell)),
-                    xi_p/_wm,
-                    np.zeros(len(ell)),
-                    np.zeros(len(ell))])
+                xi_dec_minus = Eq90_minus(corr_x, xi_m) / _wm
+                pm1_corrs = np.array(
+                    [
+                        np.zeros(len(ell)),
+                        xi_p / _wm,
+                        np.zeros(len(ell)),
+                        np.zeros(len(ell)),
+                    ]
+                )
                 pm1_cls = corr2cl(pm1_corrs.T).T
-                pm2_corrs = np.array([
-                    np.zeros(len(ell)),
-                    xi_dec_minus,
-                    np.zeros(len(ell)),
-                    np.zeros(len(ell))])
+                pm2_corrs = np.array(
+                    [
+                        np.zeros(len(ell)),
+                        xi_dec_minus,
+                        np.zeros(len(ell)),
+                        np.zeros(len(ell)),
+                    ]
+                )
                 pm2_cls = corr2cl(pm2_corrs.T).T
                 # reorder
                 _corr_d = np.zeros_like(d[d_key])
-                _corr_d[0, 0] = (pm1_cls[1] + pm2_cls[1])
-                _corr_d[1, 1] = (pm1_cls[1] - pm2_cls[1])
-            # off-diagonal terms 
+                _corr_d[0, 0] = pm1_cls[1] + pm2_cls[1]
+                _corr_d[1, 1] = pm1_cls[1] - pm2_cls[1]
+            # off-diagonal terms
             icorr_wd = (wd / _wm).imag
             # Transform back to Cl
             __icorr_d = corr2cl(icorr_wd.T).T
@@ -330,12 +342,16 @@ def Eq90_plus(x, xi_p):
     prefac1 = 8 * (2 + x) / (1 - x) ** 2
     integ1 = (1 - x) / (1 + x) ** 2
     integ1 *= xi_p
-    int1 = cumulative_simpson(integ1[::-1] * np.sin(theta[::-1]), dx=dtheta, initial=0)[::-1]
+    int1 = cumulative_simpson(integ1[::-1] * np.sin(theta[::-1]), dx=dtheta, initial=0)[
+        ::-1
+    ]
     t1 = prefac1 * int1
     prefac2 = 8 / (1 - x)
     integ2 = 1 / (1 + x) ** 2
     integ2 *= xi_p
-    int2 = cumulative_simpson(integ2[::-1] * np.sin(theta[::-1]), dx=dtheta, initial=0)[::-1]
+    int2 = cumulative_simpson(integ2[::-1] * np.sin(theta[::-1]), dx=dtheta, initial=0)[
+        ::-1
+    ]
     t2 = prefac2 * int2
     eq90 = xi_p - t1 + t2
     return eq90
