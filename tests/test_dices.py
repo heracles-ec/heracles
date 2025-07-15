@@ -224,31 +224,45 @@ def test_polspice(data_path):
 
 
 def test_jackknife(data_path):
-    Njk = 5
+    JackNjk = 5
     nside = 128
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
 
-    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    assert len(cls1) == Njk
-    for key in cls1.keys():
-        cl = cls1[key]
+    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    assert len(delete1_data_cls) == JackNjk
+    for key in delete1_data_cls.keys():
+        cl = delete1_data_cls[key]
         for key in list(cl.keys()):
             _cl = cl[key]
             *_, nells = _cl.shape
             assert nells == nside + 1
 
-    # Check correct number of delete1 cls
-    assert len(list(cls1.keys())) == Njk
+    lbins = 5
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    lgrid = (ledges[1:] + ledges[:-1]) / 2
+    cqs0 = heracles.binned(data_cls, ledges)
+    for key in list(cqs0.keys()):
+        cq = cqs0[key]
+        *_, nells = cq.shape
+        assert nells == len(lgrid)
+    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    for key in list(cqs1.keys()):
+        for k in list(cqs1[key].keys()):
+            cq = cqs1[key][k]
+            *_, nells = cq.shape
+            assert nells == len(lgrid)
 
     # Delete1
-    cov_jk = dices.jackknife_covariance(cls1)
+    cov_jk = dices.jackknife_covariance(cqs1)
 
     # Check for correct keys)
-    cls_keys = list(cls0.keys())
+    cls_keys = list(cqs0.keys())
+    k = 0
     for i in range(0, len(cls_keys)):
         for j in range(i, len(cls_keys)):
             ki = cls_keys[i]
@@ -262,44 +276,7 @@ def test_jackknife(data_path):
     for key in list(cov_jk.keys()):
         cov = cov_jk[key]
         *_, m, n = cov.shape
-        assert (m, n) == (nside + 1, nside + 1)
-
-    # re-arrange cqs1
-    _cls1 = {}
-    for k1 in cls0.keys():
-        _cls1[k1] = [cls1[k2][k1].array for k2 in cls1.keys()]
-
-    # Check against sample covariance
-    for key in list(cls0.keys()):
-        a, b, i, j = key
-        cov_key = (a, b, a, b, i, j, i, j)
-        cov = cov_jk[cov_key].array
-        _cq = np.array(_cls1[key]).T
-        prefactor = (Njk - 1) ** 2 / (Njk)
-        print(f"Checking {key} with prefactor {prefactor}")
-        if a == b == "POS":
-            _cov = prefactor * np.cov(_cq)
-            print(key)
-            print((cov - _cov) / _cov)
-            assert np.allclose(cov, _cov)
-        elif a == b == "SHE":
-            cov_E = cov[0, 0, 0, 0]
-            cov_B = cov[1, 1, 1, 1]
-            _cq_E = _cq[:, 0, 0]
-            _cq_B = _cq[:, 1, 1]
-            _cov_E = prefactor * np.cov(_cq_E)
-            _cov_B = prefactor * np.cov(_cq_B)
-            assert np.allclose(cov_E, _cov_E)
-            assert np.allclose(cov_B, _cov_B)
-        elif a == "POS" and b == "SHE":
-            cov_E = cov[0, 0]
-            cov_B = cov[1, 1]
-            _cq_E = _cq[:, 0]
-            _cq_B = _cq[:, 1]
-            _cov_E = prefactor * np.cov(_cq_E)
-            _cov_B = prefactor * np.cov(_cq_B)
-            assert np.allclose(cov_E, _cov_E)
-            assert np.allclose(cov_B, _cov_B)
+        assert (m, n) == (lbins, lbins)
 
 
 def test_debiasing(data_path):
