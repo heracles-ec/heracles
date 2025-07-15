@@ -97,32 +97,33 @@ def _natural_unmixing(d, wm):
         # Check if ell is None
         if ell is None:
             ell = np.arange(len(_wm))
+        _d = np.atleast_2d(d[d_key])
         if a == b == "SHE":
-            _d = np.array(
+            __d = np.array(
                 [
-                    np.zeros(len(ell)),
-                    d[d_key][0, 0],  # EE like spin-2
-                    d[d_key][1, 1],  # BB like spin-2
-                    np.zeros(len(ell)),
+                    np.zeros_like(_d[0, 0]),
+                    _d[0, 0],  # EE like spin-2
+                    _d[1, 1],  # BB like spin-2
+                    np.zeros_like(_d[0, 0]),
                 ]
             )
-            _id = np.array(
+            __id = np.array(
                 [
-                    np.zeros(len(ell)),
-                    -d[d_key][0, 1],  # EB like spin-0
-                    d[d_key][1, 0],  # EB like spin-0
-                    np.zeros(len(ell)),
+                    np.zeros_like(_d[0, 0]),
+                    -_d[0, 1],  # EB like spin-0
+                    _d[1, 0],  # EB like spin-0
+                    np.zeros_like(_d[0, 0]),
                 ]
             )
             # Correct by alpha
-            wd = cl2corr(_d.T).T + 1j * cl2corr(_id.T).T
+            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
             corr_wd = (wd / _wm).real
             icorr_wd = (wd / _wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
             # reorder
-            _corr_d = np.zeros_like(d[d_key])
+            _corr_d = np.zeros_like(_d)
             _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
             _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
             _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
@@ -130,7 +131,6 @@ def _natural_unmixing(d, wm):
         else:
             # Treat everything as spin-0
             _corr_d = []
-            _d = np.atleast_2d(d[d_key])
             for cl in _d:
                 wd = cl2corr(cl).T
                 corr_wd = wd / _wm
@@ -145,5 +145,5 @@ def _natural_unmixing(d, wm):
     return corr_d
 
 
-def logistic(x, x0=-2, k=50):
+def logistic(x, x0=-5, k=50):
     return 1.0 + np.exp(-k * (x - x0))
