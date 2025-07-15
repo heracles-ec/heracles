@@ -163,7 +163,7 @@ def _polspice(d, wm, mode="minus"):
             xi_m = wd[2].real
             corr_x, _ = _cached_gauss_legendre(ell[-1] + 1)
             if mode == "plus":
-                xi_dec_plus = Eq90_plus(corr_x, xi_p) / _wm
+                xi_dec_plus = decoupling_plus(corr_x, xi_p) / _wm
                 pp1_corrs = np.array(
                     [
                         np.zeros(len(ell)),
@@ -187,7 +187,7 @@ def _polspice(d, wm, mode="minus"):
                 _corr_d[0, 0] = -(pp1_cls[2] + pp2_cls[2])
                 _corr_d[1, 1] = pp1_cls[2] - pp2_cls[2]
             elif mode == "minus":
-                xi_dec_minus = Eq90_minus(corr_x, xi_m) / _wm
+                xi_dec_minus = decoupling_minus(corr_x, xi_m) / _wm
                 pm1_corrs = np.array(
                     [
                         np.zeros(len(ell)),
@@ -235,7 +235,7 @@ def _polspice(d, wm, mode="minus"):
     return corr_d
 
 
-def Eq90_plus(x, xi_p):
+def decoupling_plus(x, xi_p):
     theta = np.arccos(x)[::-1]
     dtheta = theta[1] - theta[0]
     prefac1 = 8 * (2 + x) / (1 - x) ** 2
@@ -256,7 +256,7 @@ def Eq90_plus(x, xi_p):
     return eq90
 
 
-def Eq90_minus(x, xi_m):
+def decoupling_minus(x, xi_m):
     theta = np.arccos(x)[::-1]
     dtheta = theta[1] - theta[0]
     prefac1 = 8 * (2 - x) / (1 + x) ** 2
