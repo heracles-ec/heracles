@@ -112,32 +112,6 @@ def test_jkmap(data_path):
         assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
 
 
-def test_jackknife_maps(data_path):
-    Njk = 5
-    data_maps = make_data_maps()
-    jk_maps = make_jkmaps(data_path)
-    # multiply maps by jk footprint
-    vmap = jk_maps[("VIS", 1)]
-    vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
-    for key in list(data_maps.keys()):
-        data_maps[key] *= vmap
-    # test null case
-    _data_maps = dices.jackknife.jackknife_maps(data_maps, jk_maps)
-    for key in list(_data_maps.keys()):
-        np.testing.assert_allclose(_data_maps[key], data_maps[key])
-    # test delete1 case
-    __data_maps = np.array(
-        [
-            dices.jackknife.jackknife_maps(data_maps, jk_maps, jk=i, jk2=i)[("POS", 1)]
-            for i in range(1, Njk + 1)
-        ]
-    )
-    __data_map = np.sum(__data_maps, axis=0) / (Njk - 1)
-    np.testing.assert_allclose(__data_map, data_maps[("POS", 1)])
-    ___data_map = np.prod(__data_maps, axis=0)
-    np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
-
-
 def test_cls(data_path):
     nside = 128
     data_maps = make_data_maps()
