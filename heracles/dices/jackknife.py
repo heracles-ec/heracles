@@ -98,6 +98,7 @@ def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
         _jkmap = jkmaps[key_mask]
         _mask = np.copy(_jkmap)
         _mask[_mask != 0] = _mask[_mask != 0] / _mask[_mask != 0]
+#        if key_data[0] != 'SHE' and key_data[0] != 'POS':
         # Remove jk 2 regions
         cond = np.where((_jkmap == float(jk)) | (_jkmap == float(jk2)))[0]
         _mask[cond] = 0.0
