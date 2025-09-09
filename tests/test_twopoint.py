@@ -350,6 +350,7 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
         mms[key] = Result(_m, axis=mms[key].axis, ell=mms[key].ell)
 
     inv_mms = invert_mixing_matrix(mms)
+    assert inv_mms.keys() == mms.keys()
     for key in mms:
         _inv_mms = np.sum(inv_mms[key].array)
         np.testing.assert_allclose(_inv_mms, 1.0)
@@ -357,11 +358,13 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
     # test application of mixing matrices
     from heracles.twopoint import apply_mixing_matrix
 
-    for key in cls:
-        _cl = np.ones_like(cls[key])
-        cls[key] = Result(_cl, axis=(0,), ell=None)
+    cls = {}
+    for key in mms:
+        _, n = mms[key].shape
+        cls[key] = Result(np.ones(n), axis=(0,), ell=None)
 
     mixed_cls = apply_mixing_matrix(cls, inv_mms)
-    for key in cls:
+    assert mixed_cls.keys() == cls.keys()
+    for key in mixed_cls:
         _mixed_cls = np.sum(mixed_cls[key].array)
         np.testing.assert_allclose(_mixed_cls, 1.0)
