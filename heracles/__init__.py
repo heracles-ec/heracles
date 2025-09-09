@@ -72,6 +72,8 @@ __all__ = [
     # transforms
     "cl2corr",
     "corr2cl",
+    # unmixing
+    "natural_unmixing",
 ]
 
 try:
@@ -146,4 +148,8 @@ from .twopoint import (
 from .transforms import (
     cl2corr,
     corr2cl,
+)
+
+from .unmixing import (
+    natural_unmixing,
 )
