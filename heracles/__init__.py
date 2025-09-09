@@ -73,6 +73,10 @@ __all__ = [
     "cl2corr",
     "corr2cl",
     # unmixing
+<<<<<<< HEAD
+=======
+    "inversion",
+>>>>>>> d5ed94ea383612ef17bda2e07909dc041a1c551b
     "natural_unmixing",
 ]
 
@@ -151,5 +155,9 @@ from .transforms import (
 )
 
 from .unmixing import (
+<<<<<<< HEAD
+=======
+    inversion,
+>>>>>>> d5ed94ea383612ef17bda2e07909dc041a1c551b
     natural_unmixing,
 )
