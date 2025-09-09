@@ -430,15 +430,13 @@ def apply_mixing_matrix(d, M):
         corr_d: Corrected Cl
     """
     corr_d = {}
-    d_keys = list(d.keys())
-    m_keys = list(M.keys())
-    for d_key, m_key in zip(d_keys, m_keys):
-        a, b, i, j = d_key
-        dtype = d[d_key].array.dtype
-        ell = d[d_key].ell
-        axis = d[d_key].axis
-        _d = d[d_key].array
-        _M = M[m_key].array
+    for key in d.keys():
+        a, b, i, j = key
+        dtype = d[key].array.dtype
+        ell = d[key].ell
+        axis = d[key].axis
+        _d = np.atleast_2d(d[key].array)
+        _M = M[key].array
         *_, _n, _m = _M.shape
         if a == b == "SHE":
             _corr_d_EE = _M[0] @ _d[0, 0] + _M[1] @ _d[1, 1]
@@ -451,5 +449,5 @@ def apply_mixing_matrix(d, M):
                 _corr_d.append(_M @ cl)
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
+        corr_d[key] = Result(_corr_d, axis=axis, ell=ell)
     return corr_d

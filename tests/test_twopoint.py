@@ -339,3 +339,16 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
         ("POS", "POS", 0, 1),
         ("POS", "POS", 1, 1),
     }
+
+    # test inversion of mixing matrices
+    from heracles.twopoint import Result, invert_mixing_matrix
+    cls = {("VIS", "VIS", 0, 0): cl, ("VIS", "VIS", 0, 1): cl, ("VIS", "VIS", 1, 1): cl}
+    mms = mixing_matrices(fields, cls)
+    for key in mms:
+        _m = np.ones_like(mms[key].array)
+        mms[key] = Result(_m, axis=mms[key].axis, ell=mms[key].ell)
+
+    inv_mms = invert_mixing_matrix(mms)
+    for key in mms:
+        _inv_mms = np.sum(inv_mms[key].array)
+        np.testing.assert_allclose(_inv_mms, 1.0)
