@@ -21,36 +21,6 @@ from .result import Result
 from .transforms import cl2corr, corr2cl
 
 
-def invert_mixing_matrix(M, rtol=1e-5):
-    """
-    Inversion model for the unmixing E/B modes.
-    Args:
-        M: Mixing matrix
-        Returns:
-        inversion_cls: inverted Cl
-    """
-    inv_M = {}
-    for key in list(d.keys()):
-        a, b, i, j = key
-        _d = np.atleast_2d(d[key])
-        _M = M[key].array
-        *_, _n, _m = _M.shape
-        if a == b == "SHE":
-            _inv_m = np.linalg.pinv(
-                np.vstack(
-                (np.hstack((_M[0], _M[1])),
-                np.hstack((_M[1], _M[0])))
-            ))
-            _inv_M_EEEE = _inv_m[:_m, :_n]
-            _inv_M_EEBB = _inv_m[_m:, _n:]
-            _inv_M_EBEB = np.linalg.pinv(_M[2])
-            _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
-        else:
-            _inv_M = np.linalg.pinv(_M)
-        inv_M[key] = Result(_inv_M, axis=M[key].axis, ell=M[key].ell)
-    return inv_M
-
-
 def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
     wm = {}
     m_keys = list(m.keys())
