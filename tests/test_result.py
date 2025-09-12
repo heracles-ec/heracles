@@ -200,3 +200,70 @@ def test_binned_metadata():
 
     binned = heracles.binned(result, np.array([0, 1, 2]))
     assert binned.dtype.metadata == md
+
+
+def trunc1(data, ell_max, axis):
+    """truncate data over a single axis"""
+    ell = np.arange(data.shape[axis])
+    mask = ell <= ell_max
+    out = np.take(data, np.where(mask)[0], axis=axis)
+    return out, ell[mask], np.ones_like(ell[mask])
+
+
+@pytest.mark.parametrize("ndim,axis", [(1, 0), (2, 0), (3, 1)])
+def test_truncated(ndim, axis, rng):
+    shape = rng.integers(5, 50, ndim)
+    lmax = shape[axis] - 1
+    ell_max = rng.integers(0, lmax)
+
+    data = heracles.Result(rng.standard_normal(shape), axis=axis)
+    result = heracles.truncated(data, ell_max)
+
+    trunc_data, trunc_ell, trunc_weight = trunc1(data, ell_max, axis)
+
+    np.testing.assert_array_almost_equal(result, trunc_data)
+    np.testing.assert_array_equal(result.ell, trunc_ell)
+    np.testing.assert_array_equal(result.weight, trunc_weight)
+
+
+def test_truncated_2d(rng):
+    ndim = 3
+    axes = (0, 2)
+    shape = rng.integers(5, 50, ndim)
+    data = heracles.Result(rng.standard_normal(shape), axis=axes)
+
+    ell_max = tuple(rng.integers(0, shape[ax]) for ax in axes)
+    result = heracles.truncated(data, ell_max)
+
+    trunc = data.array
+    for i, axis in enumerate(axes):
+        trunc, trunc_ell, trunc_weight = trunc1(trunc, ell_max[i], axis)
+        np.testing.assert_array_equal(result.ell[i], trunc_ell)
+        np.testing.assert_array_equal(result.weight[i], trunc_weight)
+    np.testing.assert_array_almost_equal(result, trunc)
+
+
+def test_truncated_mapping():
+    result = {
+        object(): object(),
+        object(): object(),
+        object(): object(),
+    }
+    ell_max = object()
+
+    with patch("heracles.result.truncated") as mock:
+        out = heracles.truncated(result, ell_max)
+        assert mock.call_count == len(out) == len(result)
+
+    for i, key in enumerate(result):
+        assert mock.call_args_list[i] == call(result[key], ell_max)
+        assert out[key] is mock.return_value
+
+
+def test_truncated_metadata():
+    md = {"test": object()}
+    result = np.zeros(3, dtype=np.dtype(float, metadata=md))
+    assert result.dtype.metadata == md
+
+    truncated = heracles.truncated(result, 1)
+    assert truncated.dtype.metadata == md
