@@ -405,6 +405,7 @@ def invert_mixing_matrix(M, rtol=1e-5):
         a, b, i, j = key
         _M = M[key].array
         *_, _n, _m = _M.shape
+        new_ell = np.arange(_m)
         if a == b == "SHE":
             _inv_m = np.linalg.pinv(
                 np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
@@ -416,7 +417,7 @@ def invert_mixing_matrix(M, rtol=1e-5):
             _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
         else:
             _inv_M = np.linalg.pinv(_M, rtol=rtol)
-        inv_M[key] = Result(_inv_M, axis=M[key].axis, ell=M[key].ell)
+        inv_M[key] = Result(_inv_M, axis=M[key].axis, ell=new_ell)
     return inv_M
 
 
@@ -433,7 +434,7 @@ def apply_mixing_matrix(d, M):
     for key in d.keys():
         a, b, i, j = key
         dtype = d[key].array.dtype
-        ell = d[key].ell
+        ell = M[key].ell
         axis = d[key].axis
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array
