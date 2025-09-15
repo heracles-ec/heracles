@@ -412,7 +412,7 @@ def invert_mixing_matrix(M, rtol=1e-5):
                 rtol=rtol,
             )
             _inv_M_EEEE = _inv_m[:_m, :_n]
-            _inv_M_EEBB = _inv_m[_m:, _n:]
+            _inv_M_EEBB = _inv_m[_m:, :_n]
             _inv_M_EBEB = np.linalg.pinv(_M[2], rtol=rtol)
             _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
         else:
