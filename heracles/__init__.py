@@ -65,6 +65,7 @@ __all__ = [
     # result
     "Result",
     "binned",
+    "truncated",
     # twopoint
     "angular_power_spectra",
     "debias_cls",
@@ -139,6 +140,7 @@ from .progress import (
 from .result import (
     Result,
     binned,
+    truncated,
 )
 
 from .twopoint import (
