@@ -442,8 +442,9 @@ def apply_mixing_matrix(d, M):
         if a == b == "SHE":
             _corr_d_EE = _M[0] @ _d[0, 0] + _M[1] @ _d[1, 1]
             _corr_d_BB = _M[1] @ _d[0, 0] + _M[0] @ _d[1, 1]
-            _corr_d_EB = _M[2] @ _d[1, 1]
-            _corr_d = np.array([[_corr_d_EE, _corr_d_EB], [_corr_d_EB, _corr_d_BB]])
+            _corr_d_EB = _M[2] @ _d[0, 1]
+            _corr_d_BE = _M[2] @ _d[1, 0]
+            _corr_d = np.array([[_corr_d_EE, _corr_d_EB], [_corr_d_BE, _corr_d_BB]])
         else:
             _corr_d = []
             for cl in _d:
