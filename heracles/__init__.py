@@ -70,6 +70,8 @@ __all__ = [
     "angular_power_spectra",
     "debias_cls",
     "mixing_matrices",
+    "invert_mixing_matrix",
+    "apply_mixing_matrix",
     # transforms
     "cl2corr",
     "corr2cl",
@@ -145,6 +147,8 @@ from .twopoint import (
     angular_power_spectra,
     debias_cls,
     mixing_matrices,
+    invert_mixing_matrix,
+    apply_mixing_matrix,
 )
 
 from .transforms import (
