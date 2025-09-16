@@ -392,32 +392,52 @@ def mixing_matrices(
     return out
 
 
-def invert_mixing_matrix(M, rtol=1e-5):
+def invert_mixing_matrix(
+    M,
+    rtol: float = 1e-5,
+    progress: Progress | None = None,
+):
     """
     Inversion model for the unmixing E/B modes.
+
     Args:
-        M: Mixing matrix
-        Returns:
-        inversion_cls: inverted Cl
+        M: Mixing matrix (mapping of keys -> Result objects)
+        rtol: relative tolerance for pseudo-inverse
+        progress: optional progress reporter
+
+    Returns:
+        inv_M: inverted Cls in the same mapping form
     """
+    if progress is None:
+        progress = NoProgress()
+
     inv_M = {}
-    for key in M.keys():
+    current, total = 0, len(M)
+
+    for key, value in M.items():
+        current += 1
+        progress.update(current, total)
+
         a, b, i, j = key
-        _M = M[key].array
+        _M = value.array
         *_, _n, _m = _M.shape
         new_ell = np.arange(_m)
-        if a == b == "SHE":
-            _inv_m = np.linalg.pinv(
-                np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
-                rcond=rtol,
-            )
-            _inv_M_EEEE = _inv_m[:_m, :_n]
-            _inv_M_EEBB = _inv_m[_m:, :_n]
-            _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
-            _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
-        else:
-            _inv_M = np.linalg.pinv(_M, rcond=rtol)
-        inv_M[key] = Result(_inv_M, axis=M[key].axis, ell=new_ell)
+
+        with progress.task(f"invert {key}"):
+            if a == b == "SHE":
+                _inv_m = np.linalg.pinv(
+                    np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
+                    rcond=rtol,
+                )
+                _inv_M_EEEE = _inv_m[:_m, :_n]
+                _inv_M_EEBB = _inv_m[_m:, :_n]
+                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
+                _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
+            else:
+                _inv_M = np.linalg.pinv(_M, rcond=rtol)
+
+            inv_M[key] = Result(_inv_M, axis=value.axis, ell=new_ell)
+
     return inv_M
 
 
