@@ -163,6 +163,12 @@ def test_add_metadata_to_external_map():
     assert m2.dtype.metadata["neff"] == 1.0 / (4 * np.pi)
     assert m2.dtype.metadata["fsky"] == 1.0
 
+    with pytest.raises(ValueError):
+        add_metadata_to_external_map(np.ones(12), spin=2, verbose=False)
+
+    with pytest.raises(ValueError):
+        add_metadata_to_external_map(np.ones((2, 12)), spin=0, verbose=False)
+
 
 def test_exception_explainer():
     from heracles.core import ExceptionExplainer
