@@ -409,14 +409,14 @@ def invert_mixing_matrix(M, rtol=1e-5):
         if a == b == "SHE":
             _inv_m = np.linalg.pinv(
                 np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
-                rtol=rtol,
+                rcond=rtol,
             )
             _inv_M_EEEE = _inv_m[:_m, :_n]
             _inv_M_EEBB = _inv_m[_m:, :_n]
-            _inv_M_EBEB = np.linalg.pinv(_M[2], rtol=rtol)
+            _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
             _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
         else:
-            _inv_M = np.linalg.pinv(_M, rtol=rtol)
+            _inv_M = np.linalg.pinv(_M, rcond=rtol)
         inv_M[key] = Result(_inv_M, axis=M[key].axis, ell=new_ell)
     return inv_M
 
