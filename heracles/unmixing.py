@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import Result
-from .transforms import cl2corr, corr2cl
+from .transforms import cl2corr, corr2cl, _cached_gauss_legendre
 
 
 def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
@@ -48,15 +48,22 @@ def _natural_unmixing(d, wm):
     wm_keys = list(wm.keys())
     for d_key, wm_key in zip(d_keys, wm_keys):
         a, b, i, j = d_key
+        *_, lmax = d[d_key].shape
+        _d = np.atleast_2d(d[d_key])
+        lmax_mask = len(wm[wm_key])
         _wm = wm[wm_key]
+        _inv_wm = 1.0 / _wm
+        if lmax_mask > lmax:
+            x, _ = _cached_gauss_legendre(lmax)
+            x_mask, _ = _cached_gauss_legendre(lmax_mask)
+            _inv_wm = np.interp(x, x_mask, _inv_wm)
+        elif lmax_mask < lmax:
+            msg = f"Mask lmax {lmax_mask} is smaller than data lmax {lmax}"
+            raise ValueError(msg)
         # Grab metadata
         dtype = d[d_key].array.dtype
-        ell = d[d_key].ell
         axis = d[d_key].axis
-        # Check if ell is None
-        if ell is None:
-            ell = np.arange(len(_wm))
-        _d = np.atleast_2d(d[d_key])
+        ell = np.arange(lmax+1)
         if a == b == "SHE":
             __d = np.array(
                 [
@@ -76,8 +83,8 @@ def _natural_unmixing(d, wm):
             )
             # Correct by alpha
             wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd / _wm).real
-            icorr_wd = (wd / _wm).imag
+            corr_wd = (wd * _inv_wm).real
+            icorr_wd = (wd * _inv_wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
@@ -92,7 +99,7 @@ def _natural_unmixing(d, wm):
             _corr_d = []
             for cl in _d:
                 wd = cl2corr(cl).T
-                corr_wd = wd / _wm
+                corr_wd = wd * _inv_wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
