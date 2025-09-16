@@ -63,7 +63,7 @@ def _natural_unmixing(d, wm):
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
-        ell = np.arange(lmax+1)
+        ell = np.arange(lmax + 1)
         if a == b == "SHE":
             __d = np.array(
                 [
