@@ -339,3 +339,64 @@ def test_mixing_matrices(mock, mock_eb, lmax, rng):
         ("POS", "POS", 0, 1),
         ("POS", "POS", 1, 1),
     }
+
+
+def test_inverting_mixing_matrices():
+    from heracles.twopoint import mixing_matrices
+    from heracles.twopoint import Result, invert_mixing_matrix
+    from heracles.twopoint import apply_mixing_matrix
+
+    lmax = 30
+    cl = np.ones(lmax + 1)
+
+    # create the mock field information
+    fields = {
+        "POS": Mock(mask="VIS", spin=0),
+        "SHE": Mock(mask="WHT", spin=2),
+    }
+
+    cls = {
+        ("POS", "POS", 0, 0): Result(cl, axis=(0,)),
+        ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), axis=(1,)),
+        ("SHE", "SHE", 0, 0): Result(np.array([[cl, cl], [cl, cl]]), axis=(2,)),
+    }
+    cls2 = {
+        ("VIS", "VIS", 0, 0): Result(cl, axis=(0,)),
+        ("VIS", "WHT", 0, 0): Result(cl, axis=(0,)),
+        ("WHT", "WHT", 0, 0): Result(cl, axis=(0,)),
+    }
+    mms = mixing_matrices(fields, cls2, l1max=10, l2max=20)
+    inv_mms = invert_mixing_matrix(mms)
+
+    # test for correct shape
+    for key in mms.keys():
+        *_, n, m = mms[key].shape
+        *_, _n, _m = inv_mms[key].shape
+        assert n == _m
+        assert m == _n
+
+    # test that the inverse is correct
+    mms = mixing_matrices(fields, cls2)
+    for key in mms:
+        _m = np.ones_like(mms[key].array)
+        mms[key] = Result(_m, axis=mms[key].axis, ell=mms[key].ell)
+
+    inv_mms = invert_mixing_matrix(mms)
+    assert inv_mms.keys() == mms.keys()
+    for key in mms:
+        inv_mm = inv_mms[key].array
+        if inv_mm.ndim == 3:
+            _inv_m = np.sum(inv_mm)
+            np.testing.assert_allclose(_inv_m, 1.5)
+        else:
+            _inv_m = np.sum(inv_mm)
+            np.testing.assert_allclose(_inv_m, 1.0)
+
+    # test application of mixing matrices
+    mixed_cls = apply_mixing_matrix(cls, inv_mms)
+    assert mixed_cls.keys() == cls.keys()
+    for key in mixed_cls:
+        (n,) = mixed_cls[key].axis
+        _mixed_cls = np.sum(mixed_cls[key].array)
+        print(key, _mixed_cls)
+        np.testing.assert_allclose(_mixed_cls, (n + 1) * 1.0)
