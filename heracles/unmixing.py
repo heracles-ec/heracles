@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .result import Result
+from .result import Result, truncated
 from .transforms import cl2corr, corr2cl
 
 
-def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
+def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
     wm = {}
     m_keys = list(m.keys())
     for m_key in m_keys:
@@ -30,10 +30,10 @@ def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
         if patch_hole:
             _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
         wm[m_key] = _wm
-    return _natural_unmixing(d, wm)
+    return _natural_unmixing(d, wm, lmax=lmax)
 
 
-def _natural_unmixing(d, wm):
+def _natural_unmixing(d, wm, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -48,15 +48,18 @@ def _natural_unmixing(d, wm):
     wm_keys = list(wm.keys())
     for d_key, wm_key in zip(d_keys, wm_keys):
         a, b, i, j = d_key
+        if lmax is None:
+            *_, lmax = d[d_key].shape
+        _d = np.atleast_2d(d[d_key])
         _wm = wm[wm_key]
+        lmax_mask = len(wm[wm_key])
+        # pad cls
+        pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
+        pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
+        _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
         # Grab metadata
         dtype = d[d_key].array.dtype
-        ell = d[d_key].ell
         axis = d[d_key].axis
-        # Check if ell is None
-        if ell is None:
-            ell = np.arange(len(_wm))
-        _d = np.atleast_2d(d[d_key])
         if a == b == "SHE":
             __d = np.array(
                 [
@@ -100,7 +103,9 @@ def _natural_unmixing(d, wm):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
+        corr_d[d_key] = Result(_corr_d, axis=axis)
+    # truncate to lmax
+    corr_d = truncated(corr_d, lmax)
     return corr_d
 
 
