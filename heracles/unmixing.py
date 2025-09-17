@@ -21,7 +21,7 @@ from .result import Result, truncated
 from .transforms import cl2corr, corr2cl
 
 
-def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50, lmax=None):
+def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
     wm = {}
     m_keys = list(m.keys())
     for m_key in m_keys:
@@ -51,14 +51,12 @@ def _natural_unmixing(d, wm, lmax=None):
         if lmax is None:
             *_, lmax = d[d_key].shape
         _d = np.atleast_2d(d[d_key])
+        _wm = wm[wm_key]
         lmax_mask = len(wm[wm_key])
         # pad cls
         pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
         pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
-        # invert mask
-        _wm = wm[wm_key]
-        _inv_wm = 1.0 / _wm
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
@@ -81,8 +79,8 @@ def _natural_unmixing(d, wm, lmax=None):
             )
             # Correct by alpha
             wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd * _inv_wm).real
-            icorr_wd = (wd * _inv_wm).imag
+            corr_wd = (wd / _wm).real
+            icorr_wd = (wd / _wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
@@ -97,7 +95,7 @@ def _natural_unmixing(d, wm, lmax=None):
             _corr_d = []
             for cl in _d:
                 wd = cl2corr(cl).T
-                corr_wd = wd * _inv_wm
+                corr_wd = wd / _wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
