@@ -26,6 +26,7 @@ from collections import UserDict
 from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
+import healpy as hp
 import numpy as np
 
 T = TypeVar("T")
@@ -120,6 +121,70 @@ def update_metadata(array, *sources, **metadata):
         raise ValueError(msg)
     # set the new dtype in array
     array.dtype = dt
+
+
+def add_metadata_to_external_map(
+    m,
+    spin,
+    verbose=True,
+    geometry="healpix",
+    kernel="healpix",
+    deconv=True,
+    catalog=None,
+    ngal=1.0,
+    nbar=1.0,
+    wmean=1.0,
+    bias=0.0,
+    var=1.0,
+):
+    # Basic checks
+    if spin == 0 and len(m.shape) != 1:
+        raise ValueError("Spin-0 map must be 1D array")
+    if spin == 2 and len(m.shape) != 2:
+        raise ValueError("Spin-2 map must be 2D array with shape (2, npix)")
+    # Derived quantities
+    nside = hp.get_nside(m)
+    if spin == 0:
+        fsky = len(m[m != 0]) / len(m)
+    else:
+        fsky = len(m[0][m[0] != 0]) / len(m[0])
+    variance = var / wmean**2
+    neff = ngal / (4 * np.pi * fsky)
+    # update metadata
+    if verbose:
+        print("Adding metadata to external map:")
+        print(f"  geometry: {geometry}")
+        print(f"  kernel: {kernel}")
+        print(f"  deconv: {deconv}")
+        print(f"  catalog: {catalog}")
+        print(f"  nside: {nside}")
+        print(f"  ngal: {ngal}")
+        print(f"  nbar: {nbar}")
+        print(f"  wmean: {wmean}")
+        print(f"  bias: {bias}")
+        print(f"  var: {var}")
+        print(f"  variance: {variance}")
+        print(f"  neff: {neff}")
+        print(f"  fsky: {fsky}")
+        print(f"  spin: {spin}")
+    update_metadata(
+        m,
+        geometry=geometry,
+        kernel=kernel,
+        deconv=deconv,
+        catalog=catalog,
+        nside=nside,
+        ngal=ngal,
+        nbar=nbar,
+        wmean=wmean,
+        bias=bias,
+        var=var,
+        variance=variance,
+        neff=neff,
+        fsky=fsky,
+        spin=spin,
+    )
+    return m
 
 
 class ExceptionExplainer:
