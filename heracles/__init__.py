@@ -65,10 +65,13 @@ __all__ = [
     # result
     "Result",
     "binned",
+    "truncated",
     # twopoint
     "angular_power_spectra",
     "debias_cls",
     "mixing_matrices",
+    "invert_mixing_matrix",
+    "apply_mixing_matrix",
     # transforms
     "cl2corr",
     "corr2cl",
@@ -137,12 +140,15 @@ from .progress import (
 from .result import (
     Result,
     binned,
+    truncated,
 )
 
 from .twopoint import (
     angular_power_spectra,
     debias_cls,
     mixing_matrices,
+    invert_mixing_matrix,
+    apply_mixing_matrix,
 )
 
 from .transforms import (
