@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import Result
-from .transforms import cl2corr, corr2cl, _cached_gauss_legendre
+from .transforms import cl2corr, corr2cl
 
 
 def natural_unmixing(d, m, patch_hole=True, x0=-2, k=50):
@@ -51,15 +51,13 @@ def _natural_unmixing(d, wm):
         *_, lmax = d[d_key].shape
         _d = np.atleast_2d(d[d_key])
         lmax_mask = len(wm[wm_key])
+        # pad cls
+        pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
+        pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
+        _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
+        # invert mask
         _wm = wm[wm_key]
         _inv_wm = 1.0 / _wm
-        if lmax_mask > lmax:
-            x, _ = _cached_gauss_legendre(lmax)
-            x_mask, _ = _cached_gauss_legendre(lmax_mask)
-            _inv_wm = np.interp(x, x_mask, _inv_wm)
-        elif lmax_mask < lmax:
-            msg = f"Mask lmax {lmax_mask} is smaller than data lmax {lmax}"
-            raise ValueError(msg)
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
