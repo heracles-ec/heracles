@@ -53,16 +53,18 @@ def _natural_unmixing(d, wm, lmax=None):
         _d = np.atleast_2d(d[d_key])
         lmax_mask = len(wm[wm_key])
         # pad cls
+        print(_d.shape)
         pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
         pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
+        print(_d.shape)
         # invert mask
         _wm = wm[wm_key]
         _inv_wm = 1.0 / _wm
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
-        ell = np.arange(lmax + 1)
+        ell_mask = np.arange(lmax_mask + 1)
         if a == b == "SHE":
             __d = np.array(
                 [
@@ -106,7 +108,7 @@ def _natural_unmixing(d, wm, lmax=None):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
+        corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell_mask)
     # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d
