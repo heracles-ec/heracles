@@ -474,6 +474,6 @@ def apply_mixing_matrix(d, M, lmax=None):
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = Result(_corr_d, axis=axis, ell=ell_mask)
-    #truncate
+    # truncate
     corr_d = truncated(corr_d, lmax)
     return corr_d

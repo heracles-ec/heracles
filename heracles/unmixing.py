@@ -107,7 +107,7 @@ def _natural_unmixing(d, wm, lmax=None):
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[d_key] = Result(_corr_d, axis=axis, ell=ell)
-    #truncate to lmax
+    # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d
 
