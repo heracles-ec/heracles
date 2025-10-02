@@ -276,11 +276,8 @@ def test_jackknife(data_path):
         cov = cov_jk[cov_key].array
         _cq = np.array(_cls1[key]).T
         prefactor = (Njk - 1) ** 2 / (Njk)
-        print(f"Checking {key} with prefactor {prefactor}")
         if a == b == "POS":
             _cov = prefactor * np.cov(_cq)
-            print(key)
-            print((cov - _cov) / _cov)
             assert np.allclose(cov, _cov)
         elif a == b == "SHE":
             cov_E = cov[0, 0, 0, 0]
@@ -351,7 +348,6 @@ def test_debiasing(data_path):
             cq = cqs2[key][k]
             *_, nells = cq.shape
             assert nells == len(lgrid)
-
     # Delete1
     cov_jk = dices.jackknife_covariance(cqs1)
 
@@ -378,7 +374,6 @@ def test_debiasing(data_path):
         # Extract off-diagonal elements
         offd = c[offd_mask]
         _offd = _c[offd_mask]
-        print(key, offd, _offd)
         assert np.allclose(offd, _offd)
 
     # Check keys
@@ -431,6 +426,7 @@ def test_shrinkage(data_path):
     cov_jk = dices.jackknife_covariance(cqs1)
 
     # Fake target
+    from heracles.result import _update_result_array
     unit_matrix = {}
     for key in cov_jk.keys():
         g = cov_jk[key]
@@ -439,7 +435,7 @@ def test_shrinkage(data_path):
         single_diag = np.eye(i)  # Shape: (i, j)
         # Expand to the desired shape using broadcasting
         a = np.broadcast_to(single_diag, s)
-        unit_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
+        unit_matrix[key] = _update_result_array(g, a)
 
     # Random matrix
     random_matrix = {}
@@ -447,7 +443,7 @@ def test_shrinkage(data_path):
         g = cov_jk[key]
         s = g.shape
         a = np.abs(np.random.rand(*s))
-        random_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
+        random_matrix[key] = _update_result_array(g, a)
 
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
@@ -467,7 +463,6 @@ def test_shrinkage(data_path):
         _c_diag = np.diagonal(_c, axis1=-2, axis2=-1)
         c_diag = np.nan_to_num(c_diag)
         _c_diag = np.nan_to_num(_c_diag)
-        print(key, c_diag, _c_diag)
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
@@ -503,12 +498,6 @@ def test_flatten(data_path):
         _d_flat_cov.append(d)
     _d_flat_cov = np.array(_d_flat_cov).flatten()
     assert d_flat_cov.shape == _d_flat_cov.shape
-    for i, o in enumerate(order):
-        print(
-            o,
-            d_flat_cov[i * lbins : (1 + i) * lbins],
-            _d_flat_cov[i * lbins : (i + 1) * lbins],
-        )
     assert (_d_flat_cov == d_flat_cov).all()
 
 
@@ -524,11 +513,6 @@ def test_gauss_cov(data_path):
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
     cqs0 = heracles.binned(cls0, ledges)
-    for key in list(cqs0.keys()):
-        print(key, cqs0[key].shape, cqs0[key].spin)
-    for key in list(cqs1.keys()):
-        for k in list(cqs1[key].keys()):
-            print(key, k, cqs1[key][k].shape, cqs1[key][k].spin)
     cov_jk = dices.jackknife_covariance(cqs1)
     gauss_cov = dices.gaussian_covariance(cqs0)
     # Add bias

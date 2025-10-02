@@ -191,7 +191,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     for key in cls.keys():
         cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl, axis=cls[key].axis, spin=cls[key].spin, ell=cls[key].ell)
+        cls[key] = _update_result_array(cls[key], cl)
     return cls
 
 
@@ -241,6 +241,8 @@ def _jackknife_covariance(samples, nd=1):
         # get reference results
         result1 = first[key1]
         result2 = first[key2]
+        sa1, sb1 = result1.spin
+        sa2, sb2 = result2.spin 
         # gather samples for this key combination
         samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
         samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
@@ -267,7 +269,7 @@ def _jackknife_covariance(samples, nd=1):
             # add extra axis if needed
             a1, b1, i1, j1 = key1
             a2, b2, i2, j2 = key2
-            result = Result(a, axis=axis, ell=ell)
+            result = Result(a, axis=axis, spin= (sa1, sb1, sa2, sb2), ell=ell)
             # store result
             cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
     return cov
@@ -321,7 +323,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
             _qii += (Njk - 2) * cls2[kk][key].array
-            _qii = Result(_qii)
+            _qii = _update_result_array(cls0[key], _qii)
             qii[key] = _qii
         Q_ii.append(qii)
     # Compute the correction from the ensemble
