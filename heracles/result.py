@@ -80,6 +80,7 @@ class Result:
 
     array: NDArray[Any]
     ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
+    spin: int | tuple[int, ...] | None = None
     axis: int | tuple[int, ...] | None = None
     lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
     upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
