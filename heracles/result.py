@@ -231,6 +231,7 @@ def binned(result, bins, weight=None):
     # construct the result
     return Result(
         out,
+        spin=result.spin,
         ell=binned_ell,
         axis=axes,
         lower=binned_lower,
@@ -292,6 +293,7 @@ def truncated(result, ell_max):
 
     return Result(
         out,
+        spin=result.spin,
         ell=truncated_ell,
         axis=axes,
         weight=truncated_weight,

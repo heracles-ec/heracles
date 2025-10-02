@@ -50,6 +50,7 @@ def _natural_unmixing(d, wm, lmax=None):
         a, b, i, j = d_key
         if lmax is None:
             *_, lmax = d[d_key].shape
+        s1, s2 = d[d_key].spin
         _d = np.atleast_2d(d[d_key])
         _wm = wm[wm_key]
         lmax_mask = len(wm[wm_key])
@@ -60,7 +61,7 @@ def _natural_unmixing(d, wm, lmax=None):
         # Grab metadata
         dtype = d[d_key].array.dtype
         axis = d[d_key].axis
-        if a == b == "SHE":
+        if s1 == s2 == 2:
             __d = np.array(
                 [
                     np.zeros_like(_d[0, 0]),

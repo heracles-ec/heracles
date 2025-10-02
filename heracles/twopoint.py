@@ -424,6 +424,7 @@ def invert_mixing_matrix(
 
         a, b, i, j = key
         _M = value.array
+        print(key, value.spin)
         s1, s2 = value.spin
         *_, _n, _m = _M.shape
         new_ell = np.arange(_m)

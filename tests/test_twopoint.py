@@ -89,6 +89,8 @@ def test_alm2cl_unequal_size(rng):
 
 
 def test_angular_power_spectra(mock_alms, lmax):
+    from heracles.healpy import HealpixMapper
+    from heracles.fields import Positions, Shears
     from heracles.twopoint import angular_power_spectra
 
     # expected combinations of input alms and their shapes
@@ -106,7 +108,25 @@ def test_angular_power_spectra(mock_alms, lmax):
     }
 
     # alms cross themselves
-    cls = angular_power_spectra(mock_alms)
+    mapper = HealpixMapper(32, lmax)
+    fields = {
+    "POS": Positions(
+        mapper,
+        "RA",
+        "DEC",
+        mask="VIS",
+    ),
+    "SHE": Shears(
+        mapper,
+        "RA",
+        "DEC",
+        "E1",
+        "E2",
+        "W",
+        mask="WHT",
+    ),
+}
+    cls = angular_power_spectra(fields, mock_alms)
     keys = set(cls.keys())
     assert keys == comb.keys()
     for key, cl in cls.items():
@@ -114,7 +134,7 @@ def test_angular_power_spectra(mock_alms, lmax):
         assert cl.axis == (cl.ndim - 1,)
 
     # explicit cross
-    cls = angular_power_spectra(mock_alms, mock_alms)
+    cls = angular_power_spectra(fields, mock_alms, mock_alms)
     keys = set(cls.keys())
     assert keys == comb.keys()
     for key, cl in cls.items():
@@ -131,7 +151,7 @@ def test_angular_power_spectra(mock_alms, lmax):
         ("SHE", "SHE", 0, 1): (2, 2, lmax + 1),
     }
 
-    cls = angular_power_spectra(mock_alms1, mock_alms2)
+    cls = angular_power_spectra(fields, mock_alms1, mock_alms2)
     keys = set(cls.keys())
     assert keys == comb12.keys()
     for key, cl in cls.items():
@@ -142,7 +162,7 @@ def test_angular_power_spectra(mock_alms, lmax):
     exc = object()
     with patch("heracles.twopoint.toc_match") as mock_match:
         mock_match.return_value = False
-        cls = angular_power_spectra(mock_alms1, mock_alms2, include=inc, exclude=exc)
+        cls = angular_power_spectra(fields, mock_alms1, mock_alms2, include=inc, exclude=exc)
     assert len(cls) == 0
     assert mock_match.call_count == len(comb12)
     call_iter = iter(mock_match.call_args_list)
@@ -356,14 +376,14 @@ def test_inverting_mixing_matrices():
     }
 
     cls = {
-        ("POS", "POS", 0, 0): Result(cl, axis=(0,)),
-        ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), axis=(1,)),
-        ("SHE", "SHE", 0, 0): Result(np.array([[cl, cl], [cl, cl]]), axis=(2,)),
+        ("POS", "POS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), spin=(0, 2), axis=(1,)),
+        ("SHE", "SHE", 0, 0): Result(np.array([[cl, cl], [cl, cl]]), spin=(2, 2), axis=(2,)),
     }
     cls2 = {
-        ("VIS", "VIS", 0, 0): Result(cl, axis=(0,)),
-        ("VIS", "WHT", 0, 0): Result(cl, axis=(0,)),
-        ("WHT", "WHT", 0, 0): Result(cl, axis=(0,)),
+        ("VIS", "VIS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("VIS", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("WHT", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
     }
     mms = mixing_matrices(fields, cls2, l1max=10, l2max=20)
     inv_mms = invert_mixing_matrix(mms)
@@ -379,7 +399,7 @@ def test_inverting_mixing_matrices():
     mms = mixing_matrices(fields, cls2)
     for key in mms:
         _m = np.ones_like(mms[key].array)
-        mms[key] = Result(_m, axis=mms[key].axis, ell=mms[key].ell)
+        mms[key] = Result(_m, spin=mms[key].spin, axis=mms[key].axis, ell=mms[key].ell)
 
     inv_mms = invert_mixing_matrix(mms)
     assert inv_mms.keys() == mms.keys()
