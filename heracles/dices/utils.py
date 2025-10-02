@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from ..result import Result
+from ..result import Result, _update_result_array
 
 
 def add_to_Cls(Cls, x):
@@ -31,8 +31,8 @@ def add_to_Cls(Cls, x):
     """
     _Cls = {}
     for key in Cls.keys():
-        ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].array + x[key], ell)
+        arr = Cls[key].array + x[key]
+        _Cls[key] = _update_result_array(Cls[key], arr)
     return _Cls
 
 
@@ -47,8 +47,8 @@ def sub_to_Cls(Cls, x):
     """
     _Cls = {}
     for key in Cls.keys():
-        ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].array - x[key], ell)
+        arr = Cls[key].array - x[key]
+        _Cls[key] = _update_result_array(Cls[key], arr)
     return _Cls
 
 
@@ -71,5 +71,5 @@ def impose_correlation(cov_a, cov_b):
         b_std = np.sqrt(b_v[..., None, :])
         c = a * (b_std * np.swapaxes(b_std, -1, -2))
         c /= a_std * np.swapaxes(a_std, -1, -2)
-        cov_c[key] = Result(c, axis=a.axis, ell=a.ell)
+        cov_c[key] = _update_result_array(a, c)
     return cov_c

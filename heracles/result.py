@@ -93,11 +93,14 @@ class Result:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(axis={self.axis!r})"
 
-    def __array__(self, dtype=None, *, copy=None) -> NDArray[Any]:
+    def __array__(
+        self,
+        dtype: np.dtype[Any] | None = None,
+        *,
+        copy: np.bool[bool] | None = None,
+    ) -> NDArray[Any]:
         if copy is not None:
-            # copy being set means NumPy v2, so it's safe to pass it on
             return self.array.__array__(dtype, copy=copy)
-        # NumPy v1 might not know about copy
         return self.array.__array__(dtype)
 
     def __getitem__(self, key):
@@ -297,4 +300,17 @@ def truncated(result, ell_max):
         ell=truncated_ell,
         axis=axes,
         weight=truncated_weight,
+    )
+
+
+def _update_result_array(result, arr):
+    """Return a copy of result with array replaced by arr."""
+    return Result(
+        arr,
+        spin=result.spin,
+        ell=result.ell,
+        axis=result.axis,
+        lower=result.lower,
+        upper=result.upper,
+        weight=result.weight,
     )

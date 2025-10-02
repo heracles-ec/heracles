@@ -22,7 +22,7 @@ from copy import deepcopy
 from itertools import combinations
 from .utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
-from ..result import Result, get_result_array
+from ..result import Result, get_result_array, _update_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _natural_unmixing, logistic
@@ -191,7 +191,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     for key in cls.keys():
         cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl)
+        cls[key] = Result(cl, axis=cls[key].axis, spin=cls[key].spin, ell=cls[key].ell)
     return cls
 
 
@@ -334,7 +334,7 @@ def delete2_correction(cls0, cls1, cls2):
         q_diag_exp = np.zeros_like(q)
         diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
+        Q[key] = _update_result_array(q, q_diag_exp)
     return Q
 
 
@@ -361,9 +361,5 @@ def _debias_covariance(cov_jk, Q):
     debiased_cov = {}
     for key in list(cov_jk.keys()):
         c = cov_jk[key].array - Q[key].array
-        debiased_cov[key] = Result(
-            c,
-            ell=cov_jk[key].ell,
-            axis=cov_jk[key].axis,
-        )
+        debiased_cov[key] = _update_result_array(cov_jk[key], c)
     return debiased_cov

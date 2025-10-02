@@ -524,6 +524,11 @@ def test_gauss_cov(data_path):
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
     cqs0 = heracles.binned(cls0, ledges)
+    for key in list(cqs0.keys()):
+        print(key, cqs0[key].shape, cqs0[key].spin)
+    for key in list(cqs1.keys()):
+        for k in list(cqs1[key].keys()):
+            print(key, k, cqs1[key][k].shape, cqs1[key][k].spin)
     cov_jk = dices.jackknife_covariance(cqs1)
     gauss_cov = dices.gaussian_covariance(cqs0)
     # Add bias

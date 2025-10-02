@@ -120,11 +120,13 @@ def gaussian_covariance(Cls):
         # get reference results
         cl1 = Cls[key1]
         cl2 = Cls[key2]
+        sa1, sb1 = cl1.spin
+        sa2, sb2 = cl2.spin
         # get components
-        _a1, idx1 = _split_key(a1, pos=0)
-        _b1, idx2 = _split_key(b1, pos=0)
-        _a2, idx3 = _split_key(a2, pos=0)
-        _b2, idx4 = _split_key(b2, pos=0)
+        _a1, idx1 = _split_key(a1, sa1, pos=0)
+        _b1, idx2 = _split_key(b1, sb1, pos=0)
+        _a2, idx3 = _split_key(a2, sa2, pos=0)
+        _b2, idx4 = _split_key(b2, sb2, pos=0)
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")
         ell2 = get_result_array(cl2, "ell")
@@ -145,7 +147,7 @@ def gaussian_covariance(Cls):
         # Remove the extra dimensions
         r = np.squeeze(r)
         # Make Result
-        result = Result(r, ell=ell)
+        result = Result(r, spin=(sa1, sb1, sa2, sb2), ell=ell)
         cov[covkey] = result
     return cov
 
