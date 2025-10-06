@@ -60,7 +60,6 @@ def _natural_unmixing(d, wm, lmax=None):
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
         # Grab metadata
         dtype = d[d_key].array.dtype
-        axis = d[d_key].axis
         if s1 == s2 == 2:
             __d = np.array(
                 [

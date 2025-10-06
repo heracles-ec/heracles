@@ -427,6 +427,7 @@ def test_shrinkage(data_path):
 
     # Fake target
     from heracles.result import _update_result_array
+
     unit_matrix = {}
     for key in cov_jk.keys():
         g = cov_jk[key]

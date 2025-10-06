@@ -358,7 +358,9 @@ def test_inverting_mixing_matrices():
     cls = {
         ("POS", "POS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
         ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), spin=(0, 2), axis=(1,)),
-        ("SHE", "SHE", 0, 0): Result(np.array([[cl, cl], [cl, cl]]), spin=(2, 2), axis=(2,)),
+        ("SHE", "SHE", 0, 0): Result(
+            np.array([[cl, cl], [cl, cl]]), spin=(2, 2), axis=(2,)
+        ),
     }
     cls2 = {
         ("VIS", "VIS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),

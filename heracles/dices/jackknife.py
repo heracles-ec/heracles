@@ -242,7 +242,7 @@ def _jackknife_covariance(samples, nd=1):
         result1 = first[key1]
         result2 = first[key2]
         sa1, sb1 = result1.spin
-        sa2, sb2 = result2.spin 
+        sa2, sb2 = result2.spin
         # gather samples for this key combination
         samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
         samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
@@ -269,7 +269,7 @@ def _jackknife_covariance(samples, nd=1):
             # add extra axis if needed
             a1, b1, i1, j1 = key1
             a2, b2, i2, j2 = key2
-            result = Result(a, axis=axis, spin= (sa1, sb1, sa2, sb2), ell=ell)
+            result = Result(a, axis=axis, spin=(sa1, sb1, sa2, sb2), ell=ell)
             # store result
             cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
     return cov
