@@ -77,7 +77,7 @@ def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     # compute alms
     alms = transform(fields, _maps)
     # compute cls
-    cls = angular_power_spectra(fields, alms)
+    cls = angular_power_spectra(alms)
     return cls
 
 

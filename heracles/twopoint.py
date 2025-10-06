@@ -164,7 +164,6 @@ def _debias_cl(
 
 
 def angular_power_spectra(
-    fields: Mapping[Any, Field],
     alms,
     alms2=None,
     *,
@@ -208,8 +207,6 @@ def angular_power_spectra(
     # do not compute duplicates
     for (k1, i1), (k2, i2) in pairs:
         # skip duplicate cls in any order
-        spin1 = fields[k1].spin
-        spin2 = fields[k2].spin
         if (k1, k2, i1, i2) in cls or (k2, k1, i2, i1) in cls:
             continue
 
@@ -217,7 +214,6 @@ def angular_power_spectra(
         if (k1, k2) not in twopoint_names and (k2, k1) in twopoint_names:
             i1, i2 = i2, i1
             k1, k2 = k2, k1
-            spin1, spin2 = spin2, spin1
             swapped = True
         else:
             swapped = False
@@ -243,6 +239,10 @@ def angular_power_spectra(
         # get metadata from alms
         md1 = alm1.dtype.metadata or {}
         md2 = alm2.dtype.metadata or {}
+        # Get spins of the fields
+        s1, s2 = md1.get("spin", None), md2.get("spin", None)
+        if s1 is None or s2 is None:
+            raise ValueError(f"missing spin metadata for {k1} or {k2}")
         # collect metadata
         md = {}
         bias = None
@@ -269,7 +269,7 @@ def angular_power_spectra(
 
         # wrap in result array type
         # do this before binned() so it picks up the correct ell axes
-        cl = Result(cl, spin=(spin1, spin2), axis=-1)
+        cl = Result(cl, spin=(s1, s2), axis=-1)
 
         # if bins are given, apply the binning
         if bins is not None:
