@@ -162,20 +162,10 @@ def _gaussian_covariance(cls, key):
         cov: covariance matrix
     """
     a1, b1, a2, b2, i1, j1, i2, j2 = key
-    #clkey1 = format_key((a1, a2, i1, i2))
-    #clkey2 = format_key((b1, b2, j1, j2))
-    #clkey3 = format_key((a1, b2, i1, j2))
-    #clkey4 = format_key((b1, a2, j1, i2))
-    #cl1 = cls[clkey1].array
-    #cl2 = cls[clkey2].array
-    #cl3 = cls[clkey3].array
-    #cl4 = cls[clkey4].array
-
     cl1 = _get_cl((a1, a2, i1, i2), cls)
     cl2 = _get_cl((b1, b2, j1, j2), cls)
     cl3 = _get_cl((a1, b2, i1, j2), cls)
     cl4 = _get_cl((b1, a2, j1, i2), cls)
-    # Compute the Gaussian covariance
     cov = cl1 * cl2 + cl3 * cl4
     return cov
 

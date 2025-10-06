@@ -177,22 +177,3 @@ def _split_key(f, spin, pos=None):
         return [f], [pos]
     if spin == 2:
         return [f + "_E", f + "_B"], [0, 1]
-
-
-def format_key(key, spin):
-    """
-    Produces a Cl key for data maps.
-    input:
-        key: Cl key
-    returns:
-        Clkey: Cl key
-    """
-    _key = copy.deepcopy(key)
-    a, b, i, j = _key
-    _, sb = spin
-    if i > j:
-        i, j = j, i
-        a, b = b, a
-    if sb==0 or (b[-2:] == "_E" and a[-2:] == "_B"):
-        a, b = b, a
-    return (a, b, i, j)
