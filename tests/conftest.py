@@ -16,6 +16,7 @@ def rng(seed: int = 50) -> np.random.Generator:
 def data_maps():
     import healpy as hp
     import heracles
+
     nbins = 2
     nside = 128
     lmax = 128
@@ -67,6 +68,7 @@ def data_maps():
 def vis_maps():
     import healpy as hp
     import heracles
+
     nbins = 2
     nside = 128
     npix = hp.nside2npix(nside)
@@ -98,6 +100,7 @@ def fields():
     """
     from heracles.healpy import HealpixMapper
     from heracles.fields import Positions, Shears, Visibility, Weights
+
     nside = 128
     lmax = 128
     mapper = HealpixMapper(nside=nside, lmax=lmax)
@@ -113,6 +116,7 @@ def fields():
 @pytest.fixture(scope="session")
 def jk_maps():
     import healpy as hp
+
     data_path = Path(__file__).parent / "data"
     jkmap = hp.read_map(data_path / "jkmap.fits")
     return {
@@ -126,16 +130,19 @@ def jk_maps():
 @pytest.fixture(scope="session")
 def cls0(fields, data_maps, jk_maps):
     from heracles.dices.jackknife import get_cls
+
     return get_cls(data_maps, jk_maps, fields)
 
 
 @pytest.fixture(scope="session")
 def cls1(fields, data_maps, vis_maps, jk_maps):
     from heracles.dices.jackknife import jackknife_cls
+
     return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
 
 
 @pytest.fixture(scope="session")
 def cls2(fields, data_maps, vis_maps, jk_maps):
     from heracles.dices.jackknife import jackknife_cls
+
     return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
