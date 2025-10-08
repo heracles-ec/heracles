@@ -9,8 +9,8 @@ from heracles.fields import Positions, Shears, Visibility, Weights
 
 def make_data_maps():
     nbins = 2
-    nside = 64
-    lmax = 64
+    nside = 32
+    lmax = 32
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
@@ -57,7 +57,7 @@ def make_data_maps():
 
 def make_vis_maps():
     nbins = 2
-    nside = 128
+    nside = 32
     npix = hp.nside2npix(nside)
     map = 4 * np.ones(npix)
     maps = {}
@@ -84,8 +84,8 @@ def get_fields():
     returns:
         fields (dict): Dictionary of fields
     """
-    nside = 128
-    lmax = 128
+    nside = 32
+    lmax = 32
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
@@ -139,7 +139,7 @@ def test_jackknife_maps(data_path):
 
 
 def test_cls(data_path):
-    nside = 128
+    nside = 32
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     jk_maps = make_jkmaps(data_path)
@@ -225,7 +225,7 @@ def test_polspice(data_path):
 
 def test_jackknife(data_path):
     Njk = 5
-    nside = 128
+    nside = 32
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
@@ -304,7 +304,7 @@ def test_jackknife(data_path):
 
 def test_debiasing(data_path):
     JackNjk = 5
-    nside = 128
+    nside = 32
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
@@ -395,7 +395,7 @@ def test_debiasing(data_path):
 
 def test_shrinkage(data_path):
     JackNjk = 5
-    nside = 128
+    nside = 32
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
@@ -472,7 +472,7 @@ def test_shrinkage(data_path):
 
 
 def test_flatten(data_path):
-    nside = 128
+    nside = 32
     lbins = 2
     data_maps = make_data_maps()
     fields = get_fields()
@@ -513,7 +513,7 @@ def test_flatten(data_path):
 
 
 def test_gauss_cov(data_path):
-    nside = 128
+    nside = 32
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
