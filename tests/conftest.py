@@ -109,10 +109,11 @@ def fields():
 
 @pytest.fixture(scope="session")
 def jk_maps():
-    path = Path(__file__).parent / "data"
-    nbins = 2
-    jk_maps = {}
-    for i in range(1, nbins + 1):
-        jk_maps[("VIS", i)] = hp.read_map(path / "jkmap.fits")
-        jk_maps[("WHT", i)] = hp.read_map(path / "jkmap.fits")
-    return jk_maps
+    data_path = Path(__file__).parent / "data"
+    jkmap = hp.read_map(data_path / "jkmap.fits")
+    return {
+        ("VIS", 1): jkmap,
+        ("WHT", 1): jkmap,
+        ("VIS", 2): jkmap,
+        ("WHT", 2): jkmap,
+    }

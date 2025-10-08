@@ -5,17 +5,15 @@ import heracles.dices as dices
 
 
 def test_jkmap(jk_maps):
-    # Check that the jk maps contain the right number of regions
     Njk = 5
     for key in list(jk_maps.keys()):
         assert np.all(np.unique(jk_maps[key]) == np.arange(0, Njk + 1))
 
 
 def test_jackknife_maps(data_maps, jk_maps):
-    # Check that the segmentation of the maps given the jk maps is correct
     Njk = 5
     # multiply maps by jk footprint
-    vmap = jk_maps[("VIS", 1)]
+    vmap = np.copy(jk_maps[("VIS", 1)])
     vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
     for key in list(data_maps.keys()):
         data_maps[key] *= vmap
@@ -50,7 +48,7 @@ def test_cls(fields, data_maps, vis_maps, jk_maps):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_bias(data_maps, jk_maps, fields):
+def test_bias(fields, data_maps, jk_maps):
     cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     b = dices.jackknife.bias(cls)
     for key in list(cls.keys()):
@@ -78,7 +76,7 @@ def test_get_delete2_fsky(jk_maps):
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction(data_maps, vis_maps, fields, jk_maps):
+def test_mask_correction(fields, data_maps, vis_maps, jk_maps):
     cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     mls = dices.jackknife.get_cls(vis_maps, jk_maps, fields)
     alphas = dices.mask_correction(mls, mls)
@@ -180,12 +178,10 @@ def test_jackknife(fields, data_maps, vis_maps, jk_maps):
             assert np.allclose(cov_B, _cov_B)
 
 
-def test_debiasing(data_maps, vis_maps, fields, jk_maps):
+def test_debiasing(fields, data_maps, vis_maps, jk_maps):
     JackNjk = 5
     nside = 128
-
     data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-
     delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
@@ -194,7 +190,6 @@ def test_debiasing(data_maps, vis_maps, fields, jk_maps):
             _cl = cl[key]
             *_, nells = _cl.shape
             assert nells == nside + 1
-
     delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
     assert len(delete2_data_cls) == 2 * JackNjk
     for jk in range(1, JackNjk + 1):
@@ -272,6 +267,7 @@ def test_shrinkage(fields, data_maps, vis_maps, jk_maps):
     nside = 128
 
     data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+
     delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
@@ -378,7 +374,7 @@ def test_flatten(fields, data_maps, jk_maps):
     assert (_d_flat_cov == d_flat_cov).all()
 
 
-def test_gauss_cov(data_maps, vis_maps, fields, jk_maps):
+def test_gauss_cov(fields, data_maps, vis_maps, jk_maps):
     nside = 128
     cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     cls1 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
