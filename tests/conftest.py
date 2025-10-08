@@ -2,10 +2,7 @@ import numpy as np
 import pytest
 from pathlib import Path
 from numba import config
-import heracles
-import healpy as hp
-from heracles.healpy import HealpixMapper
-from heracles.fields import Positions, Shears, Visibility, Weights
+
 
 config.DISABLE_JIT = True
 
@@ -17,6 +14,8 @@ def rng(seed: int = 50) -> np.random.Generator:
 
 @pytest.fixture(scope="session")
 def data_maps():
+    import healpy as hp
+    import heracles
     nbins = 2
     nside = 128
     lmax = 128
@@ -66,6 +65,8 @@ def data_maps():
 
 @pytest.fixture(scope="session")
 def vis_maps():
+    import healpy as hp
+    import heracles
     nbins = 2
     nside = 128
     npix = hp.nside2npix(nside)
@@ -95,6 +96,8 @@ def fields():
     returns:
         fields (dict): Dictionary of fields
     """
+    from heracles.healpy import HealpixMapper
+    from heracles.fields import Positions, Shears, Visibility, Weights
     nside = 128
     lmax = 128
     mapper = HealpixMapper(nside=nside, lmax=lmax)
@@ -109,6 +112,7 @@ def fields():
 
 @pytest.fixture(scope="session")
 def jk_maps():
+    import healpy as hp
     data_path = Path(__file__).parent / "data"
     jkmap = hp.read_map(data_path / "jkmap.fits")
     return {
