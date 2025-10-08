@@ -10,7 +10,7 @@ from heracles.fields import Positions, Shears, Visibility, Weights
 def make_data_maps():
     nbins = 2
     nside = 128
-    lmax = 128
+    lmax = 20
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
@@ -85,7 +85,7 @@ def get_fields():
         fields (dict): Dictionary of fields
     """
     nside = 128
-    lmax = 128
+    lmax = 20
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
