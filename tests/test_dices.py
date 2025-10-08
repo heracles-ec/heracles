@@ -1,121 +1,19 @@
-import healpy as hp
 import numpy as np
 import heracles
 import pytest
 import heracles.dices as dices
-from heracles.healpy import HealpixMapper
-from heracles.fields import Positions, Shears, Visibility, Weights
 
 
-def make_data_maps():
-    nbins = 2
-    nside = 128
-    lmax = 20
-    npix = hp.nside2npix(nside)
-    fsky = 1 / 2
-    ngal = 4.0
-    wmean = 1.0
-    var = 1.0
-    bias = 4 * np.pi * fsky**2 * (var / wmean**2) / ngal
-    map_p = 4 * np.ones(npix)
-    nbar = (ngal * wmean) / (fsky * npix)
-    heracles.update_metadata(
-        map_p,
-        nside=nside,
-        lmax=lmax,
-        ngal=ngal,
-        nbar=nbar,
-        wmean=wmean,
-        bias=bias,
-        var=var,
-        variance=var / wmean**2,
-        neff=ngal / (4 * np.pi * fsky),
-        fsky=fsky,
-        spin=0,
-    )
-    map_g = 4 * np.ones(npix)
-    heracles.update_metadata(
-        map_g,
-        nside=nside,
-        lmax=lmax,
-        ngal=ngal,
-        nbar=nbar,
-        wmean=wmean,
-        bias=bias,
-        var=var,
-        variance=var / wmean**2,
-        neff=ngal / (2 * np.pi * fsky),
-        fsky=fsky,
-        spin=2,
-    )
-    maps = {}
-    for i in range(1, nbins + 1):
-        maps[("POS", i)] = map_p
-        maps[("SHE", i)] = np.array([map_g, map_g])
-    return maps
-
-
-def make_vis_maps():
-    nbins = 2
-    nside = 128
-    npix = hp.nside2npix(nside)
-    map = 4 * np.ones(npix)
-    maps = {}
-    heracles.update_metadata(
-        map,
-        nside=nside,
-        lmax=nside,
-        bias=0.0,
-        fsky=1 / 2,
-        spin=0,
-    )
-    for i in range(1, nbins + 1):
-        maps[("VIS", i)] = map
-        maps[("WHT", i)] = np.array([map])
-    return maps
-
-
-def get_fields():
-    """
-    Internal method to initialize fields.
-    inputs:
-        nside (int): Healpix nside
-        lmax (int): Maximum multipole
-    returns:
-        fields (dict): Dictionary of fields
-    """
-    nside = 128
-    lmax = 20
-    mapper = HealpixMapper(nside=nside, lmax=lmax)
-    fields = {
-        "POS": Positions(mapper, mask="VIS"),
-        "SHE": Shears(mapper, mask="WHT"),
-        "VIS": Visibility(mapper),
-        "WHT": Weights(mapper),
-    }
-    return fields
-
-
-def make_jkmaps(data_path):
-    vis_maps = make_vis_maps()
-    jkmap = hp.read_map(data_path / "jkmap.fits")
-    jkmaps = {}
-    for key in list(vis_maps.keys()):
-        jkmaps[key] = jkmap
-    return jkmaps
-
-
-def test_jkmap(data_path):
+def test_jkmap(jk_maps):
+    # Check that the jk maps contain the right number of regions
     Njk = 5
-    jkmaps = make_jkmaps(data_path)
-    for key in list(jkmaps.keys()):
-        assert np.all(np.unique(jkmaps[key]) == np.arange(0, Njk + 1))
+    for key in list(jk_maps.keys()):
+        assert np.all(np.unique(jk_maps[key]) == np.arange(0, Njk + 1))
 
 
-def test_jackknife_maps(data_path):
+def test_jackknife_maps(data_maps, jk_maps):
+    # Check that the segmentation of the maps given the jk maps is correct
     Njk = 5
-    data_maps = make_data_maps()
-    jk_maps = make_jkmaps(data_path)
     # multiply maps by jk footprint
     vmap = jk_maps[("VIS", 1)]
     vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
@@ -138,12 +36,8 @@ def test_jackknife_maps(data_path):
     np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
 
 
-def test_cls(data_path):
+def test_cls(fields, data_maps, vis_maps, jk_maps):
     nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    jk_maps = make_jkmaps(data_path)
-    fields = get_fields()
     data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     _data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
     for key in list(data_cls.keys()):
@@ -156,46 +50,37 @@ def test_cls(data_path):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_bias(data_path):
-    data_maps = make_data_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+def test_bias(data_maps, jk_maps, fields):
+    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     b = dices.jackknife.bias(cls)
     for key in list(cls.keys()):
         assert key in list(b.keys())
 
 
-def test_get_delete1_fsky(data_path):
+def test_get_delete1_fsky(jk_maps):
     JackNjk = 5
-    jkmaps = make_jkmaps(data_path)
     for jk in range(1, JackNjk + 1):
-        alphas = dices.jackknife_fsky(jkmaps, jk, jk)
+        alphas = dices.jackknife_fsky(jk_maps, jk, jk)
         for key in list(alphas.keys()):
             _alpha = 1 - 1 / JackNjk
             alpha = alphas[key]
             assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_get_delete2_fsky(data_path):
+def test_get_delete2_fsky(jk_maps):
     JackNjk = 5
-    jkmaps = make_jkmaps(data_path)
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
-            alphas = dices.jackknife_fsky(jkmaps, jk, jk2)
+            alphas = dices.jackknife_fsky(jk_maps, jk, jk2)
             for key in list(alphas.keys()):
                 _alpha = 1 - 2 / JackNjk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction(data_path):
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    mls = dices.jackknife.get_cls(vis_maps, jkmaps, fields)
+def test_mask_correction(data_maps, vis_maps, fields, jk_maps):
+    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+    mls = dices.jackknife.get_cls(vis_maps, jk_maps, fields)
     alphas = dices.mask_correction(mls, mls)
     _cls = heracles.unmixing._natural_unmixing(cls, alphas)
     for key in list(cls.keys()):
@@ -204,11 +89,8 @@ def test_mask_correction(data_path):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_polspice(data_path):
-    data_maps = make_data_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+def test_polspice(fields, data_maps, jk_maps):
+    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     cls = np.array(
         [
             cls[("POS", "POS", 1, 1)],
@@ -223,16 +105,12 @@ def test_polspice(data_path):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_jackknife(data_path):
+def test_jackknife(fields, data_maps, vis_maps, jk_maps):
     Njk = 5
     nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
 
-    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(cls1) == Njk
     for key in cls1.keys():
         cl = cls1[key]
@@ -302,17 +180,13 @@ def test_jackknife(data_path):
             assert np.allclose(cov_B, _cov_B)
 
 
-def test_debiasing(data_path):
+def test_debiasing(data_maps, vis_maps, fields, jk_maps):
     JackNjk = 5
     nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
 
-    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
 
-    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
@@ -321,7 +195,7 @@ def test_debiasing(data_path):
             *_, nells = _cl.shape
             assert nells == nside + 1
 
-    delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=2)
+    delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
     assert len(delete2_data_cls) == 2 * JackNjk
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
@@ -393,17 +267,12 @@ def test_debiasing(data_path):
         assert C1.shape == C2.shape
 
 
-def test_shrinkage(data_path):
+def test_shrinkage(fields, data_maps, vis_maps, jk_maps):
     JackNjk = 5
     nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
 
-    data_cls = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-
-    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(delete1_data_cls) == JackNjk
     for key in delete1_data_cls.keys():
         cl = delete1_data_cls[key]
@@ -471,13 +340,10 @@ def test_shrinkage(data_path):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten(data_path):
+def test_flatten(fields, data_maps, jk_maps):
     nside = 128
     lbins = 2
-    data_maps = make_data_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs0 = heracles.binned(cls0, ledges)
     comp_cqs0 = dices.io._fields2components(cqs0)
@@ -512,14 +378,10 @@ def test_flatten(data_path):
     assert (_d_flat_cov == d_flat_cov).all()
 
 
-def test_gauss_cov(data_path):
+def test_gauss_cov(data_maps, vis_maps, fields, jk_maps):
     nside = 128
-    data_maps = make_data_maps()
-    vis_maps = make_vis_maps()
-    fields = get_fields()
-    jkmaps = make_jkmaps(data_path)
-    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     lbins = 3
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
