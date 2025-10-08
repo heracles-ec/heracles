@@ -103,12 +103,10 @@ def test_polspice(fields, data_maps, jk_maps):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_jackknife(fields, data_maps, vis_maps, jk_maps):
+def test_jackknife(cls0, cls1):
     Njk = 5
     nside = 128
 
-    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     assert len(cls1) == Njk
     for key in cls1.keys():
         cl = cls1[key]
@@ -178,23 +176,20 @@ def test_jackknife(fields, data_maps, vis_maps, jk_maps):
             assert np.allclose(cov_B, _cov_B)
 
 
-def test_debiasing(fields, data_maps, vis_maps, jk_maps):
+def test_debiasing(cls0, cls1, cls2):
     JackNjk = 5
     nside = 128
-    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
-    assert len(delete1_data_cls) == JackNjk
-    for key in delete1_data_cls.keys():
-        cl = delete1_data_cls[key]
+    assert len(cls1) == JackNjk
+    for key in cls1.keys():
+        cl = cls1[key]
         for key in list(cl.keys()):
             _cl = cl[key]
             *_, nells = _cl.shape
             assert nells == nside + 1
-    delete2_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
-    assert len(delete2_data_cls) == 2 * JackNjk
+    assert len(cls2) == 2 * JackNjk
     for jk in range(1, JackNjk + 1):
         for jk2 in range(jk + 1, JackNjk + 1):
-            cl = delete2_data_cls[(jk, jk2)]
+            cl = cls2[(jk, jk2)]
             for key in list(cl.keys()):
                 _cl = cl[key]
                 *_, nells = _cl.shape
@@ -203,18 +198,18 @@ def test_debiasing(fields, data_maps, vis_maps, jk_maps):
     lbins = 5
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     lgrid = (ledges[1:] + ledges[:-1]) / 2
-    cqs0 = heracles.binned(data_cls, ledges)
+    cqs0 = heracles.binned(cls0, ledges)
     for key in list(cqs0.keys()):
         cq = cqs0[key]
         *_, nells = cq.shape
         assert nells == len(lgrid)
-    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    cqs1 = heracles.binned(cls1, ledges)
     for key in list(cqs1.keys()):
         for k in list(cqs1[key].keys()):
             cq = cqs1[key][k]
             *_, nells = cq.shape
             assert nells == len(lgrid)
-    cqs2 = heracles.binned(delete2_data_cls, ledges)
+    cqs2 = heracles.binned(cls2, ledges)
     for key in list(cqs2.keys()):
         for k in list(cqs2[key].keys()):
             cq = cqs2[key][k]
@@ -262,16 +257,13 @@ def test_debiasing(fields, data_maps, vis_maps, jk_maps):
         assert C1.shape == C2.shape
 
 
-def test_shrinkage(fields, data_maps, vis_maps, jk_maps):
+def test_shrinkage(cls0, cls1):
     JackNjk = 5
     nside = 128
 
-    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-
-    delete1_data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
-    assert len(delete1_data_cls) == JackNjk
-    for key in delete1_data_cls.keys():
-        cl = delete1_data_cls[key]
+    assert len(cls1) == JackNjk
+    for key in cls1.keys():
+        cl = cls1[key]
         for key in list(cl.keys()):
             _cl = cl[key]
             *_, nells = _cl.shape
@@ -280,12 +272,12 @@ def test_shrinkage(fields, data_maps, vis_maps, jk_maps):
     lbins = 5
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     lgrid = (ledges[1:] + ledges[:-1]) / 2
-    cqs0 = heracles.binned(data_cls, ledges)
+    cqs0 = heracles.binned(cls0, ledges)
     for key in list(cqs0.keys()):
         cq = cqs0[key]
         *_, nells = cq.shape
         assert nells == len(lgrid)
-    cqs1 = heracles.binned(delete1_data_cls, ledges)
+    cqs1 = heracles.binned(cls1, ledges)
     for key in list(cqs1.keys()):
         for k in list(cqs1[key].keys()):
             cq = cqs1[key][k]
@@ -374,10 +366,8 @@ def test_flatten(fields, data_maps, jk_maps):
     assert (_d_flat_cov == d_flat_cov).all()
 
 
-def test_gauss_cov(fields, data_maps, vis_maps, jk_maps):
+def test_gauss_cov(cls0, cls1):
     nside = 128
-    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    cls1 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
     lbins = 3
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)

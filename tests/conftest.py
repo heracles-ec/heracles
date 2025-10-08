@@ -121,3 +121,21 @@ def jk_maps():
         ("VIS", 2): jkmap,
         ("WHT", 2): jkmap,
     }
+
+
+@pytest.fixture(scope="session")
+def cls0(fields, data_maps, jk_maps):
+    from heracles.dices.jackknife import get_cls
+    return get_cls(data_maps, jk_maps, fields)
+
+
+@pytest.fixture(scope="session")
+def cls1(fields, data_maps, vis_maps, jk_maps):
+    from heracles.dices.jackknife import jackknife_cls
+    return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
+
+
+@pytest.fixture(scope="session")
+def cls2(fields, data_maps, vis_maps, jk_maps):
+    from heracles.dices.jackknife import jackknife_cls
+    return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
