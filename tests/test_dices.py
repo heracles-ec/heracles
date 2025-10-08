@@ -34,24 +34,22 @@ def test_jackknife_maps(data_maps, jk_maps):
     np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
 
 
-def test_cls(fields, data_maps, vis_maps, jk_maps):
+def test_cls(cls0, fields, data_maps, vis_maps, jk_maps):
     nside = 128
-    data_cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    _data_cls = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
-    for key in list(data_cls.keys()):
-        _cl = data_cls[key]
+    _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
+    for key in list(_cls0.keys()):
+        _cl = _cls0[key]
         *_, nells = _cl.shape
         assert nells == nside + 1
-    for key in list(data_cls.keys()):
-        cl = data_cls[key].__array__()
-        _cl = _data_cls[key].__array__()
+    for key in list(cls0.keys()):
+        cl = cls0[key].__array__()
+        _cl = _cls0[key].__array__()
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_bias(fields, data_maps, jk_maps):
-    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    b = dices.jackknife.bias(cls)
-    for key in list(cls.keys()):
+def test_bias(cls0):
+    b = dices.jackknife.bias(cls0)
+    for key in list(cls0.keys()):
         assert key in list(b.keys())
 
 
@@ -76,25 +74,22 @@ def test_get_delete2_fsky(jk_maps):
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction(fields, data_maps, vis_maps, jk_maps):
-    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
-    mls = dices.jackknife.get_cls(vis_maps, jk_maps, fields)
-    alphas = dices.mask_correction(mls, mls)
-    _cls = heracles.unmixing._natural_unmixing(cls, alphas)
-    for key in list(cls.keys()):
-        cl = cls[key].__array__()
+def test_mask_correction(cls0, mls0):
+    alphas = dices.mask_correction(mls0, mls0)
+    _cls = heracles.unmixing._natural_unmixing(cls0, alphas)
+    for key in list(cls0.keys()):
+        cl = cls0[key].__array__()
         _cl = _cls[key].__array__()
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_polspice(fields, data_maps, jk_maps):
-    cls = dices.jackknife.get_cls(data_maps, jk_maps, fields)
+def test_polspice(cls0):
     cls = np.array(
         [
-            cls[("POS", "POS", 1, 1)],
-            cls[("SHE", "SHE", 1, 1)][0, 0],
-            cls[("SHE", "SHE", 1, 1)][1, 1],
-            cls[("POS", "SHE", 1, 1)][0],
+            cls0[("POS", "POS", 1, 1)],
+            cls0[("SHE", "SHE", 1, 1)][0, 0],
+            cls0[("SHE", "SHE", 1, 1)][1, 1],
+            cls0[("POS", "SHE", 1, 1)][0],
         ]
     ).T
     corrs = heracles.cl2corr(cls)
