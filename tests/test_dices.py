@@ -9,8 +9,8 @@ from heracles.fields import Positions, Shears, Visibility, Weights
 
 def make_data_maps():
     nbins = 2
-    nside = 128
-    lmax = 128
+    nside = 64
+    lmax = 64
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
