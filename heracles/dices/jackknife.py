@@ -132,9 +132,8 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0):
         fskyjk2 (np.array): Fraction of the sky after deleting two regions.
     """
     rel_fskys = {}
-    _jkmaps = deepcopy(jkmaps)
-    for key in _jkmaps.keys():
-        jkmap = _jkmaps[key]
+    for key in jkmaps.keys():
+        jkmap = jkmaps[key]
         mask = np.copy(jkmap)
         mask[mask != 0] = mask[mask != 0] / mask[mask != 0]
         fsky = sum(mask) / len(mask)
