@@ -37,7 +37,7 @@ def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
     for key in list(_cls0.keys()):
         _cl = _cls0[key]
         *_, nells = _cl.shape
-        assert nells == nside//4 + 1
+        assert nells == nside // 4 + 1
     for key in list(cls0.keys()):
         cl = cls0[key].__array__()
         _cl = _cls0[key].__array__()
@@ -100,7 +100,7 @@ def test_jackknife(nside, njk, cov_jk, cls0, cls1):
         for key in list(cl.keys()):
             _cl = cl[key]
             *_, nells = _cl.shape
-            assert nells == nside//4 + 1
+            assert nells == nside // 4 + 1
 
     # Check correct number of delete1 cls
     assert len(list(cls1.keys())) == njk
@@ -120,7 +120,7 @@ def test_jackknife(nside, njk, cov_jk, cls0, cls1):
     for key in list(cov_jk.keys()):
         cov = cov_jk[key]
         *_, m, n = cov.shape
-        assert (m, n) == (nside//4 + 1, nside//4 + 1)
+        assert (m, n) == (nside // 4 + 1, nside // 4 + 1)
 
     # re-arrange cqs1
     _cls1 = {}
@@ -228,7 +228,7 @@ def test_shrinkage(cov_jk):
 
 def test_flatten(nside, cls0):
     lbins = 2
-    ledges = np.logspace(np.log10(10), np.log10(nside//4), lbins + 1)
+    ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)
     cqs0 = heracles.binned(cls0, ledges)
     comp_cqs0 = dices.io._fields2components(cqs0)
     order = list(comp_cqs0.keys())
@@ -264,7 +264,7 @@ def test_flatten(nside, cls0):
 
 def test_gauss_cov(nside, cls0, cls1):
     lbins = 3
-    ledges = np.logspace(np.log10(10), np.log10(nside//4), lbins + 1)
+    ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
     cqs0 = heracles.binned(cls0, ledges)
     cov_jk = dices.jackknife_covariance(cqs1)
