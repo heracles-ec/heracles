@@ -49,10 +49,10 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
     for regions in combinations(range(1, njk + 1), nd):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
-        # _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
+        _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        # alphas = mask_correction(_cls_mm, mls0)
-        # _cls = _natural_unmixing(_cls, alphas)
+        alphas = mask_correction(_cls_mm, mls0)
+        _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         cls[regions] = _cls
