@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from copy import deepcopy
 try:
     from copy import replace
-except AttributeError:
+except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
