@@ -27,7 +27,7 @@ def data_maps(nside):
     import heracles
 
     nbins = 2
-    lmax = nside
+    lmax = nside//4
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
@@ -84,7 +84,7 @@ def vis_maps(nside):
     heracles.update_metadata(
         map,
         nside=nside,
-        lmax=nside,
+        lmax=nside//4,
         bias=0.0,
         fsky=1 / 2,
         spin=0,
@@ -108,7 +108,7 @@ def fields(nside):
     from heracles.healpy import HealpixMapper
     from heracles.fields import Positions, Shears, Visibility, Weights
 
-    lmax = nside
+    lmax = nside//4
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
