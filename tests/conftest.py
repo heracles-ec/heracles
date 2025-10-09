@@ -7,19 +7,22 @@ from numba import config
 config.DISABLE_JIT = True
 
 
+@pytest.fixture(scope="session", autouse=True)
+def nside():
+    return 32
+
 @pytest.fixture(scope="session")
 def rng(seed: int = 50) -> np.random.Generator:
     return np.random.default_rng(seed)
 
 
 @pytest.fixture(scope="session")
-def data_maps():
+def data_maps(nside):
     import healpy as hp
     import heracles
 
     nbins = 2
-    nside = 128
-    lmax = 128
+    lmax = nside
     npix = hp.nside2npix(nside)
     fsky = 1 / 2
     ngal = 4.0
@@ -65,12 +68,11 @@ def data_maps():
 
 
 @pytest.fixture(scope="session")
-def vis_maps():
+def vis_maps(nside):
     import healpy as hp
     import heracles
 
     nbins = 2
-    nside = 128
     npix = hp.nside2npix(nside)
     map = 4 * np.ones(npix)
     maps = {}
@@ -89,7 +91,7 @@ def vis_maps():
 
 
 @pytest.fixture(scope="session")
-def fields():
+def fields(nside):
     """
     Internal method to initialize fields.
     inputs:
@@ -101,8 +103,7 @@ def fields():
     from heracles.healpy import HealpixMapper
     from heracles.fields import Positions, Shears, Visibility, Weights
 
-    nside = 128
-    lmax = 128
+    lmax = nside
     mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
         "POS": Positions(mapper, mask="VIS"),
@@ -114,11 +115,12 @@ def fields():
 
 
 @pytest.fixture(scope="session")
-def jk_maps():
-    import healpy as hp
-
-    data_path = Path(__file__).parent / "data"
-    jkmap = hp.read_map(data_path / "jkmap.fits")
+def jk_maps(nside):
+    npix = 12*nside**2
+    jkmap = np.ones(npix)
+    segment = npix // 5
+    for i in range(5):
+        jkmap[i*segment : (i+1)*segment] = i + 1
     return {
         ("VIS", 1): jkmap,
         ("WHT", 1): jkmap,
@@ -153,3 +155,9 @@ def cls2(fields, data_maps, vis_maps, jk_maps):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
+
+@pytest.fixture(scope="session")
+def cov_jk(cls1):
+    from heracles.dices import jackknife_covariance
+
+    return jackknife_covariance(cls1)

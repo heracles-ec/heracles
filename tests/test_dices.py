@@ -7,7 +7,7 @@ import heracles.dices as dices
 def test_jkmap(jk_maps):
     Njk = 5
     for key in list(jk_maps.keys()):
-        assert np.all(np.unique(jk_maps[key]) == np.arange(0, Njk + 1))
+        assert np.all(np.unique(jk_maps[key]) == np.arange(1, Njk + 1))
 
 
 def test_jackknife_maps(data_maps, jk_maps):
@@ -34,8 +34,7 @@ def test_jackknife_maps(data_maps, jk_maps):
     np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
 
 
-def test_cls(cls0, fields, data_maps, vis_maps, jk_maps):
-    nside = 128
+def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
     _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
     for key in list(_cls0.keys()):
         _cl = _cls0[key]
@@ -98,9 +97,8 @@ def test_polspice(cls0):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_jackknife(cls0, cls1):
+def test_jackknife(nside, cov_jk, cls0, cls1):
     Njk = 5
-    nside = 128
 
     assert len(cls1) == Njk
     for key in cls1.keys():
@@ -112,9 +110,6 @@ def test_jackknife(cls0, cls1):
 
     # Check correct number of delete1 cls
     assert len(list(cls1.keys())) == Njk
-
-    # Delete1
-    cov_jk = dices.jackknife_covariance(cls1)
 
     # Check for correct keys)
     cls_keys = list(cls0.keys())
@@ -171,55 +166,13 @@ def test_jackknife(cls0, cls1):
             assert np.allclose(cov_B, _cov_B)
 
 
-def test_debiasing(cls0, cls1, cls2):
-    JackNjk = 5
-    nside = 128
-    assert len(cls1) == JackNjk
-    for key in cls1.keys():
-        cl = cls1[key]
-        for key in list(cl.keys()):
-            _cl = cl[key]
-            *_, nells = _cl.shape
-            assert nells == nside + 1
-    assert len(cls2) == 2 * JackNjk
-    for jk in range(1, JackNjk + 1):
-        for jk2 in range(jk + 1, JackNjk + 1):
-            cl = cls2[(jk, jk2)]
-            for key in list(cl.keys()):
-                _cl = cl[key]
-                *_, nells = _cl.shape
-                assert nells == nside + 1
-
-    lbins = 5
-    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
-    lgrid = (ledges[1:] + ledges[:-1]) / 2
-    cqs0 = heracles.binned(cls0, ledges)
-    for key in list(cqs0.keys()):
-        cq = cqs0[key]
-        *_, nells = cq.shape
-        assert nells == len(lgrid)
-    cqs1 = heracles.binned(cls1, ledges)
-    for key in list(cqs1.keys()):
-        for k in list(cqs1[key].keys()):
-            cq = cqs1[key][k]
-            *_, nells = cq.shape
-            assert nells == len(lgrid)
-    cqs2 = heracles.binned(cls2, ledges)
-    for key in list(cqs2.keys()):
-        for k in list(cqs2[key].keys()):
-            cq = cqs2[key][k]
-            *_, nells = cq.shape
-            assert nells == len(lgrid)
-
-    # Delete1
-    cov_jk = dices.jackknife_covariance(cqs1)
-
+def test_debiasing(cov_jk, cls0, cls1, cls2):
     # Debias
-    debiased_cov = dices.debias_covariance(cov_jk, cqs0, cqs1, cqs2)
+    debiased_cov = dices.debias_covariance(cov_jk, cls0, cls1, cls2)
     Q = dices.delete2_correction(
-        cqs0,
-        cqs1,
-        cqs2,
+        cls0,
+        cls1,
+        cls2,
     )
     _debiased_cov = {}
     for key in list(cov_jk.keys()):
@@ -252,36 +205,7 @@ def test_debiasing(cls0, cls1, cls2):
         assert C1.shape == C2.shape
 
 
-def test_shrinkage(cls0, cls1):
-    JackNjk = 5
-    nside = 128
-
-    assert len(cls1) == JackNjk
-    for key in cls1.keys():
-        cl = cls1[key]
-        for key in list(cl.keys()):
-            _cl = cl[key]
-            *_, nells = _cl.shape
-            assert nells == nside + 1
-
-    lbins = 5
-    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
-    lgrid = (ledges[1:] + ledges[:-1]) / 2
-    cqs0 = heracles.binned(cls0, ledges)
-    for key in list(cqs0.keys()):
-        cq = cqs0[key]
-        *_, nells = cq.shape
-        assert nells == len(lgrid)
-    cqs1 = heracles.binned(cls1, ledges)
-    for key in list(cqs1.keys()):
-        for k in list(cqs1[key].keys()):
-            cq = cqs1[key][k]
-            *_, nells = cq.shape
-            assert nells == len(lgrid)
-
-    # Delete1
-    cov_jk = dices.jackknife_covariance(cqs1)
-
+def test_shrinkage(cov_jk):
     # Fake target
     unit_matrix = {}
     for key in cov_jk.keys():
@@ -292,25 +216,10 @@ def test_shrinkage(cls0, cls1):
         # Expand to the desired shape using broadcasting
         a = np.broadcast_to(single_diag, s)
         unit_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
-
-    # Random matrix
-    random_matrix = {}
-    for key in cov_jk.keys():
-        g = cov_jk[key]
-        s = g.shape
-        a = np.abs(np.random.rand(*s))
-        random_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
-
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
-    shrinkage_factor = dices.shrinkage_factor(cqs1, unit_matrix)
-
-    # Check that the shrinkage factor is between 0 and 1
-    assert 0 <= shrinkage_factor <= 1
-
-    # Shrinkage
-    shrunk_cov = dices.shrink(unit_matrix, random_matrix, shrinkage_factor)
-
+    shrinkage_factor = 0.5
+    shrunk_cov = dices.shrink(unit_matrix, cov_jk, shrinkage_factor)
     # Test that diagonals are not touched
     for key in list(shrunk_cov.keys()):
         c = shrunk_cov[key]
@@ -361,8 +270,7 @@ def test_flatten(fields, data_maps, jk_maps):
     assert (_d_flat_cov == d_flat_cov).all()
 
 
-def test_gauss_cov(cls0, cls1):
-    nside = 128
+def test_gauss_cov(nside, cls0, cls1):
     lbins = 3
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs1 = heracles.binned(cls1, ledges)
