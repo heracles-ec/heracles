@@ -4,14 +4,12 @@ import pytest
 import heracles.dices as dices
 
 
-def test_jkmap(jk_maps):
-    Njk = 5
+def test_jkmap(jk_maps, njk):
     for key in list(jk_maps.keys()):
-        assert np.all(np.unique(jk_maps[key]) == np.arange(1, Njk + 1))
+        assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
 
 
-def test_jackknife_maps(data_maps, jk_maps):
-    Njk = 5
+def test_jackknife_maps(data_maps, jk_maps, njk):
     # multiply maps by jk footprint
     vmap = np.copy(jk_maps[("VIS", 1)])
     vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
@@ -25,10 +23,10 @@ def test_jackknife_maps(data_maps, jk_maps):
     __data_maps = np.array(
         [
             dices.jackknife.jackknife_maps(data_maps, jk_maps, jk=i, jk2=i)[("POS", 1)]
-            for i in range(1, Njk + 1)
+            for i in range(1, njk + 1)
         ]
     )
-    __data_map = np.sum(__data_maps, axis=0) / (Njk - 1)
+    __data_map = np.sum(__data_maps, axis=0) / (njk - 1)
     np.testing.assert_allclose(__data_map, data_maps[("POS", 1)])
     ___data_map = np.prod(__data_maps, axis=0)
     np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
@@ -52,23 +50,21 @@ def test_bias(cls0):
         assert key in list(b.keys())
 
 
-def test_get_delete1_fsky(jk_maps):
-    JackNjk = 5
-    for jk in range(1, JackNjk + 1):
+def test_get_delete1_fsky(jk_maps, njk):
+    for jk in range(1, njk + 1):
         alphas = dices.jackknife_fsky(jk_maps, jk, jk)
         for key in list(alphas.keys()):
-            _alpha = 1 - 1 / JackNjk
+            _alpha = 1 - 1 / njk
             alpha = alphas[key]
             assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_get_delete2_fsky(jk_maps):
-    JackNjk = 5
-    for jk in range(1, JackNjk + 1):
-        for jk2 in range(jk + 1, JackNjk + 1):
+def test_get_delete2_fsky(jk_maps, njk):
+    for jk in range(1, njk + 1):
+        for jk2 in range(jk + 1, njk + 1):
             alphas = dices.jackknife_fsky(jk_maps, jk, jk2)
             for key in list(alphas.keys()):
-                _alpha = 1 - 2 / JackNjk
+                _alpha = 1 - 2 / njk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
@@ -97,10 +93,8 @@ def test_polspice(cls0):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
-def test_jackknife(nside, cov_jk, cls0, cls1):
-    Njk = 5
-
-    assert len(cls1) == Njk
+def test_jackknife(nside, njk, cov_jk, cls0, cls1):
+    assert len(cls1) == njk
     for key in cls1.keys():
         cl = cls1[key]
         for key in list(cl.keys()):
@@ -109,7 +103,7 @@ def test_jackknife(nside, cov_jk, cls0, cls1):
             assert nells == nside + 1
 
     # Check correct number of delete1 cls
-    assert len(list(cls1.keys())) == Njk
+    assert len(list(cls1.keys())) == njk
 
     # Check for correct keys)
     cls_keys = list(cls0.keys())
@@ -139,7 +133,7 @@ def test_jackknife(nside, cov_jk, cls0, cls1):
         cov_key = (a, b, a, b, i, j, i, j)
         cov = cov_jk[cov_key].array
         _cq = np.array(_cls1[key]).T
-        prefactor = (Njk - 1) ** 2 / (Njk)
+        prefactor = (njk - 1) ** 2 / (njk)
         print(f"Checking {key} with prefactor {prefactor}")
         if a == b == "POS":
             _cov = prefactor * np.cov(_cq)
@@ -232,10 +226,8 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten(fields, data_maps, jk_maps):
-    nside = 128
+def test_flatten(nside, cls0):
     lbins = 2
-    cls0 = dices.jackknife.get_cls(data_maps, jk_maps, fields)
     ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
     cqs0 = heracles.binned(cls0, ledges)
     comp_cqs0 = dices.io._fields2components(cqs0)

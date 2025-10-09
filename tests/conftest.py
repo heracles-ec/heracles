@@ -11,6 +11,11 @@ def nside():
     return 32
 
 
+@pytest.fixture(scope="session", autouse=True)
+def njk():
+    return 4
+
+
 @pytest.fixture(scope="session")
 def rng(seed: int = 50) -> np.random.Generator:
     return np.random.default_rng(seed)
@@ -115,11 +120,11 @@ def fields(nside):
 
 
 @pytest.fixture(scope="session")
-def jk_maps(nside):
+def jk_maps(nside, njk):
     npix = 12 * nside**2
     jkmap = np.ones(npix)
-    segment = npix // 5
-    for i in range(5):
+    segment = npix // njk
+    for i in range(njk):
         jkmap[i * segment : (i + 1) * segment] = i + 1
     return {
         ("VIS", 1): jkmap,
