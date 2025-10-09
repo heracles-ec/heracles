@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from pathlib import Path
 from numba import config
 
 
@@ -10,6 +9,7 @@ config.DISABLE_JIT = True
 @pytest.fixture(scope="session", autouse=True)
 def nside():
     return 32
+
 
 @pytest.fixture(scope="session")
 def rng(seed: int = 50) -> np.random.Generator:
@@ -116,11 +116,11 @@ def fields(nside):
 
 @pytest.fixture(scope="session")
 def jk_maps(nside):
-    npix = 12*nside**2
+    npix = 12 * nside**2
     jkmap = np.ones(npix)
     segment = npix // 5
     for i in range(5):
-        jkmap[i*segment : (i+1)*segment] = i + 1
+        jkmap[i * segment : (i + 1) * segment] = i + 1
     return {
         ("VIS", 1): jkmap,
         ("WHT", 1): jkmap,
@@ -155,6 +155,7 @@ def cls2(fields, data_maps, vis_maps, jk_maps):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
+
 
 @pytest.fixture(scope="session")
 def cov_jk(cls1):
