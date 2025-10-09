@@ -17,10 +17,15 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from ..result import Result
+from copy import deepcopy
+try:
+    from copy import replace
+except AttributeError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
-def add_to_Cls(Cls, x):
+def add_to_Cls(cls, x):
     """
     Adds a dictionary of Cl values to another.
     input:
@@ -29,14 +34,14 @@ def add_to_Cls(Cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].array + x[key], ell)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array+x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
-def sub_to_Cls(Cls, x):
+def sub_to_Cls(cls, x):
     """
     Substracts a dictionary of Cl values to another.
     input:
@@ -45,11 +50,11 @@ def sub_to_Cls(Cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        ell = Cls[key].ell
-        _Cls[key] = Result(Cls[key].array - x[key], ell)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array-x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
 def impose_correlation(cov_a, cov_b):
@@ -71,5 +76,5 @@ def impose_correlation(cov_a, cov_b):
         b_std = np.sqrt(b_v[..., None, :])
         c = a * (b_std * np.swapaxes(b_std, -1, -2))
         c /= a_std * np.swapaxes(a_std, -1, -2)
-        cov_c[key] = Result(c, axis=a.axis, ell=a.ell)
+        cov_c[key] = replace(cov_a[key], array=c)
     return cov_c

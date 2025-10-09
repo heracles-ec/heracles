@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from copy import deepcopy
 import itertools
 from ..result import (
     Result,
@@ -35,6 +36,11 @@ from .io import (
     format_key,
     _split_key,
 )
+try:
+    from copy import replace
+except AttributeError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
 def shrink(cov, target, shrinkage_factor):
@@ -47,13 +53,13 @@ def shrink(cov, target, shrinkage_factor):
     returns:
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
-    shrunk_cov = {}
+    shrunk_cov = deepcopy(cov)
     correlated_target = impose_correlation(target, cov)
     for key in cov:
         c = cov[key].array
         tc = correlated_target[key].array
         sc = shrinkage_factor * tc + (1 - shrinkage_factor) * c
-        shrunk_cov[key] = Result(sc, axis=cov[key].axis, ell=cov[key].ell)
+        replace(shrunk_cov[key], array=sc)
     return shrunk_cov
 
 

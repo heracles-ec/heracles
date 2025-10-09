@@ -11,5 +11,6 @@ def test_add_to_cls():
     _cls = dices.utils.add_to_Cls(cls, x)
     __cls = dices.utils.sub_to_Cls(_cls, x)
     for key in list(cls.keys()):
-        assert np.all(_cls[key] == np.zeros(10))
-        assert np.all(cls[key].__array__() == __cls[key].__array__())
+        assert np.all(_cls[key].array == np.zeros(10))
+        assert np.all(cls[key].array == __cls[key].array)
+        assert np.all(cls[key].array == np.ones(10))
