@@ -32,16 +32,16 @@ def test_jackknife_maps(data_maps, jk_maps, njk):
     np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
 
 
-#def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
-#    _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
-#    for key in list(_cls0.keys()):
-#        _cl = _cls0[key]
-#        *_, nells = _cl.shape
-#        assert nells == nside // 4 + 1
-#    for key in list(cls0.keys()):
-#        cl = cls0[key].__array__()
-#        _cl = _cls0[key].__array__()
-#        assert np.isclose(cl[2:], _cl[2:]).all()
+def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
+    _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
+    for key in list(_cls0.keys()):
+        _cl = _cls0[key]
+        *_, nells = _cl.shape
+        assert nells == nside // 4 + 1
+    for key in list(cls0.keys()):
+        cl = cls0[key].__array__()
+        _cl = _cls0[key].__array__()
+        assert np.isclose(cl[2:], _cl[2:]).all()
 
 
 def test_bias(cls0):
