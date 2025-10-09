@@ -13,7 +13,7 @@ def nside():
 
 @pytest.fixture(scope="session", autouse=True)
 def njk():
-    return 4
+    return 3
 
 
 @pytest.fixture(scope="session")
