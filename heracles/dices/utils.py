@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+
 try:
     from copy import replace
 except ImportError:
@@ -35,7 +36,7 @@ def add_to_Cls(cls, x):
     """
     _cls = {}
     for key in cls.keys():
-        arr = cls[key].array+x[key]
+        arr = cls[key].array + x[key]
         _cls[key] = replace(cls[key], array=arr)
     return _cls
 
@@ -51,7 +52,7 @@ def sub_to_Cls(cls, x):
     """
     _cls = {}
     for key in cls.keys():
-        arr = cls[key].array-x[key]
+        arr = cls[key].array - x[key]
         _cls[key] = replace(cls[key], array=arr)
     return _cls
 
