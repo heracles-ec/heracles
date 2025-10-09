@@ -38,7 +38,7 @@ from .io import (
 )
 try:
     from copy import replace
-except AttributeError:
+except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
