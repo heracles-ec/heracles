@@ -137,8 +137,6 @@ def test_jackknife(nside, njk, cov_jk, cls0, cls1):
         print(f"Checking {key} with prefactor {prefactor}")
         if a == b == "POS":
             _cov = prefactor * np.cov(_cq)
-            print(key)
-            print((cov - _cov) / _cov)
             assert np.allclose(cov, _cov)
         elif a == b == "SHE":
             cov_E = cov[0, 0, 0, 0]
@@ -201,9 +199,15 @@ def test_debiasing(cov_jk, cls0, cls1, cls2):
 
 def test_shrinkage(cov_jk):
     # Fake target
-    unit_matrix = {}
+    cov = {}
+    # same as cov_jk but with rand entries
     for key in cov_jk.keys():
         g = cov_jk[key]
+        s = g.shape
+        cov[key] = heracles.Result(np.random.rand(*s), ell=g.ell, axis=g.axis)
+    unit_matrix = {}
+    for key in cov.keys():
+        g = cov[key]
         s = g.shape
         *_, i = s
         single_diag = np.eye(i)  # Shape: (i, j)
@@ -213,16 +217,13 @@ def test_shrinkage(cov_jk):
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
     shrinkage_factor = 0.5
-    shrunk_cov = dices.shrink(unit_matrix, cov_jk, shrinkage_factor)
+    shrunk_cov = dices.shrink(unit_matrix, cov, shrinkage_factor)
     # Test that diagonals are not touched
     for key in list(shrunk_cov.keys()):
         c = shrunk_cov[key]
         _c = unit_matrix[key]
         c_diag = np.diagonal(c, axis1=-2, axis2=-1)
         _c_diag = np.diagonal(_c, axis1=-2, axis2=-1)
-        c_diag = np.nan_to_num(c_diag)
-        _c_diag = np.nan_to_num(_c_diag)
-        print(key, c_diag, _c_diag)
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
@@ -253,12 +254,6 @@ def test_flatten(nside, cls0):
         _d_flat_cov.append(d)
     _d_flat_cov = np.array(_d_flat_cov).flatten()
     assert d_flat_cov.shape == _d_flat_cov.shape
-    for i, o in enumerate(order):
-        print(
-            o,
-            d_flat_cov[i * lbins : (1 + i) * lbins],
-            _d_flat_cov[i * lbins : (i + 1) * lbins],
-        )
     assert (_d_flat_cov == d_flat_cov).all()
 
 

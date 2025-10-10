@@ -54,7 +54,7 @@ def shrink(cov, target, shrinkage_factor):
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
     shrunk_cov = {}
-    correlated_target = impose_correlation(target, cov)
+    correlated_target = impose_correlation(cov, target)
     for key in cov:
         c = cov[key].array
         tc = correlated_target[key].array
