@@ -25,7 +25,7 @@ dependencies = [
     "coroutines",
     "fitsio",
     "healpy",
-    "numba",
+    "numba <= 0.61.0",
     "numpy",
     "scipy",
 ]
