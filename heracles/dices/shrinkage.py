@@ -32,7 +32,6 @@ from .utils import (
 from .io import (
     _fields2components,
     flatten,
-    format_key,
     _split_key,
 )
 
