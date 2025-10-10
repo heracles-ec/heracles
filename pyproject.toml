@@ -21,8 +21,8 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
-    "convolvecl <= 2022.5.10",
-    "coroutines <= 0.3.0",
+    "convolvecl",
+    "coroutines",
     "fitsio <= 1.2.5",
     "healpy",
     "numba <= 0.61.0",
