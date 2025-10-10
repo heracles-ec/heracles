@@ -23,7 +23,7 @@ classifiers = [
 dependencies = [
     "convolvecl",
     "coroutines",
-    "fitsio <= 1.2.5",
+    "fitsio",
     "healpy",
     "numba <= 0.61.0",
     "numpy",
