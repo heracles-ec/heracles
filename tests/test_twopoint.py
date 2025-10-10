@@ -356,14 +356,16 @@ def test_inverting_mixing_matrices():
     }
 
     cls = {
-        ("POS", "POS", 0, 0): Result(cl, axis=(0,)),
-        ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), axis=(1,)),
-        ("SHE", "SHE", 0, 0): Result(np.array([[cl, cl], [cl, cl]]), axis=(2,)),
+        ("POS", "POS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("POS", "SHE", 0, 0): Result(np.array([cl, cl]), spin=(0, 2), axis=(1,)),
+        ("SHE", "SHE", 0, 0): Result(
+            np.array([[cl, cl], [cl, cl]]), spin=(2, 2), axis=(2,)
+        ),
     }
     cls2 = {
-        ("VIS", "VIS", 0, 0): Result(cl, axis=(0,)),
-        ("VIS", "WHT", 0, 0): Result(cl, axis=(0,)),
-        ("WHT", "WHT", 0, 0): Result(cl, axis=(0,)),
+        ("VIS", "VIS", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("VIS", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
+        ("WHT", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
     }
     mms = mixing_matrices(fields, cls2, l1max=10, l2max=20)
     inv_mms = invert_mixing_matrix(mms)
@@ -379,7 +381,7 @@ def test_inverting_mixing_matrices():
     mms = mixing_matrices(fields, cls2)
     for key in mms:
         _m = np.ones_like(mms[key].array)
-        mms[key] = Result(_m, axis=mms[key].axis, ell=mms[key].ell)
+        mms[key] = Result(_m, spin=mms[key].spin, axis=mms[key].axis, ell=mms[key].ell)
 
     inv_mms = invert_mixing_matrix(mms)
     assert inv_mms.keys() == mms.keys()

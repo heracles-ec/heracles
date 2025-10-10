@@ -239,6 +239,10 @@ def angular_power_spectra(
         # get metadata from alms
         md1 = alm1.dtype.metadata or {}
         md2 = alm2.dtype.metadata or {}
+        # Get spins of the fields
+        s1, s2 = md1.get("spin", None), md2.get("spin", None)
+        if s1 is None or s2 is None:
+            raise ValueError(f"missing spin metadata for {k1} or {k2}")
         # collect metadata
         md = {}
         bias = None
@@ -265,7 +269,7 @@ def angular_power_spectra(
 
         # wrap in result array type
         # do this before binned() so it picks up the correct ell axes
-        cl = Result(cl, axis=-1)
+        cl = Result(cl, spin=(s1, s2), axis=-1)
 
         # if bins are given, apply the binning
         if bins is not None:
@@ -381,7 +385,7 @@ def mixing_matrices(
 
                 # wrap in result array type
                 # second to last axis is the *output* ell axis
-                mm = Result(mm, axis=-2)
+                mm = Result(mm, spin=(spin1, spin2), axis=-2)
 
                 if bins is not None:
                     mm = binned(mm, bins, weights)
@@ -420,11 +424,13 @@ def invert_mixing_matrix(
 
         a, b, i, j = key
         _M = value.array
+        print(key, value.spin)
+        s1, s2 = value.spin
         *_, _n, _m = _M.shape
         new_ell = np.arange(_m)
 
         with progress.task(f"invert {key}"):
-            if a == b == "SHE":
+            if s1 == s2 == 2:
                 _inv_m = np.linalg.pinv(
                     np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
                     rcond=rtol,
@@ -458,10 +464,11 @@ def apply_mixing_matrix(d, M, lmax=None):
         dtype = d[key].array.dtype
         ell_mask = M[key].ell
         axis = d[key].axis
+        s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array
         *_, _n, _m = _M.shape
-        if a == b == "SHE":
+        if s1 == s2 == 2:
             _corr_d_EE = _M[0] @ _d[0, 0] + _M[1] @ _d[1, 1]
             _corr_d_BB = _M[1] @ _d[0, 0] + _M[0] @ _d[1, 1]
             _corr_d_EB = _M[2] @ _d[0, 1]
