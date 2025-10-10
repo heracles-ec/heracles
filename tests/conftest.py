@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import random
 from numba import config
 
 
@@ -69,6 +70,12 @@ def data_maps(nside):
     for i in range(1, nbins + 1):
         maps[("POS", i)] = map_p
         maps[("SHE", i)] = np.array([map_g, map_g])
+    maps[("POS", 3)] = map_p
+
+    # Create a new dictionary with shuffled order
+    items = list(maps.items())
+    random.shuffle(items)
+    maps = dict(items)
     return maps
 
 
@@ -92,6 +99,7 @@ def vis_maps(nside):
     for i in range(1, nbins + 1):
         maps[("VIS", i)] = map
         maps[("WHT", i)] = np.array([map])
+    maps[("VIS", 3)] = map
     return maps
 
 
@@ -131,6 +139,7 @@ def jk_maps(nside, njk):
         ("WHT", 1): jkmap,
         ("VIS", 2): jkmap,
         ("WHT", 2): jkmap,
+        ("VIS", 3): jkmap,
     }
 
 
