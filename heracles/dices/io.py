@@ -164,21 +164,3 @@ def _split_key(f, pos=None):
         return ["POS"], [pos]
     if f == "SHE":
         return ["G_E", "G_B"], [0, 1]
-
-
-def format_key(key):
-    """
-    Produces a Cl key for data maps.
-    input:
-        key: Cl key
-    returns:
-        Clkey: Cl key
-    """
-    _key = copy.deepcopy(key)
-    a, b, i, j = _key
-    if i > j:
-        i, j = j, i
-        a, b = b, a
-    if (b == "POS") or (b == "G_E" and a == "G_B"):
-        a, b = b, a
-    return (a, b, i, j)
