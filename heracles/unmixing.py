@@ -66,7 +66,7 @@ def _natural_unmixing(d, wm, lmax=None):
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
         # Grab metadata
         dtype = d[d_key].array.dtype
-        if s1 == s2 == 2:
+        if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
                     np.zeros_like(_d[0, 0]),
