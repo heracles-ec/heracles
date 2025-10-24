@@ -61,7 +61,7 @@ def _fields2components(results):
                 _key = (__a1, __b1, i1, j1)
                 _r = r[idx]
                 _r = np.squeeze(_r)
-                if sa1 == 2 and sb1 == 2:
+                if sa1 != 0 and sb1 != 0:
                     mode1, mode2 = __a1[-1], __b1[-1]
                     duplicate_cond = mode1 == "B" and mode2 == "E" and i1 == j1
                 else:
@@ -122,7 +122,7 @@ def _components2data(results, order=None):
                 nell = len(ell[0])
                 _key = (key[0], key[1], key[4], key[5])
                 a, b, i, j = _key
-                if s1 == 2 and s2 == 2:
+                if s1 != 0 and s2 != 0:
                     mode1, mode2 = _key[-1], _key[-1]
                     duplicate_cond = mode1 == "B" and mode2 == "E" and i == j
                 else:
@@ -175,5 +175,5 @@ def _components2data(results, order=None):
 def _split_key(f, spin, pos=None):
     if spin == 0:
         return [f], [pos]
-    if spin == 2:
+    else:
         return [f + "_E", f + "_B"], [0, 1]
