@@ -117,6 +117,8 @@ def _components2data(results, order=None):
             order = []
             nells = []
             for key in list(results.keys()):
+                # The order only depends on the unique fields
+                # So we only need the first two entries of the key
                 s1, s2, _, _ = results[key].spin
                 ell = results[key].ell
                 nell = len(ell[0])
@@ -175,5 +177,5 @@ def _components2data(results, order=None):
 def _split_key(f, spin, pos=None):
     if spin == 0:
         return [f], [pos]
-    else:
+    if spin != 0:
         return [f + "_E", f + "_B"], [0, 1]
