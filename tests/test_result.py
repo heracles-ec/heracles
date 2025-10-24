@@ -198,7 +198,7 @@ def test_binned_metadata():
     md = {"test": object()}
 
     result = np.zeros(3, dtype=np.dtype(float, metadata=md))
-    result = Result(result, spin=0)
+    result = Result(result)
     assert result.dtype.metadata == md
 
     binned = heracles.binned(result, np.array([0, 1, 2]))
