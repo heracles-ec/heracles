@@ -97,7 +97,7 @@ class Result:
         self,
         dtype: np.dtype[Any] | None = None,
         *,
-        copy: np.bool[bool] | None = None,
+        copy: bool | None = None,
     ) -> NDArray[Any]:
         if copy is not None:
             # copy being set means NumPy v2, so it's safe to pass it on
