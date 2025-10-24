@@ -185,7 +185,10 @@ def _get_cl(key, cls):
         a, b, i, j = key
         key_sym = (b, a, j, i)
         if key_sym in cls:
-            return cls[key_sym].array
+            if i == j:
+                return cls[key_sym].array
+            else:
+                return cls[key_sym].array.T
         else:
             raise KeyError(f"Key {key} not found in Cls.")
 
