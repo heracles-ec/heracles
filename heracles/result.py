@@ -301,16 +301,3 @@ def truncated(result, ell_max):
         axis=axes,
         weight=truncated_weight,
     )
-
-
-def _update_result_array(result, arr):
-    """Return a copy of result with array replaced by arr."""
-    return Result(
-        arr,
-        spin=result.spin,
-        ell=result.ell,
-        axis=result.axis,
-        lower=result.lower,
-        upper=result.upper,
-        weight=result.weight,
-    )

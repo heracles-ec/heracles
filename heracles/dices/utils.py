@@ -17,7 +17,12 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from ..result import _update_result_array
+
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
 def add_to_Cls(Cls, x):
@@ -32,7 +37,7 @@ def add_to_Cls(Cls, x):
     _Cls = {}
     for key in Cls.keys():
         arr = Cls[key].array + x[key]
-        _Cls[key] = _update_result_array(Cls[key], arr)
+        _Cls[key] = replace(Cls[key], array=arr)
     return _Cls
 
 
@@ -48,7 +53,7 @@ def sub_to_Cls(Cls, x):
     _Cls = {}
     for key in Cls.keys():
         arr = Cls[key].array - x[key]
-        _Cls[key] = _update_result_array(Cls[key], arr)
+        _Cls[key] = replace(Cls[key], array=arr)
     return _Cls
 
 
@@ -71,5 +76,5 @@ def impose_correlation(cov_a, cov_b):
         b_std = np.sqrt(b_v[..., None, :])
         c = a * (b_std * np.swapaxes(b_std, -1, -2))
         c /= a_std * np.swapaxes(a_std, -1, -2)
-        cov_c[key] = _update_result_array(a, c)
+        cov_c[key] = replace(a, array=c)
     return cov_c

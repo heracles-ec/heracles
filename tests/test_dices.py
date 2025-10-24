@@ -6,6 +6,12 @@ import heracles.dices as dices
 from heracles.healpy import HealpixMapper
 from heracles.fields import Positions, Shears, Visibility, Weights
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 
 def make_data_maps():
     nbins = 2
@@ -426,8 +432,6 @@ def test_shrinkage(data_path):
     cov_jk = dices.jackknife_covariance(cqs1)
 
     # Fake target
-    from heracles.result import _update_result_array
-
     unit_matrix = {}
     for key in cov_jk.keys():
         g = cov_jk[key]
@@ -436,7 +440,7 @@ def test_shrinkage(data_path):
         single_diag = np.eye(i)  # Shape: (i, j)
         # Expand to the desired shape using broadcasting
         a = np.broadcast_to(single_diag, s)
-        unit_matrix[key] = _update_result_array(g, a)
+        unit_matrix[key] = replace(g, array=a)
 
     # Random matrix
     random_matrix = {}
@@ -444,7 +448,7 @@ def test_shrinkage(data_path):
         g = cov_jk[key]
         s = g.shape
         a = np.abs(np.random.rand(*s))
-        random_matrix[key] = _update_result_array(g, a)
+        random_matrix[key] = replace(g, array=a)
 
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?

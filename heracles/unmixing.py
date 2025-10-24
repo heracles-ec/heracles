@@ -17,8 +17,14 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .result import truncated, _update_result_array
+from .result import truncated
 from .transforms import cl2corr, corr2cl
+
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
 def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
@@ -103,7 +109,7 @@ def _natural_unmixing(d, wm, lmax=None):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = _update_result_array(d[d_key], _corr_d)
+        corr_d[d_key] = replace(d[d_key], array=_corr_d)
     # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d
