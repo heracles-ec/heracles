@@ -100,7 +100,9 @@ class Result:
         copy: np.bool[bool] | None = None,
     ) -> NDArray[Any]:
         if copy is not None:
+            # copy being set means NumPy v2, so it's safe to pass it on
             return self.array.__array__(dtype, copy=copy)
+        # NumPy v1 might not know about copy
         return self.array.__array__(dtype)
 
     def __getitem__(self, key):
