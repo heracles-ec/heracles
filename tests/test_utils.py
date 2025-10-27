@@ -21,7 +21,9 @@ def test_get_cl():
     ba = 3 * a
     cls = {}
     cls[("SHE", "POS", 1, 1)] = heracles.Result(np.array([a, a]), spin=(2, 0))
-    cls[("SHE", "SHE", 2, 1)] = heracles.Result(np.array([[a, ab], [ba, a]]), spin=(2, 2))
+    cls[("SHE", "SHE", 2, 1)] = heracles.Result(
+        np.array([[a, ab], [ba, a]]), spin=(2, 2)
+    )
 
     cl = dices.utils.get_cl(("POS", "SHE", 1, 1), cls)
     assert np.all(cl == np.array([a, a]))

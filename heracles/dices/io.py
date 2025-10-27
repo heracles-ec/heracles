@@ -84,9 +84,7 @@ def _fields2components(results):
                 _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
                 _r = r[idx]
                 _r = np.squeeze(_r)
-                _results[_key] = Result(
-                    _r, spin=(0, 0, 0, 0), axis=(0, 1), ell=ell
-                )
+                _results[_key] = Result(_r, spin=(0, 0, 0, 0), axis=(0, 1), ell=ell)
         else:
             raise ValueError(
                 "Results with more than 3 axes are not supported at the moment."
