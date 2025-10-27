@@ -68,11 +68,11 @@ def add_to_Cls(cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        arr = Cls[key].array + x[key]
-        _Cls[key] = replace(Cls[key], array=arr)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array + x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
 def sub_to_Cls(cls, x):
@@ -84,11 +84,11 @@ def sub_to_Cls(cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        arr = Cls[key].array - x[key]
-        _Cls[key] = replace(Cls[key], array=arr)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array - x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
 def impose_correlation(cov_a, cov_b):
