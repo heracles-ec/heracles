@@ -193,8 +193,6 @@ def test_binned_mapping():
 
 
 def test_binned_metadata():
-    from heracles.result import Result
-
     md = {"test": object()}
 
     result = np.zeros(3, dtype=np.dtype(float, metadata=md))

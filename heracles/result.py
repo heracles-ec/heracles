@@ -133,8 +133,9 @@ def binned(result, bins, weight=None):
         """divide a by b if a is nonzero"""
         out = np.zeros(np.broadcast(a, b).shape)
         return np.divide(a, b, where=(a != 0), out=out)
+
     # get the spin if instance of Result
-    spin = getattr(result, "spin", None)   
+    spin = getattr(result, "spin", None)
 
     # get ell values from result
     ells = get_result_array(result, "ell")
