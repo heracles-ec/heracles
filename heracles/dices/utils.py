@@ -42,7 +42,8 @@ def get_cl(key, cls):
         key_sym = (b, a, j, i)
         if key_sym in cls:
             arr = cls[key_sym].array
-            if (i != j) and (arr.ndim == 3):
+            s1, s2 = cls[key_sym].spin
+            if s1 != 0 and s2 != 0:
                 return np.transpose(arr, axes=(1, 0, 2))
             else:
                 return arr
