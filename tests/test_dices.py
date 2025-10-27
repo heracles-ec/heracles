@@ -182,7 +182,6 @@ def test_debiasing(cov_jk, cls0, cls1, cls2):
         # Extract off-diagonal elements
         offd = c[offd_mask]
         _offd = _c[offd_mask]
-        print(key, offd, _offd)
         assert np.allclose(offd, _offd)
 
     # Check keys

@@ -28,6 +28,7 @@ from .jackknife import (
 from .utils import (
     add_to_Cls,
     impose_correlation,
+    get_cl,
 )
 from .io import (
     _fields2components,
@@ -125,11 +126,13 @@ def gaussian_covariance(Cls):
         # get reference results
         cl1 = Cls[key1]
         cl2 = Cls[key2]
+        sa1, sb1 = cl1.spin
+        sa2, sb2 = cl2.spin
         # get components
-        _a1, idx1 = _split_key(a1, pos=0)
-        _b1, idx2 = _split_key(b1, pos=0)
-        _a2, idx3 = _split_key(a2, pos=0)
-        _b2, idx4 = _split_key(b2, pos=0)
+        _a1, idx1 = _split_key(a1, sa1, pos=0)
+        _b1, idx2 = _split_key(b1, sb1, pos=0)
+        _a2, idx3 = _split_key(a2, sa2, pos=0)
+        _b2, idx4 = _split_key(b2, sb2, pos=0)
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")
         ell2 = get_result_array(cl2, "ell")
@@ -150,7 +153,7 @@ def gaussian_covariance(Cls):
         # Remove the extra dimensions
         r = np.squeeze(r)
         # Make Result
-        result = Result(r, ell=ell)
+        result = Result(r, spin=(sa1, sb1, sa2, sb2), ell=ell)
         cov[covkey] = result
     return cov
 
@@ -165,10 +168,10 @@ def _gaussian_covariance(cls, key):
         cov: covariance matrix
     """
     a1, b1, a2, b2, i1, j1, i2, j2 = key
-    cl1 = _get_cl((a1, a2, i1, i2), cls)
-    cl2 = _get_cl((b1, b2, j1, j2), cls)
-    cl3 = _get_cl((a1, b2, i1, j2), cls)
-    cl4 = _get_cl((b1, a2, j1, i2), cls)
+    cl1 = get_cl((a1, a2, i1, i2), cls)
+    cl2 = get_cl((b1, b2, j1, j2), cls)
+    cl3 = get_cl((a1, b2, i1, j2), cls)
+    cl4 = get_cl((b1, a2, j1, i2), cls)
     cov = cl1 * cl2 + cl3 * cl4
     return cov
 

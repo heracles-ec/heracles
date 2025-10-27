@@ -17,8 +17,14 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .result import Result, truncated
+from .result import truncated
 from .transforms import cl2corr, corr2cl
+
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
 def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
@@ -50,6 +56,7 @@ def _natural_unmixing(d, wm, lmax=None):
         a, b, i, j = d_key
         if lmax is None:
             *_, lmax = d[d_key].shape
+        s1, s2 = d[d_key].spin
         _d = np.atleast_2d(d[d_key])
         _wm = wm[wm_key]
         lmax_mask = len(wm[wm_key])
@@ -59,8 +66,7 @@ def _natural_unmixing(d, wm, lmax=None):
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
         # Grab metadata
         dtype = d[d_key].array.dtype
-        axis = d[d_key].axis
-        if a == b == "SHE":
+        if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
                     np.zeros_like(_d[0, 0]),
@@ -103,7 +109,7 @@ def _natural_unmixing(d, wm, lmax=None):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = Result(_corr_d, axis=axis)
+        corr_d[d_key] = replace(d[d_key], array=_corr_d)
     # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d

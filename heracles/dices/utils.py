@@ -25,6 +25,40 @@ except ImportError:
     from dataclasses import replace
 
 
+def get_cl(key, cls):
+    """
+    Internal method to get a Cl from a dictionary of Cls.
+    Check if the key exists if not tries to find the symmetric key.
+    input:
+        key: key of the Cl
+        cls: dictionary of Cls
+    returns:
+        cl: Cl
+    """
+    if key in cls:
+        return cls[key].array
+    else:
+        a, b, i, j = key
+        key_sym = (b, a, j, i)
+        if key_sym in cls:
+            arr = cls[key_sym].array
+            s1, s2 = cls[key_sym].spin
+            if s1 != 0 and s2 != 0:
+                print("dims of arr:", key_sym, arr.shape)
+                return np.transpose(arr, axes=(1, 0, 2))
+            else:
+                return arr
+
+        else:
+            raise KeyError(f"Key {key} not found in Cls.")
+
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
+
 def add_to_Cls(cls, x):
     """
     Adds a dictionary of Cl values to another.
@@ -34,11 +68,11 @@ def add_to_Cls(cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _cls = {}
-    for key in cls.keys():
-        arr = cls[key].array + x[key]
-        _cls[key] = replace(cls[key], array=arr)
-    return _cls
+    _Cls = {}
+    for key in Cls.keys():
+        arr = Cls[key].array + x[key]
+        _Cls[key] = replace(Cls[key], array=arr)
+    return _Cls
 
 
 def sub_to_Cls(cls, x):
@@ -50,11 +84,11 @@ def sub_to_Cls(cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _cls = {}
-    for key in cls.keys():
-        arr = cls[key].array - x[key]
-        _cls[key] = replace(cls[key], array=arr)
-    return _cls
+    _Cls = {}
+    for key in Cls.keys():
+        arr = Cls[key].array - x[key]
+        _Cls[key] = replace(Cls[key], array=arr)
+    return _Cls
 
 
 def impose_correlation(cov_a, cov_b):
@@ -74,7 +108,7 @@ def impose_correlation(cov_a, cov_b):
         b_v = np.diagonal(b, axis1=-2, axis2=-1)
         a_std = np.sqrt(a_v[..., None, :])
         b_std = np.sqrt(b_v[..., None, :])
-        c = b * (a_std * np.swapaxes(a_std, -1, -2))
-        c /= b_std * np.swapaxes(b_std, -1, -2)
-        cov_c[key] = replace(cov_a[key], array=c)
+        c = a * (b_std * np.swapaxes(b_std, -1, -2))
+        c /= a_std * np.swapaxes(a_std, -1, -2)
+        cov_c[key] = replace(a, array=c)
     return cov_c
