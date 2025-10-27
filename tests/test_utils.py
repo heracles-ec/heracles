@@ -13,3 +13,19 @@ def test_add_to_cls():
     for key in list(cls.keys()):
         assert np.all(_cls[key] == np.zeros(10))
         assert np.all(cls[key].__array__() == __cls[key].__array__())
+
+
+def test_get_cl():
+    a = np.arange(10)
+    ab = 2 * a
+    ba = 3 * a
+    cls = {}
+    cls[("SHE", "POS", 1, 1)] = heracles.Result(np.array([a, a]), spin=(2, 0))
+    cls[("SHE", "SHE", 2, 1)] = heracles.Result(
+        np.array([[a, ab], [ba, a]]), spin=(2, 2)
+    )
+
+    cl = dices.utils.get_cl(("POS", "SHE", 1, 1), cls)
+    assert np.all(cl == np.array([a, a]))
+    cl = dices.utils.get_cl(("SHE", "SHE", 1, 2), cls)
+    assert np.all(cl == np.array([[a, ba], [ab, a]]))

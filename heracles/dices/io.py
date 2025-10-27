@@ -51,8 +51,9 @@ def _fields2components(results):
         if len(axis) == 1:
             # We are dealing with Cls
             a1, b1, i1, j1 = key
-            _a1, idx1 = _split_key(a1)
-            _b1, idx2 = _split_key(b1)
+            sa1, sb1 = r.spin
+            _a1, idx1 = _split_key(a1, sa1)
+            _b1, idx2 = _split_key(b1, sb1)
             for k, idx in zip(
                 itertools.product(_a1, _b1), itertools.product(idx1, idx2)
             ):
@@ -60,16 +61,21 @@ def _fields2components(results):
                 _key = (__a1, __b1, i1, j1)
                 _r = r[idx]
                 _r = np.squeeze(_r)
-                duplicate_cond = __a1 == "G_B" and __b1 == "G_E" and i1 == j1
+                if sa1 != 0 and sb1 != 0:
+                    mode1, mode2 = __a1[-1], __b1[-1]
+                    duplicate_cond = mode1 == "B" and mode2 == "E" and i1 == j1
+                else:
+                    duplicate_cond = False
                 if not duplicate_cond:
-                    _results[_key] = Result(_r, ell=ell)
+                    _results[_key] = Result(_r, spin=(0, 0), axis=(0,), ell=ell)
         elif len(axis) == 2:
             # We are dealing with Covariance matrices
             a1, b1, a2, b2, i1, j1, i2, j2 = key
-            _a1, idx1 = _split_key(a1)
-            _b1, idx2 = _split_key(b1)
-            _a2, idx3 = _split_key(a2)
-            _b2, idx4 = _split_key(b2)
+            sa1, sb1, sa2, sb2 = r.spin
+            _a1, idx1 = _split_key(a1, sa1)
+            _b1, idx2 = _split_key(b1, sb1)
+            _a2, idx3 = _split_key(a2, sa2)
+            _b2, idx4 = _split_key(b2, sb2)
             for k, idx in zip(
                 itertools.product(_a1, _b1, _a2, _b2),
                 itertools.product(idx1, idx2, idx3, idx4),
@@ -78,7 +84,7 @@ def _fields2components(results):
                 _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
                 _r = r[idx]
                 _r = np.squeeze(_r)
-                _results[_key] = Result(_r, ell=ell)
+                _results[_key] = Result(_r, spin=(0, 0, 0, 0), axis=(0, 1), ell=ell)
         else:
             raise ValueError(
                 "Results with more than 3 axes are not supported at the moment."
@@ -109,11 +115,18 @@ def _components2data(results, order=None):
             order = []
             nells = []
             for key in list(results.keys()):
+                # The order only depends on the unique fields
+                # So we only need the first two entries of the key
+                s1, s2, _, _ = results[key].spin
                 ell = results[key].ell
                 nell = len(ell[0])
                 _key = (key[0], key[1], key[4], key[5])
                 a, b, i, j = _key
-                duplicate_cond = a == "G_B" and b == "G_E" and i == j
+                if s1 != 0 and s2 != 0:
+                    mode1, mode2 = _key[-1], _key[-1]
+                    duplicate_cond = mode1 == "B" and mode2 == "E" and i == j
+                else:
+                    duplicate_cond = False
                 if _key not in order and not duplicate_cond:
                     order.append(_key)
                     nells.append(nell)
@@ -159,26 +172,8 @@ def _components2data(results, order=None):
     return data
 
 
-def _split_key(f, pos=None):
-    if f == "POS":
-        return ["POS"], [pos]
-    if f == "SHE":
-        return ["G_E", "G_B"], [0, 1]
-
-
-def format_key(key):
-    """
-    Produces a Cl key for data maps.
-    input:
-        key: Cl key
-    returns:
-        Clkey: Cl key
-    """
-    _key = copy.deepcopy(key)
-    a, b, i, j = _key
-    if i > j:
-        i, j = j, i
-        a, b = b, a
-    if (b == "POS") or (b == "G_E" and a == "G_B"):
-        a, b = b, a
-    return (a, b, i, j)
+def _split_key(f, spin, pos=None):
+    if spin == 0:
+        return [f], [pos]
+    if spin != 0:
+        return [f + "_E", f + "_B"], [0, 1]
