@@ -67,7 +67,7 @@ def _fields2components(results):
                 else:
                     duplicate_cond = False
                 if not duplicate_cond:
-                    _results[_key] = Result(_r, spin=(sa1, sb1), axis=(0,), ell=ell)
+                    _results[_key] = Result(_r, spin=(0, 0), axis=(0,), ell=ell)
         elif len(axis) == 2:
             # We are dealing with Covariance matrices
             a1, b1, a2, b2, i1, j1, i2, j2 = key
@@ -85,7 +85,7 @@ def _fields2components(results):
                 _r = r[idx]
                 _r = np.squeeze(_r)
                 _results[_key] = Result(
-                    _r, spin=(sa1, sb1, sa2, sb2), axis=(0, 1), ell=ell
+                    _r, spin=(0, 0, 0, 0), axis=(0, 1), ell=ell
                 )
         else:
             raise ValueError(

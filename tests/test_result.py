@@ -261,8 +261,11 @@ def test_truncated_mapping():
 
 
 def test_truncated_metadata():
+    from heracles.result import Result
+
     md = {"test": object()}
     result = np.zeros(3, dtype=np.dtype(float, metadata=md))
+    result = Result(result, spin=0)
     assert result.dtype.metadata == md
     truncated = heracles.truncated(result, 1)
     assert truncated.dtype.metadata == md

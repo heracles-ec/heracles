@@ -44,6 +44,7 @@ def get_cl(key, cls):
             arr = cls[key_sym].array
             s1, s2 = cls[key_sym].spin
             if s1 != 0 and s2 != 0:
+                print("dims of arr:", key_sym, arr.shape)
                 return np.transpose(arr, axes=(1, 0, 2))
             else:
                 return arr
