@@ -52,6 +52,7 @@ def get_cl(key, cls):
         else:
             raise KeyError(f"Key {key} not found in Cls.")
 
+
 try:
     from copy import replace
 except ImportError:
