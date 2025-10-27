@@ -22,7 +22,6 @@ def test_get_cl():
     cls = {}
     cls[("SHE", "POS", 1, 1)] = heracles.Result(np.array([a, a]))
     cls[("SHE", "SHE", 2, 1)] = heracles.Result(np.array([[a, ab], [ba, a]]))
-    print(cls[("SHE", "SHE", 2, 1)].array.shape)
 
     cl = dices.utils.get_cl(("POS", "SHE", 1, 1), cls)
     assert np.all(cl == np.array([a, a]))
