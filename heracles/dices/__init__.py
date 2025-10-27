@@ -39,7 +39,7 @@ __all__ = [
     "flatten",
     # utils
     "impose_correlation",
-    "get_cl"
+    "get_cl",
 ]
 
 from .jackknife import (
