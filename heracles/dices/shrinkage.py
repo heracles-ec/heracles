@@ -136,8 +136,8 @@ def gaussian_covariance(cls):
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
         # get attributes of result
-        ell1 = get_result_array(cl1, "ell")
-        ell2 = get_result_array(cl2, "ell")
+        ell1 = get_result_array(cl1, "ell")[0]
+        ell2 = get_result_array(cl2, "ell")[0]
 
         # keys for cov
         _key1 = (a1, a2, i1, i2)
@@ -153,8 +153,10 @@ def gaussian_covariance(cls):
         r = broadcast_multiply(_cl1, _cl2)
         r += broadcast_multiply(_cl3, _cl4)
         # Expand diagonal
-        eye = np.eye(len(ell1))
-        r = r[..., :, None] * eye
+        l = r.shape[-1]
+        # Create an identity matrix of shape (l, l)
+        eye = np.eye(l)
+        r = r[..., :, None] * eye 
         # Assign to cov
         _ax = np.arange(len(r.shape))
         ax1, ax2 = int(_ax[-2]), int(_ax[-1])

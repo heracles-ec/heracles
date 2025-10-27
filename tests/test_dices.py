@@ -507,34 +507,39 @@ def test_flatten(data_path):
 
 
 def test_gauss_cov(data_path):
-    nside = 128
+    from heracles.dices.utils import get_cl
     data_maps = make_data_maps()
     vis_maps = make_vis_maps()
     fields = get_fields()
     jkmaps = make_jkmaps(data_path)
     cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
     cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
-    lbins = 3
-    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
-    cqs1 = heracles.binned(cls1, ledges)
-    cqs0 = heracles.binned(cls0, ledges)
-    cov_jk = dices.jackknife_covariance(cqs1)
-    gauss_cov = dices.gaussian_covariance(cqs0)
+    cov_jk = dices.jackknife_covariance(cls1)
+    gauss_cov = dices.gaussian_covariance(cls0)
+    assert sorted(list(cov_jk.keys())) == sorted(list(gauss_cov.keys()))
+    for key in list(cov_jk.keys()):
+        cj = cov_jk[key]
+        cg = gauss_cov[key]
+        assert cj.shape == cg.shape
+        assert cj.axis == cg.axis
     # Add bias
-    b = dices.jackknife.bias(cqs0)
-    cqs0 = dices.utils.add_to_Cls(cqs0, b)
+    b = dices.jackknife.bias(cls0)
+    cls0 = dices.utils.add_to_Cls(cls0, b)
     # Comp separate
-    _cov_jk = dices.io._fields2components(cov_jk)
     _gauss_cov = dices.io._fields2components(gauss_cov)
-    _cqs0 = dices.io._fields2components(cqs0)
-    assert sorted(list(_cov_jk.keys())) == sorted(list(_gauss_cov.keys()))
+    _cls0 = dices.io._fields2components(cls0)
     for key in list(_gauss_cov.keys()):
         a1, b1, a2, b2, i1, j1, i2, j2 = key
         key1 = a1, b1, i1, j1
         key2 = a2, b2, i2, j2
         if (key1 == key2) and ((a1, i1) == (b1, j1)) and ((a2, i2) == (b2, j2)):
-            g = 2 * _cqs0[key1].array ** 2
-            _g = dices.shrinkage._gaussian_covariance(_cqs0, key)
+            g = 2 * _cls0[key1].array ** 2
+            a1, b1, a2, b2, i1, j1, i2, j2 = key
+            cl1 = get_cl((a1, a2, i1, i2), _cls0)
+            cl2 = get_cl((b1, b2, j1, j2), _cls0)
+            cl3 = get_cl((a1, b2, i1, j2), _cls0)
+            cl4 = get_cl((b1, a2, j1, i2), _cls0)
+            _g = cl1 * cl2 + cl3 * cl4
             __g = np.diag(_gauss_cov[key].array)
             assert (g == _g).all()
             assert (g == __g).all()
