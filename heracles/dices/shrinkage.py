@@ -33,7 +33,6 @@ from .utils import (
 from .io import (
     _fields2components,
     flatten,
-    _split_key,
 )
 
 
@@ -97,76 +96,71 @@ def shrinkage_factor(cls1, target):
     return lambda_star
 
 
-def gaussian_covariance(Cls):
+def broadcast_multiply(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """
-    Computes Gaussian estimate of the target matrix.
-    input:
-        Cls: power spectra
-    returns:
-        T: target matrix
+    Broadcasts and multiplies two arrays A and B such that:
+      - The last dimension (l) must match.
+      - The output shape is A.shape[:-1] + B.shape[:-1] + (l,)
+
+    Example:
+        A.shape = (2, l)
+        B.shape = (2, 2, l)
+        -> result.shape = (2, 2, 2, l)
     """
-    # Add bias to Cls
-    b = bias(Cls)
-    Cls = add_to_Cls(Cls, b)
-    # Separate Cls into Cls
-    _Cls = _fields2components(Cls)
-    # Compute Gaussian covariance
+    # Check compatibility
+    if A.shape[-1] != B.shape[-1]:
+        raise ValueError("The last dimensions of A and B must match.")
+
+    l = A.shape[-1]
+
+    # Expand A to match B’s prefix, and vice versa
+    A_expanded = A.reshape(*A.shape[:-1], *[1] * (B.ndim - 1), l)
+    B_expanded = B.reshape(*[1] * (A.ndim - 1), *B.shape[:-1], l)
+
+    # Elementwise multiplication via broadcasting
+    result = A_expanded * B_expanded
+
+    return result
+
+
+def gaussian_covariance(cls):
+    b = bias(cls)
+    cls = add_to_Cls(cls, b)
     cov = {}
-    for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
-        # covariance key
+    for key1, key2 in itertools.combinations_with_replacement(cls.keys(), 2):
         a1, b1, i1, j1 = key1
         a2, b2, i2, j2 = key2
-        covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
-        # get reference results
-        cl1 = Cls[key1]
-        cl2 = Cls[key2]
+        cov_key = (a1, b1, a2, b2, i1, j1, i2, j2)
+        cl1 = cls[key1]
+        cl2 = cls[key2]
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
-        # get components
-        _a1, idx1 = _split_key(a1, sa1, pos=0)
-        _b1, idx2 = _split_key(b1, sb1, pos=0)
-        _a2, idx3 = _split_key(a2, sa2, pos=0)
-        _b2, idx4 = _split_key(b2, sb2, pos=0)
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")
         ell2 = get_result_array(cl2, "ell")
-        ell = ell1 + ell2
-        r = np.zeros(
-            (len(idx1), len(idx2), len(idx3), len(idx4), len(ell1[0]), len(ell2[0]))
+
+        # keys for cov
+        _key1 = (a1, a2, i1, i2)
+        _key2 = (b1, b2, j1, j2)
+        _key3 = (a1, b2, i1, j2)
+        _key4 = (b1, a2, j1, i2)
+        _cl1 = get_cl(_key1, cls)
+        _cl2 = get_cl(_key2, cls)
+        _cl3 = get_cl(_key3, cls)
+        _cl4 = get_cl(_key4, cls)
+
+        # Perform the broadcasted multiplication and sum
+        r = broadcast_multiply(_cl1, _cl2)
+        r += broadcast_multiply(_cl3, _cl4)
+        # Expand diagonal
+        eye = np.eye(len(ell1))
+        r = r[..., :, None] * eye
+        # Assign to cov
+        _ax = np.arange(len(r.shape))
+        ax1, ax2 = int(_ax[-2]), int(_ax[-1])
+        cov[cov_key] = Result(
+            r, spin=(sa1, sb1, sa2, sb2), ell=(ell1, ell2), axis=(ax1, ax2)
         )
-        # get covariance
-        for k, idx in zip(
-            itertools.product(_a1, _b1, _a2, _b2),
-            itertools.product(idx1, idx2, idx3, idx4),
-        ):
-            __a1, __b1, __a2, __b2 = k
-            _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
-            _cov = _gaussian_covariance(_Cls, _key)
-            ix1, ix2, ix3, ix4 = idx
-            r[ix1, ix2, ix3, ix4, :, :] = np.diag(_cov)
-        # Remove the extra dimensions
-        r = np.squeeze(r)
-        # Make Result
-        result = Result(r, spin=(sa1, sb1, sa2, sb2), ell=ell)
-        cov[covkey] = result
-    return cov
-
-
-def _gaussian_covariance(cls, key):
-    """
-    Returns a particular entry of the gaussian covariance matrix.
-    input:
-        cls: Cls
-        key: key of the entry
-    returns:
-        cov: covariance matrix
-    """
-    a1, b1, a2, b2, i1, j1, i2, j2 = key
-    cl1 = get_cl((a1, a2, i1, i2), cls)
-    cl2 = get_cl((b1, b2, j1, j2), cls)
-    cl3 = get_cl((a1, b2, i1, j2), cls)
-    cl4 = get_cl((b1, a2, j1, i2), cls)
-    cov = cl1 * cl2 + cl3 * cl4
     return cov
 
 
