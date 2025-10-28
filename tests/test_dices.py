@@ -218,7 +218,7 @@ def test_shrinkage(cov_jk):
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
     shrinkage_factor = 0.5
-    shrunk_cov = dices.shrink(unit_matrix, cov, shrinkage_factor)
+    shrunk_cov = dices.shrink(cov, unit_matrix, shrinkage_factor)
     # Test that diagonals are not touched
     for key in list(shrunk_cov.keys()):
         c = shrunk_cov[key]

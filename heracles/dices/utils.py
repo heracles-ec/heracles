@@ -109,7 +109,7 @@ def impose_correlation(cov_a, cov_b):
         b_v = np.diagonal(b, axis1=-2, axis2=-1)
         a_std = np.sqrt(a_v[..., None, :])
         b_std = np.sqrt(b_v[..., None, :])
-        c = b * (a_std * np.swapaxes(a_std, -1, -2))
-        c /= b_std * np.swapaxes(b_std, -1, -2)
-        cov_c[key] = replace(cov_a[key], array=c)
+        c = a * (b_std * np.swapaxes(b_std, -1, -2))
+        c /= a_std * np.swapaxes(a_std, -1, -2)
+        cov_c[key] = replace(a, array=c)
     return cov_c

@@ -43,7 +43,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def shrink(cov, target, shrinkage_factor):
+def shrink(target, cov, shrinkage_factor):
     """
     Compute the shrunk covariance.
     inputs:
