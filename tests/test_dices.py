@@ -237,18 +237,17 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten_block(cls0):
+def test_flatten_block(cls1, cov_jk):
     from heracles.dices.utils import _flatten
-
-    cov = dices.gaussian_covariance(cls0)
+    cls = cls1[(1,)]
 
     key = ("POS", "POS", 1, 1)
-    block = cls0[key]
+    block = cls[key]
     flat_block = _flatten(block)
     assert (flat_block == block.array).all()
 
     key = ("SHE", "SHE", 1, 1)
-    block = cls0[key]
+    block = cls[key]
     flat_block = _flatten(block)
     ee_block = block.array[0, 0, :]
     bb_block = block.array[1, 1, :]
@@ -265,7 +264,7 @@ def test_flatten_block(cls0):
     assert (_bb_block == bb_block).all()
 
     key = ("POS", "SHE", 1, 1)
-    block = cls0[key]
+    block = cls[key]
     flat_block = _flatten(block)
     pe_block = block.array[0, :]
     pb_block = block.array[1, :]
@@ -276,12 +275,12 @@ def test_flatten_block(cls0):
     assert (_pb_block == pb_block).all()
 
     key = ("POS", "POS", "POS", "POS", 1, 1, 1, 1)
-    block = cov[key]
+    block = cov_jk[key]
     flat_block = _flatten(block)
     assert (flat_block == block.array).all()
 
     key = ("SHE", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov[key]
+    block = cov_jk[key]
     flat_block = _flatten(block)
     eeee_block = block.array[0, 0, 0, 0, :, :]
     ell = eeee_block.shape[-1]
@@ -298,7 +297,7 @@ def test_flatten_block(cls0):
     assert (_bebe_block == bebe_block).all()
 
     key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov[key]
+    block = cov_jk[key]
     flat_block = _flatten(block)
     peee_block = block.array[0, 0, 0, :, :]
     ell = peee_block.shape[-1]
@@ -320,7 +319,7 @@ def test_gauss_cov(cls0, cov_jk):
         _cls0[key] = replace(cls0[key], array=a)
     # We want to undo the bias that we will add later
     # for an easy check
-    bias = dices.jackknife.bias(cls0)
+    bias = dices.jackknife.bias(_cls0)
     _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
 
     # Compute Gaussian covariance
