@@ -254,7 +254,7 @@ def test_flatten_cls(nside, cls0):
         assert np.allclose(arr.array, reconstructed)
 
     _cls = flatten(cls0)
-    assert len(_cls) == 30*(nside // 4 + 1)
+    assert len(_cls) == 30 * (nside // 4 + 1)
 
 
 def test_flatten_cov(nside, cov_jk):
@@ -283,7 +283,8 @@ def test_flatten_cov(nside, cov_jk):
 
     _cov = flatten(cov_jk)
     _, n = _cov.shape
-    assert n == 30*(nside // 4 + 1)
+    assert n == 30 * (nside // 4 + 1)
+
 
 def test_gauss_cov(cls0, cov_jk):
     _cls0 = {}
