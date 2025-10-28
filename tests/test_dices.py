@@ -211,14 +211,14 @@ def test_shrinkage(cov_jk):
         g = cov[key]
         s = g.shape
         *_, i = s
-        single_diag = np.eye(i)  # Shape: (i, j)
+        single_diag = np.eye(i)
         # Expand to the desired shape using broadcasting
         a = np.broadcast_to(single_diag, s)
         unit_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
     shrinkage_factor = 0.5
-    shrunk_cov = dices.shrink(cov, unit_matrix, shrinkage_factor)
+    shrunk_cov = dices.shrink(unit_matrix, cov, shrinkage_factor)
     # Test that diagonals are not touched
     for key in list(shrunk_cov.keys()):
         c = shrunk_cov[key]
