@@ -3,6 +3,12 @@ import heracles
 import pytest
 import heracles.dices as dices
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 
 def test_jkmap(jk_maps, njk):
     for key in list(jk_maps.keys()):
@@ -214,11 +220,12 @@ def test_shrinkage(cov_jk):
         single_diag = np.eye(i)
         # Expand to the desired shape using broadcasting
         a = np.broadcast_to(single_diag, s)
-        unit_matrix[key] = heracles.Result(a, ell=g.ell, axis=g.axis)
+        unit_matrix[key] = replace(g, array=a)
     # Shrinkage factor
     # To do: is there a way of checking the shrinkage factor?
     shrinkage_factor = 0.5
     shrunk_cov = dices.shrink(unit_matrix, cov, shrinkage_factor)
+
     # Test that diagonals are not touched
     for key in list(shrunk_cov.keys()):
         c = shrunk_cov[key]
