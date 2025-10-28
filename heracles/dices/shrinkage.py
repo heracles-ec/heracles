@@ -35,6 +35,11 @@ from .io import (
     flatten,
     _split_key,
 )
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
 
 
 def shrink(cov, target, shrinkage_factor):
@@ -53,7 +58,7 @@ def shrink(cov, target, shrinkage_factor):
         c = cov[key].array
         tc = correlated_target[key].array
         sc = shrinkage_factor * tc + (1 - shrinkage_factor) * c
-        shrunk_cov[key] = Result(sc, axis=cov[key].axis, ell=cov[key].ell)
+        shrunk_cov[key] = replace(cov[key], array=sc)
     return shrunk_cov
 
 
