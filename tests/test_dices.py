@@ -237,8 +237,21 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten_block(cls0, cov_jk):
+def test_flatten_block(cls0):
     from heracles.dices.utils import _flatten
+
+    _cls0 = {}
+    for key in list(cls0.keys()):
+        a = cls0[key].array
+        a = np.ones_like(a)
+        _cls0[key] = replace(cls0[key], array=a)
+    # We want to undo the bias that we will add later
+    # for an easy check
+    bias = dices.jackknife.bias(_cls0)
+    _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
+
+    # Compute Gaussian covariance
+    cov = dices.gaussian_covariance(_cls0)
 
     key = ("POS", "POS", 1, 1)
     block = cls0[key]
@@ -274,12 +287,12 @@ def test_flatten_block(cls0, cov_jk):
     assert (_pb_block == pb_block).all()
 
     key = ("POS", "POS", "POS", "POS", 1, 1, 1, 1)
-    block = cov_jk[key]
+    block = cov[key]
     flat_block = _flatten(block)
     assert (flat_block == block.array).all()
 
     key = ("SHE", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
+    block = cov[key]
     flat_block = _flatten(block)
     eeee_block = block.array[0, 0, 0, 0, :, :]
     ell = eeee_block.shape[-1]
@@ -296,7 +309,7 @@ def test_flatten_block(cls0, cov_jk):
     assert (_bebe_block == bebe_block).all()
 
     key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
+    block = cov[key]
     flat_block = _flatten(block)
     peee_block = block.array[0, 0, 0, :, :]
     ell = peee_block.shape[-1]
