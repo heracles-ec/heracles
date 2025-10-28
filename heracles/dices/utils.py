@@ -53,13 +53,6 @@ def get_cl(key, cls):
             raise KeyError(f"Key {key} not found in Cls.")
 
 
-try:
-    from copy import replace
-except ImportError:
-    # Python < 3.13
-    from dataclasses import replace
-
-
 def add_to_Cls(cls, x):
     """
     Adds a dictionary of Cl values to another.
