@@ -237,79 +237,46 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten_block(cls1, cov_jk):
+def test_flatten_cls(cls0):
     from heracles.dices.utils import _flatten
 
-    cls = cls1[(1,)]
+    for key in cls0.keys():
+        arr = cls0[key]
+        *prefix, ell = arr.shape
+        N = np.prod(prefix, dtype=int)
+        flat = _flatten(arr)
 
-    key = ("POS", "POS", 1, 1)
-    block = cls[key]
-    flat_block = _flatten(block)
-    assert (flat_block == block.array).all()
+        # --- Check shape ---
+        assert flat.shape == (N * ell)
 
-    key = ("SHE", "SHE", 1, 1)
-    block = cls[key]
-    flat_block = _flatten(block)
-    ee_block = block.array[0, 0, :]
-    bb_block = block.array[1, 1, :]
-    eb_block = block.array[0, 1, :]
-    be_block = block.array[1, 0, :]
-    ell = ee_block.shape[-1]
-    _ee_block = flat_block[0:ell]
-    _eb_block = flat_block[ell : 2 * ell]
-    _be_block = flat_block[2 * ell : 3 * ell]
-    _bb_block = flat_block[3 * ell : 4 * ell]
-    assert (_ee_block == ee_block).all()
-    assert (_eb_block == eb_block).all()
-    assert (_be_block == be_block).all()
-    assert (_bb_block == bb_block).all()
+        # --- Invert operation to verify correctness ---
+        reconstructed = flat.reshape(N, ell).transpose(0, 1).reshape(*prefix, ell)
+        assert np.allclose(arr.array, reconstructed)
 
-    key = ("POS", "SHE", 1, 1)
-    block = cls[key]
-    flat_block = _flatten(block)
-    pe_block = block.array[0, :]
-    pb_block = block.array[1, :]
-    ell = pe_block.shape[-1]
-    _pe_block = flat_block[0:ell]
-    _pb_block = flat_block[ell : 2 * ell]
-    assert (_pe_block == pe_block).all()
-    assert (_pb_block == pb_block).all()
 
-    key = ("POS", "POS", "POS", "POS", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    assert (flat_block == block.array).all()
+def test_flatten_cov(cov_jk):
+    from heracles.dices.utils import _flatten
 
-    key = ("SHE", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    eeee_block = block.array[0, 0, 0, 0, :, :]
-    ell = eeee_block.shape[-1]
-    _eeee_block = flat_block[0:ell, 0:ell]
-    assert (_eeee_block == eeee_block).all()
-    bbbb_block = block.array[1, 1, 1, 1, :, :]
-    _bbbb_block = flat_block[3 * ell : 4 * ell, 3 * ell : 4 * ell]
-    assert (_bbbb_block == bbbb_block).all()
-    ebeb_block = block.array[0, 1, 0, 1, :, :]
-    _ebeb_block = flat_block[ell : 2 * ell, ell : 2 * ell]
-    assert (_ebeb_block == ebeb_block).all()
-    bebe_block = block.array[1, 0, 1, 0, :, :]
-    _bebe_block = flat_block[2 * ell : 3 * ell, 2 * ell : 3 * ell]
-    assert (_bebe_block == bebe_block).all()
+    for key in cov_jk.keys():
+        arr = cov_jk[key]
+        *prefix, l1, l2 = arr.shape
+        s1, s2, s3, s4 = arr.spin
+        dof1 = 1 if s1 == 0 else 2
+        dof2 = 1 if s2 == 0 else 2
+        dof3 = 1 if s3 == 0 else 2
+        dof4 = 1 if s4 == 0 else 2
+        N1 = dof1 * dof2
+        N2 = dof3 * dof4
+        flat = _flatten(arr)
 
-    key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    peee_block = block.array[0, 0, 0, :, :]
-    ell = peee_block.shape[-1]
-    _peee_block = flat_block[0:ell, 0:ell]
-    assert (_peee_block == peee_block).all()
-    pbbb_block = block.array[1, 1, 1, :, :]
-    _pbbb_block = flat_block[ell : 2 * ell, 3 * ell : 4 * ell]
-    assert (_pbbb_block == pbbb_block).all()
-    pebe_block = block.array[0, 1, 0, :, :]
-    _pebe_block = flat_block[0:ell, 2 * ell : 3 * ell]
-    assert (_pebe_block == pebe_block).all()
+        # --- Check shape ---
+        assert flat.shape == (N1 * l1, N2 * l2)
+
+        # --- Invert operation to verify correctness ---
+        reconstructed = (
+            flat.reshape(N1, l1, N2, l2).transpose(0, 2, 1, 3).reshape(*prefix, l1, l2)
+        )
+        assert np.allclose(arr.array, reconstructed)
 
 
 def test_gauss_cov(cls0, cov_jk):
