@@ -237,7 +237,6 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-
 def test_flatten_block(cls0, cov_jk):
     from heracles.dices.utils import _flatten
 
@@ -336,5 +335,5 @@ def test_gauss_cov(cls0, cov_jk):
     for key in list(gauss_cov.keys()):
         c = gauss_cov[key]
         c_diag = np.diagonal(c, axis1=-2, axis2=-1)
-        _c_diag = 2*np.ones_like(c_diag)
+        _c_diag = 2 * np.ones_like(c_diag)
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
