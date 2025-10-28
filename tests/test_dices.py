@@ -239,6 +239,7 @@ def test_shrinkage(cov_jk):
 
 def test_flatten_block(cls1, cov_jk):
     from heracles.dices.utils import _flatten
+
     cls = cls1[(1,)]
 
     key = ("POS", "POS", 1, 1)
