@@ -240,19 +240,17 @@ def test_shrinkage(cov_jk):
 def test_flatten_cls(nside, cls0):
     from heracles.dices.utils import _flatten, flatten
 
+    # Check that the individual blocks are flattened correctly
     for key in cls0.keys():
         arr = cls0[key]
         *prefix, ell = arr.shape
         N = np.prod(prefix, dtype=int)
         flat = _flatten(arr)
-
-        # --- Check shape ---
         assert flat.shape == (N * ell)
-
-        # --- Invert operation to verify correctness ---
         reconstructed = flat.reshape(N, ell).transpose(0, 1).reshape(*prefix, ell)
         assert np.allclose(arr.array, reconstructed)
 
+    # Check flattened cls has correct shape
     _cls = flatten(cls0)
     assert len(_cls) == 30 * (nside // 4 + 1)
 
@@ -260,6 +258,7 @@ def test_flatten_cls(nside, cls0):
 def test_flatten_cov(nside, cov_jk):
     from heracles.dices.utils import _flatten, flatten
 
+    # Check that the individual blocks are flattened correctly
     for key in cov_jk.keys():
         arr = cov_jk[key]
         *prefix, l1, l2 = arr.shape
@@ -271,16 +270,13 @@ def test_flatten_cov(nside, cov_jk):
         N1 = dof1 * dof2
         N2 = dof3 * dof4
         flat = _flatten(arr)
-
-        # --- Check shape ---
         assert flat.shape == (N1 * l1, N2 * l2)
-
-        # --- Invert operation to verify correctness ---
         reconstructed = (
             flat.reshape(N1, l1, N2, l2).transpose(0, 2, 1, 3).reshape(*prefix, l1, l2)
         )
         assert np.allclose(arr.array, reconstructed)
 
+    # Check flattened covariance has correct shape
     _cov = flatten(cov_jk)
     _, n = _cov.shape
     assert n == 30 * (nside // 4 + 1)
