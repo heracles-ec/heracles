@@ -9,6 +9,7 @@ except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
+
 def test_jkmap(jk_maps, njk):
     for key in list(jk_maps.keys()):
         assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
@@ -236,103 +237,70 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten_block(cls0, cov_jk):
-    from heracles.dices.utils import _flatten
-
-    key = ("POS", "POS", 1, 1)
-    block = cls0[key]
-    flat_block = _flatten(block)
-    assert (flat_block == block.array).all()
-
-    key = ("SHE", "SHE", 1, 1)
-    block = cls0[key]
-    flat_block = _flatten(block)
-    ee_block = block.array[0, 0, :]
-    bb_block = block.array[1, 1, :]
-    eb_block = block.array[0, 1, :]
-    be_block = block.array[1, 0, :]
-    ell = ee_block.shape[-1]
-    _ee_block = flat_block[0:ell]
-    _eb_block = flat_block[ell : 2 * ell]
-    _be_block = flat_block[2 * ell : 3 * ell]
-    _bb_block = flat_block[3 * ell : 4 * ell]
-    assert (_ee_block == ee_block).all()
-    assert (_eb_block == eb_block).all()
-    assert (_be_block == be_block).all()
-    assert (_bb_block == bb_block).all()
-
-    key = ("POS", "SHE", 1, 1)
-    block = cls0[key]
-    flat_block = _flatten(block)
-    pe_block = block.array[0, :]
-    pb_block = block.array[1, :]
-    ell = pe_block.shape[-1]
-    _pe_block = flat_block[0:ell]
-    _pb_block = flat_block[ell : 2 * ell]
-    assert (_pe_block == pe_block).all()
-    assert (_pb_block == pb_block).all()
-
-    key = ("POS", "POS", "POS", "POS", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    assert (flat_block == block.array).all()
-
-    key = ("SHE", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    eeee_block = block.array[0, 0, 0, 0, :, :]
-    ell = eeee_block.shape[-1]
-    _eeee_block = flat_block[0:ell, 0:ell]
-    assert (_eeee_block == eeee_block).all()
-    bbbb_block = block.array[1, 1, 1, 1, :, :]
-    _bbbb_block = flat_block[3 * ell : 4 * ell, 3 * ell : 4 * ell]
-    assert (_bbbb_block == bbbb_block).all()
-    ebeb_block = block.array[0, 1, 0, 1, :, :]
-    _ebeb_block = flat_block[ell : 2 * ell, ell : 2 * ell]
-    assert (_ebeb_block == ebeb_block).all()
-    bebe_block = block.array[1, 0, 1, 0, :, :]
-    _bebe_block = flat_block[2 * ell : 3 * ell, 2 * ell : 3 * ell]
-    assert (_bebe_block == bebe_block).all()
-
-    key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
-    block = cov_jk[key]
-    flat_block = _flatten(block)
-    peee_block = block.array[0, 0, 0, :, :]
-    ell = peee_block.shape[-1]
-    _peee_block = flat_block[0:ell, 0:ell]
-    assert (_peee_block == peee_block).all()
-    pbbb_block = block.array[1, 1, 1, :, :]
-    _pbbb_block = flat_block[ell : 2 * ell, 3 * ell : 4 * ell]
-    assert (_pbbb_block == pbbb_block).all()
-    pebe_block = block.array[0, 1, 0, :, :]
-    _pebe_block = flat_block[0:ell, 2 * ell : 3 * ell]
-    assert (_pebe_block == pebe_block).all()
+def test_flatten(data_path):
+    nside = 128
+    lbins = 2
+    data_maps = make_data_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs0 = heracles.binned(cls0, ledges)
+    comp_cqs0 = dices.io._fields2components(cqs0)
+    order = list(comp_cqs0.keys())
+    cov = dices.gaussian_covariance(cqs0)
+    # Flatten
+    _cqs0 = dices.flatten(cqs0, order=order)
+    __cqs0 = np.array([comp_cqs0[key].array for key in order]).flatten()
+    flat_cov = dices.flatten(cov, order=order)
+    (n,) = _cqs0.shape
+    _n, _m = flat_cov.shape
+    assert n == _n
+    assert n == _m
+    assert (_cqs0 == __cqs0).all()
+    d_flat_cov = np.diag(flat_cov)
+    _d_flat_cov = []
+    comp_cov = dices.io._fields2components(cov)
+    for key in order:
+        a, b, i, j = key
+        cov_key = (a, b, a, b, i, j, i, j)
+        c = comp_cov[cov_key]
+        d = np.diag(c)
+        _d_flat_cov.append(d)
+    _d_flat_cov = np.array(_d_flat_cov).flatten()
+    assert d_flat_cov.shape == _d_flat_cov.shape
+    assert (_d_flat_cov == d_flat_cov).all()
 
 
-def test_gauss_cov(cls0, cov_jk):
-    _cls0 = {}
-    for key in list(cls0.keys()):
-        a = cls0[key].array
-        a = np.ones_like(a)
-        _cls0[key] = replace(cls0[key], array=a)
-    # We want to undo the bias that we will add later
-    # for an easy check
-    bias = dices.jackknife.bias(_cls0)
-    _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
-
-    # Compute Gaussian covariance
-    gauss_cov = dices.gaussian_covariance(_cls0)
-
-    # check for shape and keys
-    for key in list(cov_jk.keys()):
-        assert key in list(gauss_cov.keys())
-        c1 = cov_jk[key]
-        c2 = gauss_cov[key]
-        assert c1.shape == c2.shape
-
-    # check for diagonal values
-    for key in list(gauss_cov.keys()):
-        c = gauss_cov[key]
-        c_diag = np.diagonal(c, axis1=-2, axis2=-1)
-        _c_diag = 2*np.ones_like(c_diag)
-        assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
+def test_gauss_cov(data_path):
+    nside = 128
+    data_maps = make_data_maps()
+    vis_maps = make_vis_maps()
+    fields = get_fields()
+    jkmaps = make_jkmaps(data_path)
+    cls0 = dices.jackknife.get_cls(data_maps, jkmaps, fields)
+    cls1 = dices.jackknife_cls(data_maps, vis_maps, jkmaps, fields, nd=1)
+    lbins = 3
+    ledges = np.logspace(np.log10(10), np.log10(nside), lbins + 1)
+    cqs1 = heracles.binned(cls1, ledges)
+    cqs0 = heracles.binned(cls0, ledges)
+    cov_jk = dices.jackknife_covariance(cqs1)
+    gauss_cov = dices.gaussian_covariance(cqs0)
+    # Add bias
+    b = dices.jackknife.bias(cqs0)
+    cqs0 = dices.utils.add_to_Cls(cqs0, b)
+    # Comp separate
+    _cov_jk = dices.io._fields2components(cov_jk)
+    _gauss_cov = dices.io._fields2components(gauss_cov)
+    _cqs0 = dices.io._fields2components(cqs0)
+    assert sorted(list(_cov_jk.keys())) == sorted(list(_gauss_cov.keys()))
+    for key in list(_gauss_cov.keys()):
+        a1, b1, a2, b2, i1, j1, i2, j2 = key
+        key1 = a1, b1, i1, j1
+        key2 = a2, b2, i2, j2
+        if (key1 == key2) and ((a1, i1) == (b1, j1)) and ((a2, i2) == (b2, j2)):
+            g = 2 * _cqs0[key1].array ** 2
+            _g = dices.shrinkage._gaussian_covariance(_cqs0, key)
+            __g = np.diag(_gauss_cov[key].array)
+            assert (g == _g).all()
+            assert (g == __g).all()
