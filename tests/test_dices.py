@@ -80,7 +80,6 @@ def test_mask_correction(cls0, mls0):
 
 def test_polspice(cls0):
     from heracles.dices.utils import get_cl
-
     cls = np.array(
         [
             get_cl(("POS", "POS", 1, 1), cls0),
