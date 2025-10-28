@@ -256,6 +256,8 @@ def truncated(result, ell_max):
     if isinstance(result, Mapping):
         return {key: truncated(value, ell_max) for key, value in result.items()}
 
+    # get the spin if instance of Result
+    spin = getattr(result, "spin", None)
     ells = get_result_array(result, "ell")
     axes = normalize_result_axis(getattr(result, "axis", None), result, ells)
 
@@ -301,7 +303,7 @@ def truncated(result, ell_max):
 
     return Result(
         out,
-        spin=result.spin,
+        spin=spin,
         ell=truncated_ell,
         axis=axes,
         weight=truncated_weight,

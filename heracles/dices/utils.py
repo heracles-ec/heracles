@@ -42,7 +42,9 @@ def get_cl(key, cls):
         key_sym = (b, a, j, i)
         if key_sym in cls:
             arr = cls[key_sym].array
-            if (i != j) and (arr.ndim == 3):
+            s1, s2 = cls[key_sym].spin
+            if s1 != 0 and s2 != 0:
+                print("dims of arr:", key_sym, arr.shape)
                 return np.transpose(arr, axes=(1, 0, 2))
             else:
                 return arr
@@ -51,7 +53,7 @@ def get_cl(key, cls):
             raise KeyError(f"Key {key} not found in Cls.")
 
 
-def add_to_Cls(Cls, x):
+def add_to_Cls(cls, x):
     """
     Adds a dictionary of Cl values to another.
     input:
@@ -60,14 +62,14 @@ def add_to_Cls(Cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        arr = Cls[key].array + x[key]
-        _Cls[key] = replace(Cls[key], array=arr)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array + x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
-def sub_to_Cls(Cls, x):
+def sub_to_Cls(cls, x):
     """
     Substracts a dictionary of Cl values to another.
     input:
@@ -76,11 +78,11 @@ def sub_to_Cls(Cls, x):
     returns:
         Cls: updated dictionary of Cl values
     """
-    _Cls = {}
-    for key in Cls.keys():
-        arr = Cls[key].array - x[key]
-        _Cls[key] = replace(Cls[key], array=arr)
-    return _Cls
+    _cls = {}
+    for key in cls.keys():
+        arr = cls[key].array - x[key]
+        _cls[key] = replace(cls[key], array=arr)
+    return _cls
 
 
 def impose_correlation(cov_a, cov_b):
