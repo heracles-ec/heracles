@@ -79,13 +79,13 @@ def test_mask_correction(cls0, mls0):
 
 
 def test_polspice(cls0):
-    print(list(cls0.keys()))
+    from heracles.dices.utils import get_cl
     cls = np.array(
         [
-            cls0[("POS", "POS", 1, 1)],
-            cls0[("SHE", "SHE", 1, 1)][0, 0],
-            cls0[("SHE", "SHE", 1, 1)][1, 1],
-            cls0[("SHE", "POS", 1, 1)][0],
+            get_cl(("POS", "POS", 1, 1), cls0),
+            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
+            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
+            get_cl(("POS", "SHE", 1, 1), cls0)[0],
         ]
     ).T
     corrs = heracles.cl2corr(cls)
