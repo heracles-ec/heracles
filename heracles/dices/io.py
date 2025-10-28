@@ -25,6 +25,22 @@ import numpy as np
 from ..result import Result
 
 
+def flatten_block(result):
+    a = result.array
+    s1, s2, s3, s4 = result.spin
+    dof1 = 1 if s1 == 0 else 2
+    dof2 = 1 if s2 == 0 else 2
+    dof3 = 1 if s3 == 0 else 2
+    dof4 = 1 if s4 == 0 else 2
+    ell = a.shape[-1]
+    b = (
+        a.reshape(dof1 * dof2, dof3 * dof4, ell, ell)
+        .transpose(0, 2, 1, 3)
+        .reshape(dof1 * dof2 * ell, dof3 * dof4 * ell)
+    )
+    return b
+
+
 def flatten(results, order=None):
     """
     Flattens the results dictionary into a concatenated array.

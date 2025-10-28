@@ -241,6 +241,44 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
+def test_flatten_block(cov_jk):
+    key = ("POS", "POS", "POS", "POS", 1, 1, 1, 1)
+    block = cov_jk[key]
+    flat_block = dices.io.flatten_block(block)
+    assert (flat_block == block.array).all()
+
+    key = ("SHE", "SHE", "SHE", "SHE", 1, 1, 1, 1)
+    block = cov_jk[key]
+    flat_block = dices.io.flatten_block(block)
+    eeee_block = block.array[0, 0, 0, 0, :, :]
+    ell = eeee_block.shape[-1]
+    _eeee_block = flat_block[0:ell, 0:ell]
+    assert (_eeee_block == eeee_block).all()
+    bbbb_block = block.array[1, 1, 1, 1, :, :]
+    _bbbb_block = flat_block[3 * ell : 4 * ell, 3 * ell : 4 * ell]
+    assert (_bbbb_block == bbbb_block).all()
+    ebeb_block = block.array[0, 1, 0, 1, :, :]
+    _ebeb_block = flat_block[ell : 2 * ell, ell : 2 * ell]
+    assert (_ebeb_block == ebeb_block).all()
+    bebe_block = block.array[1, 0, 1, 0, :, :]
+    _bebe_block = flat_block[2 * ell : 3 * ell, 2 * ell : 3 * ell]
+    assert (_bebe_block == bebe_block).all()
+
+    key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
+    block = cov_jk[key]
+    flat_block = dices.io.flatten_block(block)
+    peee_block = block.array[0, 0, 0:, :]
+    ell = peee_block.shape[-1]
+    _peee_block = flat_block[0:ell, 0:ell]
+    assert (_peee_block == peee_block).all()
+    pbbb_block = block.array[1, 1, 1, :, :]
+    _pbbb_block = flat_block[ell : 2 * ell, 3 * ell : 4 * ell]
+    assert (_pbbb_block == pbbb_block).all()
+    pebe_block = block.array[0, 1, 0, :, :]
+    _pebe_block = flat_block[0:ell, 2 * ell : 3 * ell]
+    assert (_pebe_block == pebe_block).all()
+
+
 def test_flatten(nside, cls0):
     lbins = 2
     ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)

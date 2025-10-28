@@ -31,7 +31,6 @@ from .utils import (
     get_cl,
 )
 from .io import (
-    _fields2components,
     flatten,
 )
 
@@ -112,11 +111,11 @@ def broadcast_multiply(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     if A.shape[-1] != B.shape[-1]:
         raise ValueError("The last dimensions of A and B must match.")
 
-    l = A.shape[-1]
+    ell = A.shape[-1]
 
     # Expand A to match B’s prefix, and vice versa
-    A_expanded = A.reshape(*A.shape[:-1], *[1] * (B.ndim - 1), l)
-    B_expanded = B.reshape(*[1] * (A.ndim - 1), *B.shape[:-1], l)
+    A_expanded = A.reshape(*A.shape[:-1], *[1] * (B.ndim - 1), ell)
+    B_expanded = B.reshape(*[1] * (A.ndim - 1), *B.shape[:-1], ell)
 
     # Elementwise multiplication via broadcasting
     result = A_expanded * B_expanded
