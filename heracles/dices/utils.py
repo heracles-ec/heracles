@@ -150,7 +150,7 @@ def flatten(results, order=None):
 
     if axis == 1:
         # Stack all blocks vertically
-        return np.vstack(list(blocks_dict.values()))
+        return np.concatenate(list(blocks_dict.values()))
     elif axis == 2:
         # Infer order if not provided
         if order is None:

@@ -237,8 +237,8 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten_cls(cls0):
-    from heracles.dices.utils import _flatten
+def test_flatten_cls(nside, cls0):
+    from heracles.dices.utils import _flatten, flatten
 
     for key in cls0.keys():
         arr = cls0[key]
@@ -253,9 +253,12 @@ def test_flatten_cls(cls0):
         reconstructed = flat.reshape(N, ell).transpose(0, 1).reshape(*prefix, ell)
         assert np.allclose(arr.array, reconstructed)
 
+    _cls = flatten(cls0)
+    assert len(_cls) == 30*(nside // 4 + 1)
 
-def test_flatten_cov(cov_jk):
-    from heracles.dices.utils import _flatten
+
+def test_flatten_cov(nside, cov_jk):
+    from heracles.dices.utils import _flatten, flatten
 
     for key in cov_jk.keys():
         arr = cov_jk[key]
@@ -278,6 +281,9 @@ def test_flatten_cov(cov_jk):
         )
         assert np.allclose(arr.array, reconstructed)
 
+    _cov = flatten(cov_jk)
+    _, n = _cov.shape
+    assert n == 30*(nside // 4 + 1)
 
 def test_gauss_cov(cls0, cov_jk):
     _cls0 = {}
