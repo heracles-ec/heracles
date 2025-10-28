@@ -103,7 +103,7 @@ def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
         _map = _maps[key_data]
         _jkmap = jkmaps[key_mask]
         _mask = np.copy(_jkmap)
-        _mask[_mask != 0] = _mask[_mask != 0] / _mask[_mask != 0]
+        _mask = (_mask > 0).astype(int)
         # Remove jk 2 regions
         cond = np.where((_jkmap == float(jk)) | (_jkmap == float(jk2)))[0]
         _mask[cond] = 0.0
@@ -141,7 +141,7 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0):
     for key in jkmaps.keys():
         jkmap = jkmaps[key]
         mask = np.copy(jkmap)
-        mask[mask != 0] = mask[mask != 0] / mask[mask != 0]
+        mask = (mask > 0).astype(int)
         fsky = sum(mask) / len(mask)
         cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
         rel_fskys[key] = (len(cond) / len(mask)) / fsky
