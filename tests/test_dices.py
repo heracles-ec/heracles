@@ -240,18 +240,7 @@ def test_shrinkage(cov_jk):
 def test_flatten_block(cls0):
     from heracles.dices.utils import _flatten
 
-    _cls0 = {}
-    for key in list(cls0.keys()):
-        a = cls0[key].array
-        a = np.ones_like(a)
-        _cls0[key] = replace(cls0[key], array=a)
-    # We want to undo the bias that we will add later
-    # for an easy check
-    bias = dices.jackknife.bias(_cls0)
-    _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
-
-    # Compute Gaussian covariance
-    cov = dices.gaussian_covariance(_cls0)
+    cov = dices.gaussian_covariance(cls0)
 
     key = ("POS", "POS", 1, 1)
     block = cls0[key]
@@ -331,7 +320,7 @@ def test_gauss_cov(cls0, cov_jk):
         _cls0[key] = replace(cls0[key], array=a)
     # We want to undo the bias that we will add later
     # for an easy check
-    bias = dices.jackknife.bias(_cls0)
+    bias = dices.jackknife.bias(cls0)
     _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
 
     # Compute Gaussian covariance
