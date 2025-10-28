@@ -176,27 +176,6 @@ def _gaussian_covariance(cls, key):
     return cov
 
 
-def _get_cl(key, cls):
-    """
-    Internal method to get a Cl from a dictionary of Cls.
-    Check if the key exists if not tries to find the symmetric key.
-    input:
-        key: key of the Cl
-        cls: dictionary of Cls
-    returns:
-        cl: Cl
-    """
-    if key in cls:
-        return cls[key].array
-    else:
-        a, b, i, j = key
-        key_sym = (b, a, j, i)
-        if key_sym in cls:
-            return cls[key_sym].array
-        else:
-            raise KeyError(f"Key {key} not found in Cls.")
-
-
 def _get_W(x, xbar):
     """
     Internal method to compute the W matrices.
