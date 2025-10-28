@@ -33,7 +33,6 @@ from .utils import (
 from .io import (
     _fields2components,
     flatten,
-    _split_key,
 )
 
 try:
@@ -139,15 +138,10 @@ def gaussian_covariance(cls):
         a2, b2, i2, j2 = key2
         covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
         # get reference results
-        cl1 = Cls[key1]
-        cl2 = Cls[key2]
+        cl1 = cls[key1]
+        cl2 = cls[key2]
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
-        # get components
-        _a1, idx1 = _split_key(a1, sa1, pos=0)
-        _b1, idx2 = _split_key(b1, sb1, pos=0)
-        _a2, idx3 = _split_key(a2, sa2, pos=0)
-        _b2, idx4 = _split_key(b2, sb2, pos=0)
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")[0]
         ell2 = get_result_array(cl2, "ell")[0]
@@ -165,50 +159,15 @@ def gaussian_covariance(cls):
         # Perform the broadcasted multiplication and sum
         r = broadcast_multiply(_cl1, _cl2)
         r += broadcast_multiply(_cl3, _cl4)
-        # Expand diagonal
-        l = r.shape[-1]
         # Create an identity matrix of shape (l, l)
-        eye = np.eye(l)
-        r = r[..., :, None] * eye 
+        eye = np.eye(r.shape[-1])
+        r = r[..., :, None] * eye
         # Assign to cov
         _ax = np.arange(len(r.shape))
         ax1, ax2 = int(_ax[-2]), int(_ax[-1])
-        cov[cov_key] = Result(
+        cov[covkey] = Result(
             r, spin=(sa1, sb1, sa2, sb2), ell=(ell1, ell2), axis=(ax1, ax2)
         )
-        # get covariance
-        for k, idx in zip(
-            itertools.product(_a1, _b1, _a2, _b2),
-            itertools.product(idx1, idx2, idx3, idx4),
-        ):
-            __a1, __b1, __a2, __b2 = k
-            _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
-            _cov = _gaussian_covariance(_Cls, _key)
-            ix1, ix2, ix3, ix4 = idx
-            r[ix1, ix2, ix3, ix4, :, :] = np.diag(_cov)
-        # Remove the extra dimensions
-        r = np.squeeze(r)
-        # Make Result
-        result = Result(r, spin=(sa1, sb1, sa2, sb2), ell=ell)
-        cov[covkey] = result
-    return cov
-
-
-def _gaussian_covariance(cls, key):
-    """
-    Returns a particular entry of the gaussian covariance matrix.
-    input:
-        cls: Cls
-        key: key of the entry
-    returns:
-        cov: covariance matrix
-    """
-    a1, b1, a2, b2, i1, j1, i2, j2 = key
-    cl1 = get_cl((a1, a2, i1, i2), cls)
-    cl2 = get_cl((b1, b2, j1, j2), cls)
-    cl3 = get_cl((a1, b2, i1, j2), cls)
-    cl4 = get_cl((b1, a2, j1, i2), cls)
-    cov = cl1 * cl2 + cl3 * cl4
     return cov
 
 

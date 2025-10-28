@@ -272,12 +272,9 @@ def test_flatten(nside, cls0):
 
 
 def test_gauss_cov(nside, cls0, cls1):
-    lbins = 3
-    ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)
-    cqs1 = heracles.binned(cls1, ledges)
-    cqs0 = heracles.binned(cls0, ledges)
-    cov_jk = dices.jackknife_covariance(cqs1)
-    gauss_cov = dices.gaussian_covariance(cqs0)
+    from heracles.dices.utils import get_cl
+
+    gauss_cov = dices.gaussian_covariance(cls0)
     # Add bias
     b = dices.jackknife.bias(cls0)
     cls0 = dices.utils.add_to_Cls(cls0, b)
