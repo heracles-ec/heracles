@@ -267,7 +267,7 @@ def test_flatten_block(cov_jk):
     key = ("POS", "SHE", "SHE", "SHE", 1, 1, 1, 1)
     block = cov_jk[key]
     flat_block = dices.io.flatten_block(block)
-    peee_block = block.array[0, 0, 0:, :]
+    peee_block = block.array[0, 0, 0, :, :]
     ell = peee_block.shape[-1]
     _peee_block = flat_block[0:ell, 0:ell]
     assert (_peee_block == peee_block).all()
