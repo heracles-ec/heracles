@@ -29,8 +29,6 @@ from .utils import (
     add_to_Cls,
     impose_correlation,
     get_cl,
-)
-from .io import (
     flatten,
 )
 

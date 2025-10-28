@@ -44,7 +44,6 @@ def get_cl(key, cls):
             arr = cls[key_sym].array
             s1, s2 = cls[key_sym].spin
             if s1 != 0 and s2 != 0:
-                print("dims of arr:", key_sym, arr.shape)
                 return np.transpose(arr, axes=(1, 0, 2))
             else:
                 return arr
@@ -106,3 +105,80 @@ def impose_correlation(cov_a, cov_b):
         c /= a_std * np.swapaxes(a_std, -1, -2)
         cov_c[key] = replace(a, array=c)
     return cov_c
+
+
+def _flatten(result):
+    a = result.array
+    axis = len(result.axis)
+    if axis == 1:
+        s1, s2 = result.spin
+        dof1 = 1 if s1 == 0 else 2
+        dof2 = 1 if s2 == 0 else 2
+        ell = a.shape[-1]
+        b = a.reshape(dof1 * dof2, ell)
+        b = b.transpose(0, 1).reshape(dof1 * dof2 * ell)
+    elif axis == 2:
+        s1, s2, s3, s4 = result.spin
+        dof1 = 1 if s1 == 0 else 2
+        dof2 = 1 if s2 == 0 else 2
+        dof3 = 1 if s3 == 0 else 2
+        dof4 = 1 if s4 == 0 else 2
+        ell = a.shape[-1]
+        b = (
+            a.reshape(dof1 * dof2, dof3 * dof4, ell, ell)
+            .transpose(0, 2, 1, 3)
+            .reshape(dof1 * dof2 * ell, dof3 * dof4 * ell)
+        )
+    else:
+        raise NotImplementedError("Flattening for >2 axes not implemented yet.")
+    return b
+
+
+def flatten(results, order=None):
+    # Flatten each block
+    blocks_dict = {}
+    for key, result in results.items():
+        blocks_dict[key] = _flatten(result)
+
+    # check that all results have the same length axis
+    axis = [len(result.axis) for result in results.values()]
+    axis = np.unique(axis)
+    if len(axis) != 1:
+        raise ValueError("All results must have the same length axis to flatten.")
+    else:
+        axis = axis[0]
+
+    if axis == 1:
+        # Stack all blocks vertically
+        return np.vstack(list(blocks_dict.values()))
+    elif axis == 2:
+        # Infer order if not provided
+        if order is None:
+            keys = list(blocks_dict.keys())
+            keys = [(key[0], key[1], key[4], key[5]) for key in keys]
+            order = list(set(keys))
+
+        # Build row by row
+        block_rows = []
+        for key_i in order:
+            row_blocks = []
+            for key_j in order:
+                a1, b1, i1, j1 = key_i
+                a2, b2, i2, j2 = key_j
+                cov_key = (a1, b1, a2, b2, i1, j1, i2, j2)
+                block = blocks_dict.get((cov_key))
+                if block is None:
+                    # If only the transpose block exists, use it transposed
+                    sym_cov_key = (a2, b2, a1, b1, i2, j2, i1, j1)
+                    transpose_block = blocks_dict.get((sym_cov_key))
+                    if transpose_block is not None:
+                        block = transpose_block.T
+                    else:
+                        raise KeyError(f"Missing block for {cov_key}")
+                row_blocks.append(block)
+            block_rows.append(row_blocks)
+
+        # Use np.block to assemble the full covariance matrix
+        return np.block(block_rows)
+    else:
+        raise NotImplementedError("Flattening for axis != 2 not implemented yet.")
