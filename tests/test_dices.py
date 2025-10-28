@@ -73,18 +73,19 @@ def test_mask_correction(cls0, mls0):
     alphas = dices.mask_correction(mls0, mls0)
     _cls = heracles.unmixing._natural_unmixing(cls0, alphas)
     for key in list(cls0.keys()):
-        cl = cls0[key].__array__()
-        _cl = _cls[key].__array__()
+        cl = cls0[key].array
+        _cl = _cls[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
 def test_polspice(cls0):
+    print(list(cls0.keys()))
     cls = np.array(
         [
             cls0[("POS", "POS", 1, 1)],
             cls0[("SHE", "SHE", 1, 1)][0, 0],
             cls0[("SHE", "SHE", 1, 1)][1, 1],
-            cls0[("POS", "SHE", 1, 1)][0],
+            cls0[("SHE", "POS", 1, 1)][0],
         ]
     ).T
     corrs = heracles.cl2corr(cls)
