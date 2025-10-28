@@ -43,7 +43,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def shrink(target, cov, shrinkage_factor):
+def shrink(cov, target, shrinkage_factor):
     """
     Compute the shrunk covariance.
     inputs:
@@ -54,7 +54,7 @@ def shrink(target, cov, shrinkage_factor):
         shrunk_cov (dict): Dictionary of shrunk delete1 covariance
     """
     shrunk_cov = {}
-    correlated_target = impose_correlation(cov, target)
+    correlated_target = impose_correlation(target, cov)
     for key in cov:
         c = cov[key].array
         tc = correlated_target[key].array
