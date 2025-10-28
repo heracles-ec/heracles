@@ -182,13 +182,15 @@ def test_debiasing(cov_jk, cls0, cls1, cls2):
         assert (debiased_cov[key] == _debiased_cov[key]).all()
 
     # Check off-diagonal
-    for key in list(dices.io._fields2components(debiased_cov).keys()):
-        c = dices.io._fields2components(debiased_cov)[key]
-        _c = dices.io._fields2components(cov_jk)[key]
-        offd_mask = ~np.eye(c.shape[0], dtype=bool)
+    for key in list(debiased_cov.keys()):
+        c = debiased_cov[key]
+        _c = cov_jk[key]
+        ell = c.shape[-1]
+        # Create mask for off-diagonal elements
+        offd_mask = ~np.eye(ell, dtype=bool)
         # Extract off-diagonal elements
-        offd = c[offd_mask]
-        _offd = _c[offd_mask]
+        offd = c[..., offd_mask]
+        _offd = _c[..., offd_mask]
         assert np.allclose(offd, _offd)
 
     # Check keys
