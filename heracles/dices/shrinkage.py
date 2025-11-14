@@ -94,33 +94,6 @@ def shrinkage_factor(cls1, target):
     return lambda_star
 
 
-def broadcast_multiply(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-    """
-    Broadcasts and multiplies two arrays A and B such that:
-      - The last dimension (l) must match.
-      - The output shape is A.shape[:-1] + B.shape[:-1] + (l,)
-
-    Example:
-        A.shape = (2, l)
-        B.shape = (2, 2, l)
-        -> result.shape = (2, 2, 2, l)
-    """
-    # Check compatibility
-    if A.shape[-1] != B.shape[-1]:
-        raise ValueError("The last dimensions of A and B must match.")
-
-    ell = A.shape[-1]
-
-    # Expand A to match B’s prefix, and vice versa
-    A_expanded = A.reshape(*A.shape[:-1], *[1] * (B.ndim - 1), ell)
-    B_expanded = B.reshape(*[1] * (A.ndim - 1), *B.shape[:-1], ell)
-
-    # Elementwise multiplication via broadcasting
-    result = A_expanded * B_expanded
-
-    return result
-
-
 def gaussian_covariance(cls):
     b = bias(cls)
     cls = add_to_Cls(cls, b)
@@ -134,10 +107,14 @@ def gaussian_covariance(cls):
         cl2 = cls[key2]
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
+        # dof spins
+        dof_a1 = 1 if sa1 == 0 else 2
+        dof_b1 = 1 if sb1 == 0 else 2
+        dof_a2 = 1 if sa2 == 0 else 2
+        dof_b2 = 1 if sb2 == 0 else 2
         # get attributes of result
         ell1 = get_result_array(cl1, "ell")[0]
         ell2 = get_result_array(cl2, "ell")[0]
-
         # keys for cov
         _key1 = (a1, a2, i1, i2)
         _key2 = (b1, b2, j1, j2)
@@ -147,11 +124,44 @@ def gaussian_covariance(cls):
         _cl2 = get_cl(_key2, cls)
         _cl3 = get_cl(_key3, cls)
         _cl4 = get_cl(_key4, cls)
-
-        # Perform the broadcasted multiplication and sum
-        r = broadcast_multiply(_cl1, _cl2)
-        r += broadcast_multiply(_cl3, _cl4)
-        # Create an identity matrix of shape (l, l)
+        # add dimension if needed
+        _cl1 = _cl1 if _cl1.ndim > 1 else _cl1[None, :]
+        _cl2 = _cl2 if _cl2.ndim > 1 else _cl2[None, :]
+        _cl3 = _cl3 if _cl3.ndim > 1 else _cl3[None, :]
+        _cl4 = _cl4 if _cl4.ndim > 1 else _cl4[None, :]
+        # add dimension if needed 
+        _cl1 = _cl1 if _cl1.ndim > 2 else _cl1[None, :]
+        _cl2 = _cl2 if _cl2.ndim > 2 else _cl2[None, :]
+        _cl3 = _cl3 if _cl3.ndim > 2 else _cl3[None, :]
+        _cl4 = _cl4 if _cl4.ndim > 2 else _cl4[None, :]
+        idx1 = np.arange(dof_a1)
+        idx2 = np.arange(dof_b1)
+        idx3 = np.arange(dof_a2)
+        idx4 = np.arange(dof_b2)
+        combos = list(itertools.product(*[idx1, idx2, idx3, idx4]))
+        # shape of the result
+        r = np.zeros((dof_a1, dof_b1, dof_a2, dof_b2, len(ell1)))
+        for combo in combos:
+            _idx1, _idx2, _idx3, _idx4 = combo
+            try:
+                __cl1 = _cl1[_idx1, _idx3, :]
+            except Exception:
+                __cl1 = _cl1[_idx3, _idx1, :]
+            try:
+                __cl2 = _cl2[_idx2, _idx4, :]
+            except Exception:
+                __cl2 = _cl2[_idx4, _idx2, :]
+            try:
+                __cl3 = _cl3[_idx1, _idx4, :]
+            except Exception:
+                __cl3 = _cl3[_idx4, _idx1, :]
+            try:
+                __cl4 = _cl4[_idx2, _idx3, :]
+            except Exception:
+                __cl4 = _cl4[_idx3, _idx2, :]
+            _cov = __cl1 * __cl2 + __cl3 * __cl4
+            r[_idx1, _idx2, _idx3, _idx4, :] = _cov
+        r = np.squeeze(r)
         eye = np.eye(r.shape[-1])
         r = r[..., :, None] * eye
         # Assign to cov
