@@ -102,6 +102,10 @@ def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
         _jkmap = jkmaps[key_mask]
+
+        if _jkmap is None:
+            continue
+
         _mask = np.copy(_jkmap)
         _mask = (_mask > 0).astype(int)
         # Remove jk 2 regions
