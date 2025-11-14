@@ -129,7 +129,7 @@ def gaussian_covariance(cls):
         _cl2 = _cl2 if _cl2.ndim > 1 else _cl2[None, :]
         _cl3 = _cl3 if _cl3.ndim > 1 else _cl3[None, :]
         _cl4 = _cl4 if _cl4.ndim > 1 else _cl4[None, :]
-        # add dimension if needed 
+        # add dimension if needed
         _cl1 = _cl1 if _cl1.ndim > 2 else _cl1[None, :]
         _cl2 = _cl2 if _cl2.ndim > 2 else _cl2[None, :]
         _cl3 = _cl3 if _cl3.ndim > 2 else _cl3[None, :]
