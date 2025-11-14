@@ -28,6 +28,7 @@ import coroutines
 
 from heracles.core import TocDict, toc_match
 from heracles.progress import Progress, NoProgress
+from heracles.healpy import HealpixMapper
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping, Sequence
@@ -128,7 +129,6 @@ def map_catalogs(
 
 
 def transform(
-    fields: Mapping[Any, Field],
     data: Mapping[tuple[Any, Any], NDArray],
     *,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
@@ -151,15 +151,11 @@ def transform(
     for (k, i), m in data.items():
         current += 1
         progress.update(current, total)
-
         with progress.task(f"({k}, {i})"):
-            try:
-                field = fields[k]
-            except KeyError:
-                msg = f"unknown field name: {k}"
-                raise ValueError(msg) from None
-
-            out[k, i] = field.mapper_or_error.transform(m)
+            # create mapper
+            nside, lmax = m.dtype.metadata["nside"], m.dtype.metadata["lmax"]
+            mapper = HealpixMapper(nside=nside, lmax=lmax)
+            out[k, i] = mapper.transform(m)
 
     # return the toc dict of alms
     return out
