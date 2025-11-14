@@ -39,7 +39,7 @@ def test_jackknife_maps(data_maps, jk_maps, njk):
 
     # Copy data map and add systematic map which should not be jackknifed
     data_maps_nojk = data_maps.copy()
-    data_maps_nojk[("SYS", 1)] = np.arange(1,11, dtype=float)
+    data_maps_nojk[("SYS", 1)] = np.arange(1, 11, dtype=float)
 
     # Copy Jackknife maps and add None map, output jackknifed maps
     jk_maps_nojk = jk_maps.copy()
@@ -50,9 +50,8 @@ def test_jackknife_maps(data_maps, jk_maps, njk):
     np.testing.assert_allclose(out_maps[("SYS", 1)], data_maps_nojk[("SYS", 1)])
 
     # Check that a sample key WAS jackknifed
-    sample_key = ("POS",1)
-    assert not np.allclose(out_maps[sample_key],data_maps_nojk[sample_key])
-
+    sample_key = ("POS", 1)
+    assert not np.allclose(out_maps[sample_key], data_maps_nojk[sample_key])
 
 
 def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
