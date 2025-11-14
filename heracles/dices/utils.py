@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from ..result import Result
 
 try:
     from copy import replace
@@ -36,7 +37,7 @@ def get_cl(key, cls):
         cl: Cl
     """
     if key in cls:
-        return cls[key].array
+        return cls[key]
     else:
         a, b, i, j = key
         key_sym = (b, a, j, i)
@@ -44,12 +45,14 @@ def get_cl(key, cls):
             arr = cls[key_sym].array
             s1, s2 = cls[key_sym].spin
             if s1 != 0 and s2 != 0:
-                return np.transpose(arr, axes=(1, 0, 2))
+                arr = np.transpose(arr, axes=(1, 0, 2))
             else:
-                return arr
-
+                arr
+            # always transpose spins
+            s1, s2 = s2, s1
         else:
             raise KeyError(f"Key {key} not found in Cls.")
+        return Result(arr, spin=(s1, s2), axis=cls[key_sym].axis)
 
 
 def add_to_Cls(cls, x):
