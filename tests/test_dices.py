@@ -199,13 +199,15 @@ def test_debiasing(cov_jk, cls0, cls1, cls2):
         assert (debiased_cov[key] == _debiased_cov[key]).all()
 
     # Check off-diagonal
-    for key in list(dices.io._fields2components(debiased_cov).keys()):
-        c = dices.io._fields2components(debiased_cov)[key]
-        _c = dices.io._fields2components(cov_jk)[key]
-        offd_mask = ~np.eye(c.shape[0], dtype=bool)
+    for key in list(debiased_cov.keys()):
+        c = debiased_cov[key]
+        _c = cov_jk[key]
+        ell = c.shape[-1]
+        # Create mask for off-diagonal elements
+        offd_mask = ~np.eye(ell, dtype=bool)
         # Extract off-diagonal elements
-        offd = c[offd_mask]
-        _offd = _c[offd_mask]
+        offd = c[..., offd_mask]
+        _offd = _c[..., offd_mask]
         assert np.allclose(offd, _offd)
 
     # Check keys
@@ -251,58 +253,75 @@ def test_shrinkage(cov_jk):
         assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)
 
 
-def test_flatten(nside, cls0):
-    lbins = 2
-    ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)
-    cqs0 = heracles.binned(cls0, ledges)
-    comp_cqs0 = dices.io._fields2components(cqs0)
-    order = list(comp_cqs0.keys())
-    cov = dices.gaussian_covariance(cqs0)
-    # Flatten
-    _cqs0 = dices.flatten(cqs0, order=order)
-    __cqs0 = np.array([comp_cqs0[key].array for key in order]).flatten()
-    flat_cov = dices.flatten(cov, order=order)
-    (n,) = _cqs0.shape
-    _n, _m = flat_cov.shape
-    assert n == _n
-    assert n == _m
-    assert (_cqs0 == __cqs0).all()
-    d_flat_cov = np.diag(flat_cov)
-    _d_flat_cov = []
-    comp_cov = dices.io._fields2components(cov)
-    for key in order:
-        a, b, i, j = key
-        cov_key = (a, b, a, b, i, j, i, j)
-        c = comp_cov[cov_key]
-        d = np.diag(c)
-        _d_flat_cov.append(d)
-    _d_flat_cov = np.array(_d_flat_cov).flatten()
-    assert d_flat_cov.shape == _d_flat_cov.shape
-    assert (_d_flat_cov == d_flat_cov).all()
+def test_flatten_cls(nside, cls0):
+    from heracles.dices.utils import _flatten, flatten
+
+    # Check that the individual blocks are flattened correctly
+    for key in cls0.keys():
+        arr = cls0[key]
+        *prefix, ell = arr.shape
+        N = np.prod(prefix, dtype=int)
+        flat = _flatten(arr)
+        assert flat.shape == (N * ell)
+        reconstructed = flat.reshape(N, ell).transpose(0, 1).reshape(*prefix, ell)
+        assert np.allclose(arr.array, reconstructed)
+
+    # Check flattened cls has correct shape
+    _cls = flatten(cls0)
+    assert len(_cls) == 30 * (nside // 4 + 1)
 
 
-def test_gauss_cov(nside, cls0, cls1):
-    lbins = 3
-    ledges = np.logspace(np.log10(10), np.log10(nside // 4), lbins + 1)
-    cqs1 = heracles.binned(cls1, ledges)
-    cqs0 = heracles.binned(cls0, ledges)
-    cov_jk = dices.jackknife_covariance(cqs1)
-    gauss_cov = dices.gaussian_covariance(cqs0)
-    # Add bias
-    b = dices.jackknife.bias(cqs0)
-    cqs0 = dices.utils.add_to_Cls(cqs0, b)
-    # Comp separate
-    _cov_jk = dices.io._fields2components(cov_jk)
-    _gauss_cov = dices.io._fields2components(gauss_cov)
-    _cqs0 = dices.io._fields2components(cqs0)
-    assert sorted(list(_cov_jk.keys())) == sorted(list(_gauss_cov.keys()))
-    for key in list(_gauss_cov.keys()):
-        a1, b1, a2, b2, i1, j1, i2, j2 = key
-        key1 = a1, b1, i1, j1
-        key2 = a2, b2, i2, j2
-        if (key1 == key2) and ((a1, i1) == (b1, j1)) and ((a2, i2) == (b2, j2)):
-            g = 2 * _cqs0[key1].array ** 2
-            _g = dices.shrinkage._gaussian_covariance(_cqs0, key)
-            __g = np.diag(_gauss_cov[key].array)
-            assert (g == _g).all()
-            assert (g == __g).all()
+def test_flatten_cov(nside, cov_jk):
+    from heracles.dices.utils import _flatten, flatten
+
+    # Check that the individual blocks are flattened correctly
+    for key in cov_jk.keys():
+        arr = cov_jk[key]
+        *prefix, l1, l2 = arr.shape
+        s1, s2, s3, s4 = arr.spin
+        dof1 = 1 if s1 == 0 else 2
+        dof2 = 1 if s2 == 0 else 2
+        dof3 = 1 if s3 == 0 else 2
+        dof4 = 1 if s4 == 0 else 2
+        N1 = dof1 * dof2
+        N2 = dof3 * dof4
+        flat = _flatten(arr)
+        assert flat.shape == (N1 * l1, N2 * l2)
+        reconstructed = (
+            flat.reshape(N1, l1, N2, l2).transpose(0, 2, 1, 3).reshape(*prefix, l1, l2)
+        )
+        assert np.allclose(arr.array, reconstructed)
+
+    # Check flattened covariance has correct shape
+    _cov = flatten(cov_jk)
+    _, n = _cov.shape
+    assert n == 30 * (nside // 4 + 1)
+
+
+def test_gauss_cov(cls0, cov_jk):
+    _cls0 = {}
+    for key in list(cls0.keys()):
+        a = cls0[key].array
+        a = np.ones_like(a)
+        _cls0[key] = replace(cls0[key], array=a)
+    # We want to undo the bias that we will add later
+    # for an easy check
+    bias = dices.jackknife.bias(_cls0)
+    _cls0 = dices.utils.sub_to_Cls(_cls0, bias)
+
+    # Compute Gaussian covariance
+    gauss_cov = dices.gaussian_covariance(_cls0)
+
+    # check for shape and keys
+    for key in list(cov_jk.keys()):
+        assert key in list(gauss_cov.keys())
+        c1 = cov_jk[key]
+        c2 = gauss_cov[key]
+        assert c1.shape == c2.shape
+
+    # check for diagonal values
+    for key in list(gauss_cov.keys()):
+        c = gauss_cov[key]
+        c_diag = np.diagonal(c, axis1=-2, axis2=-1)
+        _c_diag = 2 * np.ones_like(c_diag)
+        assert np.allclose(c_diag, _c_diag, rtol=1e-5, atol=1e-5)

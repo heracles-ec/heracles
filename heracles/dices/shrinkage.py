@@ -29,11 +29,7 @@ from .utils import (
     add_to_Cls,
     impose_correlation,
     get_cl,
-)
-from .io import (
-    _fields2components,
     flatten,
-    _split_key,
 )
 
 try:
@@ -72,14 +68,9 @@ def shrinkage_factor(cls1, target):
     returns:
         lambda_star: optimal linear shrinkage factor
     """
-    # To data vector
-    cls1_first = cls1[list(cls1.keys())[0]]
-    cls1_first = _fields2components(cls1_first)
-    order = list(cls1_first.keys())
-
     cls1_all = [flatten(cls1[key]) for key in list(cls1.keys())]
     cls1_mu_all = np.mean(np.array(cls1_all), axis=0)
-    target = flatten(target, order=order)
+    target = flatten(target)
     # Ingredient for the shrinkage factor
     Njk = len(cls1_all)
     W = _get_W(cls1_all, cls1_mu_all)
@@ -103,76 +94,75 @@ def shrinkage_factor(cls1, target):
     return lambda_star
 
 
-def gaussian_covariance(Cls):
-    """
-    Computes Gaussian estimate of the target matrix.
-    input:
-        Cls: power spectra
-    returns:
-        T: target matrix
-    """
-    # Add bias to Cls
-    b = bias(Cls)
-    Cls = add_to_Cls(Cls, b)
-    # Separate Cls into Cls
-    _Cls = _fields2components(Cls)
-    # Compute Gaussian covariance
+def gaussian_covariance(cls):
+    b = bias(cls)
+    cls = add_to_Cls(cls, b)
     cov = {}
-    for key1, key2 in itertools.combinations_with_replacement(Cls, 2):
-        # covariance key
+    for key1, key2 in itertools.combinations_with_replacement(cls.keys(), 2):
         a1, b1, i1, j1 = key1
         a2, b2, i2, j2 = key2
         covkey = (a1, b1, a2, b2, i1, j1, i2, j2)
         # get reference results
-        cl1 = Cls[key1]
-        cl2 = Cls[key2]
+        cl1 = cls[key1]
+        cl2 = cls[key2]
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
-        # get components
-        _a1, idx1 = _split_key(a1, sa1, pos=0)
-        _b1, idx2 = _split_key(b1, sb1, pos=0)
-        _a2, idx3 = _split_key(a2, sa2, pos=0)
-        _b2, idx4 = _split_key(b2, sb2, pos=0)
+        # dof spins
+        dof_a1 = 1 if sa1 == 0 else 2
+        dof_b1 = 1 if sb1 == 0 else 2
+        dof_a2 = 1 if sa2 == 0 else 2
+        dof_b2 = 1 if sb2 == 0 else 2
         # get attributes of result
-        ell1 = get_result_array(cl1, "ell")
-        ell2 = get_result_array(cl2, "ell")
-        ell = ell1 + ell2
-        r = np.zeros(
-            (len(idx1), len(idx2), len(idx3), len(idx4), len(ell1[0]), len(ell2[0]))
-        )
-        # get covariance
-        for k, idx in zip(
-            itertools.product(_a1, _b1, _a2, _b2),
-            itertools.product(idx1, idx2, idx3, idx4),
-        ):
-            __a1, __b1, __a2, __b2 = k
-            _key = (__a1, __b1, __a2, __b2, i1, j1, i2, j2)
-            _cov = _gaussian_covariance(_Cls, _key)
-            ix1, ix2, ix3, ix4 = idx
-            r[ix1, ix2, ix3, ix4, :, :] = np.diag(_cov)
-        # Remove the extra dimensions
+        ell1 = get_result_array(cl1, "ell")[0]
+        ell2 = get_result_array(cl2, "ell")[0]
+        # keys for cov
+        _key1 = (a1, a2, i1, i2)
+        _key2 = (b1, b2, j1, j2)
+        _key3 = (a1, b2, i1, j2)
+        _key4 = (b1, a2, j1, i2)
+        _cl1 = get_cl(_key1, cls)
+        _cl2 = get_cl(_key2, cls)
+        _cl3 = get_cl(_key3, cls)
+        _cl4 = get_cl(_key4, cls)
+        # get spins
+        _sa1, _sb1 = _cl1.spin[0], _cl1.spin[1]
+        _sa2, _sb2 = _cl2.spin[0], _cl2.spin[1]
+        _sa3, _sb3 = _cl3.spin[0], _cl3.spin[1]
+        _sa4, _sb4 = _cl4.spin[0], _cl4.spin[1]
+        # add dimension if needed
+        _cl1 = _cl1 if _sa1 > 1 else _cl1[None, :]
+        _cl2 = _cl2 if _sa2 > 1 else _cl2[None, :]
+        _cl3 = _cl3 if _sa3 > 1 else _cl3[None, :]
+        _cl4 = _cl4 if _sa4 > 1 else _cl4[None, :]
+        # add dimension if needed
+        _cl1 = _cl1 if _sb1 > 1 else _cl1[:, None, :]
+        _cl2 = _cl2 if _sb2 > 1 else _cl2[:, None, :]
+        _cl3 = _cl3 if _sb3 > 1 else _cl3[:, None, :]
+        _cl4 = _cl4 if _sb4 > 1 else _cl4[:, None, :]
+        idx1 = np.arange(dof_a1)
+        idx2 = np.arange(dof_b1)
+        idx3 = np.arange(dof_a2)
+        idx4 = np.arange(dof_b2)
+        combos = list(itertools.product(idx1, idx2, idx3, idx4))
+        # shape of the result
+        r = np.zeros((dof_a1, dof_b1, dof_a2, dof_b2, len(ell1)))
+        for combo in combos:
+            _idx1, _idx2, _idx3, _idx4 = combo
+            __cl1 = _cl1[_idx1, _idx3, :]
+            __cl2 = _cl2[_idx2, _idx4, :]
+            __cl3 = _cl3[_idx1, _idx4, :]
+            __cl4 = _cl4[_idx2, _idx3, :]
+            _cov = __cl1 * __cl2 + __cl3 * __cl4
+            r[_idx1, _idx2, _idx3, _idx4, :] = _cov
         r = np.squeeze(r)
-        # Make Result
-        result = Result(r, spin=(sa1, sb1, sa2, sb2), ell=ell)
-        cov[covkey] = result
-    return cov
-
-
-def _gaussian_covariance(cls, key):
-    """
-    Returns a particular entry of the gaussian covariance matrix.
-    input:
-        cls: Cls
-        key: key of the entry
-    returns:
-        cov: covariance matrix
-    """
-    a1, b1, a2, b2, i1, j1, i2, j2 = key
-    cl1 = get_cl((a1, a2, i1, i2), cls)
-    cl2 = get_cl((b1, b2, j1, j2), cls)
-    cl3 = get_cl((a1, b2, i1, j2), cls)
-    cl4 = get_cl((b1, a2, j1, i2), cls)
-    cov = cl1 * cl2 + cl3 * cl4
+        eye = np.eye(r.shape[-1])
+        r = r[..., :, None] * eye
+        # Assign to cov
+        _ax = np.arange(len(r.shape))
+        ax1, ax2 = int(_ax[-2]), int(_ax[-1])
+        cov[covkey] = Result(
+            r, spin=(sa1, sb1, sa2, sb2), ell=(ell1, ell2), axis=(ax1, ax2)
+        )
     return cov
 
 

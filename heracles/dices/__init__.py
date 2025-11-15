@@ -35,11 +35,10 @@ __all__ = [
     "shrink",
     "shrinkage_factor",
     "gaussian_covariance",
-    # io
-    "flatten",
     # utils
     "impose_correlation",
     "get_cl",
+    "flatten",
 ]
 
 from .jackknife import (
@@ -59,9 +58,8 @@ from .shrinkage import (
     shrinkage_factor,
     gaussian_covariance,
 )
-from .io import (
-    flatten,
-)
 from .utils import (
     impose_correlation,
+    get_cl,
+    flatten,
 )
