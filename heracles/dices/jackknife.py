@@ -49,6 +49,11 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
     """
     if nd < 0 or nd > 2:
         raise ValueError("number of deletions must be 0, 1, or 2")
+    # Set _mask to array of -1 if input jkmap is None
+    # This is for eg. XC with systematics maps 
+    for key_mask in jk_maps.keys():
+        if jk_maps[key_mask] is None:
+            jk_maps[key_mask] = -1*np.ones_like(vis_maps[key_mask])
     cls = {}
     mls0 = get_cls(vis_maps, jk_maps, fields)
     jkmap = jk_maps[list(jk_maps.keys())[0]]
