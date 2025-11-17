@@ -45,10 +45,8 @@ def get_cl(key, cls):
             s1, s2 = cls[key_sym].spin
             if s1 != 0 and s2 != 0:
                 arr = np.transpose(arr, axes=(1, 0, 2))
-            else:
-                arr
-            # always transpose spins
-            s1, s2 = s2, s1
+                # transpose spins
+                s1, s2 = s2, s1
         else:
             raise KeyError(f"Key {key} not found in Cls.")
         return replace(cls[key_sym], array=arr, spin=(s1, s2))
