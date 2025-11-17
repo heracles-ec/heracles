@@ -116,8 +116,7 @@ def gaussian_covariance(cls):
         # Eg. POS POS goes from (l) to (1, 1, l)
         cl1 = expand_spin0_dims(cls[key1])
         cl2 = expand_spin0_dims(cls[key2])
-        print("ell1:", ell1, "ell2:", ell2)
-        # keys for cov
+        # get cls needed
         _cl1 = get_cl((a1, a2, i1, i2), cls)
         _cl2 = get_cl((b1, b2, j1, j2), cls)
         _cl3 = get_cl((a1, b2, i1, j2), cls)
@@ -131,20 +130,15 @@ def gaussian_covariance(cls):
         dof_a1, dof_b1, _ = cl1.shape
         dof_a2, dof_b2, _ = cl2.shape
         _ell = min(len(ell1), len(ell2))
-        print("dofs: ", dof_a1, dof_b1, dof_a2, dof_b2, _ell)
         r = np.zeros((dof_a1, dof_b1, dof_a2, dof_b2, _ell))
-        print(r.shape)
         for _1, _2, _3, _4 in np.ndindex(r.shape[:-1]):
             _r = _cl1[_1, _3] * _cl2[_2, _4] + _cl3[_1, _4] * _cl4[_2, _3]
-            print("_r shape: ", _r.shape, "r shape:", r[_1, _2, _3, _4, :].shape)
             r[_1, _2, _3, _4, :] = _r
         # make diagonal into matrix
         eye = np.eye(r.shape[-1])
         r = r[..., :, None] * eye
         # Assign to cov
-        _ax = np.arange(len(r.shape))
-        ax1, ax2 = int(_ax[-2]), int(_ax[-1])
-        r = Result(r, spin=(*cl1.spin, *cl2.spin), ell=(ell1, ell2), axis=(ax1, ax2))
+        r = Result(r, spin=(*cl1.spin, *cl2.spin), ell=(ell1, ell2), axis=(-2, -1))
         # squeeze spin0 dims
         cov[covkey] = squeeze_spin0_dims(r)
     return cov
