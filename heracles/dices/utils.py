@@ -87,6 +87,37 @@ def sub_to_Cls(cls, x):
     return _cls
 
 
+def expand_spin0_dims(result):
+    """
+    Expands spin-0 dimensions into axes of length 1.
+    """
+    offset = 0
+    shape = list(result.shape)
+    for i, s in enumerate(result.spin):
+        if s == 0:
+            shape.insert(i, 1)
+            offset += 1
+    arr = result.array.reshape(*shape)
+    new_axes = tuple(a + offset for a in result.axis)
+    return Result(arr, spin=result.spin, axis=new_axes, ell=result.ell)
+
+
+def squeeze_spin0_dims(result):
+    """
+    Remove spin-0 dimensions.
+    """
+    offset = 0
+    shape = list(result.shape)
+    for i, s in enumerate(result.spin):
+        if s == 0:
+            dim = shape.pop(i - offset)
+            assert dim == 1, "found spin-0 axis of size != 1"
+            offset += 1
+    arr = result.array.reshape(*shape)
+    new_axes = tuple(a - offset for a in result.axis)
+    return Result(arr, spin=result.spin, axis=new_axes, ell=result.ell)
+
+
 def impose_correlation(cov_a, cov_b):
     """
     Imposes the correlation of b to a.

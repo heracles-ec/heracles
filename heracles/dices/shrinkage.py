@@ -18,6 +18,10 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import itertools
+from .utils import (
+    expand_spin0_dims,
+    squeeze_spin0_dims,
+)
 from ..result import (
     Result,
     get_result_array,
@@ -105,64 +109,44 @@ def gaussian_covariance(cls):
         # get reference results
         cl1 = cls[key1]
         cl2 = cls[key2]
-        sa1, sb1 = cl1.spin
-        sa2, sb2 = cl2.spin
-        # dof spins
-        dof_a1 = 1 if sa1 == 0 else 2
-        dof_b1 = 1 if sb1 == 0 else 2
-        dof_a2 = 1 if sa2 == 0 else 2
-        dof_b2 = 1 if sb2 == 0 else 2
         # get attributes of result
-        ell1 = get_result_array(cl1, "ell")[0]
-        ell2 = get_result_array(cl2, "ell")[0]
+        (ell1,) = get_result_array(cl1, "ell")
+        (ell2,) = get_result_array(cl2, "ell")
+        # get dof by expanding spin0 dims
+        # Eg. POS POS goes from (l) to (1, 1, l)
+        cl1 = expand_spin0_dims(cls[key1])
+        cl2 = expand_spin0_dims(cls[key2])
+        print("ell1:", ell1, "ell2:", ell2)
         # keys for cov
-        _key1 = (a1, a2, i1, i2)
-        _key2 = (b1, b2, j1, j2)
-        _key3 = (a1, b2, i1, j2)
-        _key4 = (b1, a2, j1, i2)
-        _cl1 = get_cl(_key1, cls)
-        _cl2 = get_cl(_key2, cls)
-        _cl3 = get_cl(_key3, cls)
-        _cl4 = get_cl(_key4, cls)
+        _cl1 = get_cl((a1, a2, i1, i2), cls)
+        _cl2 = get_cl((b1, b2, j1, j2), cls)
+        _cl3 = get_cl((a1, b2, i1, j2), cls)
+        _cl4 = get_cl((b1, a2, j1, i2), cls)
         # get spins
-        _sa1, _sb1 = _cl1.spin[0], _cl1.spin[1]
-        _sa2, _sb2 = _cl2.spin[0], _cl2.spin[1]
-        _sa3, _sb3 = _cl3.spin[0], _cl3.spin[1]
-        _sa4, _sb4 = _cl4.spin[0], _cl4.spin[1]
-        # add dimension if needed
-        _cl1 = _cl1 if _sa1 > 1 else _cl1[None, :]
-        _cl2 = _cl2 if _sa2 > 1 else _cl2[None, :]
-        _cl3 = _cl3 if _sa3 > 1 else _cl3[None, :]
-        _cl4 = _cl4 if _sa4 > 1 else _cl4[None, :]
-        # add dimension if needed
-        _cl1 = _cl1 if _sb1 > 1 else _cl1[:, None, :]
-        _cl2 = _cl2 if _sb2 > 1 else _cl2[:, None, :]
-        _cl3 = _cl3 if _sb3 > 1 else _cl3[:, None, :]
-        _cl4 = _cl4 if _sb4 > 1 else _cl4[:, None, :]
-        idx1 = np.arange(dof_a1)
-        idx2 = np.arange(dof_b1)
-        idx3 = np.arange(dof_a2)
-        idx4 = np.arange(dof_b2)
-        combos = list(itertools.product(idx1, idx2, idx3, idx4))
+        _cl1 = expand_spin0_dims(_cl1)
+        _cl2 = expand_spin0_dims(_cl2)
+        _cl3 = expand_spin0_dims(_cl3)
+        _cl4 = expand_spin0_dims(_cl4)
         # shape of the result
-        r = np.zeros((dof_a1, dof_b1, dof_a2, dof_b2, len(ell1)))
-        for combo in combos:
-            _idx1, _idx2, _idx3, _idx4 = combo
-            __cl1 = _cl1[_idx1, _idx3, :]
-            __cl2 = _cl2[_idx2, _idx4, :]
-            __cl3 = _cl3[_idx1, _idx4, :]
-            __cl4 = _cl4[_idx2, _idx3, :]
-            _cov = __cl1 * __cl2 + __cl3 * __cl4
-            r[_idx1, _idx2, _idx3, _idx4, :] = _cov
-        r = np.squeeze(r)
+        dof_a1, dof_b1, _ = cl1.shape
+        dof_a2, dof_b2, _ = cl2.shape
+        _ell = min(len(ell1), len(ell2))
+        print("dofs: ", dof_a1, dof_b1, dof_a2, dof_b2, _ell)
+        r = np.zeros((dof_a1, dof_b1, dof_a2, dof_b2, _ell))
+        print(r.shape)
+        for _1, _2, _3, _4 in np.ndindex(r.shape[:-1]):
+            _r = _cl1[_1, _3] * _cl2[_2, _4] + _cl3[_1, _4] * _cl4[_2, _3]
+            print("_r shape: ", _r.shape, "r shape:", r[_1, _2, _3, _4, :].shape)
+            r[_1, _2, _3, _4, :] = _r
+        # make diagonal into matrix
         eye = np.eye(r.shape[-1])
         r = r[..., :, None] * eye
         # Assign to cov
         _ax = np.arange(len(r.shape))
         ax1, ax2 = int(_ax[-2]), int(_ax[-1])
-        cov[covkey] = Result(
-            r, spin=(sa1, sb1, sa2, sb2), ell=(ell1, ell2), axis=(ax1, ax2)
-        )
+        r = Result(r, spin=(*cl1.spin, *cl2.spin), ell=(ell1, ell2), axis=(ax1, ax2))
+        # squeeze spin0 dims
+        cov[covkey] = squeeze_spin0_dims(r)
     return cov
 
 
