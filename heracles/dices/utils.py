@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from ..result import Result
 
 try:
     from copy import replace
@@ -52,7 +51,7 @@ def get_cl(key, cls):
             s1, s2 = s2, s1
         else:
             raise KeyError(f"Key {key} not found in Cls.")
-        return Result(arr, spin=(s1, s2), axis=cls[key_sym].axis)
+        return replace(cls[key_sym], array=arr, spin=(s1, s2))
 
 
 def add_to_Cls(cls, x):
@@ -99,7 +98,7 @@ def expand_spin0_dims(result):
             offset += 1
     arr = result.array.reshape(*shape)
     new_axes = tuple(a + offset for a in result.axis)
-    return Result(arr, spin=result.spin, axis=new_axes, ell=result.ell)
+    return replace(result, array=arr, axis=new_axes)
 
 
 def squeeze_spin0_dims(result):
@@ -115,7 +114,7 @@ def squeeze_spin0_dims(result):
             offset += 1
     arr = result.array.reshape(*shape)
     new_axes = tuple(a - offset for a in result.axis)
-    return Result(arr, spin=result.spin, axis=new_axes, ell=result.ell)
+    return replace(result, array=arr, axis=new_axes)
 
 
 def impose_correlation(cov_a, cov_b):
