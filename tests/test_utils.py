@@ -43,6 +43,7 @@ def test_expand_squeeze_spin0_dims(cls0, cov_jk):
         assert _ax == 2
         __cl = dices.utils.squeeze_spin0_dims(_cl)
         assert np.all(cl.__array__() == __cl.__array__())
+        assert cl.axis == __cl.axis
 
     for key in list(cov_jk.keys()):
         cov = cov_jk[key]
@@ -64,3 +65,4 @@ def test_expand_squeeze_spin0_dims(cls0, cov_jk):
         assert (_ax1, _ax2) == (4, 5)
         __cov = dices.utils.squeeze_spin0_dims(_cov)
         assert np.all(cov.__array__() == __cov.__array__())
+        assert cov.axis == __cov.axis
