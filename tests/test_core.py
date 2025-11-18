@@ -122,54 +122,6 @@ def test_update_metadata():
     assert a.dtype.metadata == {"x": 1, "y": 2}
 
 
-def test_add_metadata_to_external_map():
-    from heracles.core import add_metadata_to_external_map
-
-    m = np.ones(12)
-
-    assert m.dtype.metadata is None
-
-    m = add_metadata_to_external_map(m, spin=0, verbose=False)
-
-    assert m.dtype.metadata is not None
-    assert m.dtype.metadata["spin"] == 0
-    assert m.dtype.metadata["geometry"] == "healpix"
-    assert m.dtype.metadata["kernel"] == "healpix"
-    assert m.dtype.metadata["deconv"] is True
-    assert m.dtype.metadata["nside"] == 1
-    assert m.dtype.metadata["ngal"] == 1.0
-    assert m.dtype.metadata["nbar"] == 1.0
-    assert m.dtype.metadata["wmean"] == 1.0
-    assert m.dtype.metadata["bias"] == 0.0
-    assert m.dtype.metadata["var"] == 1.0
-    assert m.dtype.metadata["variance"] == 1.0
-    assert m.dtype.metadata["neff"] == 1.0 / (4 * np.pi)
-    assert m.dtype.metadata["fsky"] == 1.0
-
-    m2 = np.ones((2, 12))
-    m2 = add_metadata_to_external_map(m2, spin=2, verbose=False)
-    assert m2.dtype.metadata is not None
-    assert m2.dtype.metadata["spin"] == 2
-    assert m2.dtype.metadata["geometry"] == "healpix"
-    assert m2.dtype.metadata["kernel"] == "healpix"
-    assert m2.dtype.metadata["deconv"] is True
-    assert m2.dtype.metadata["nside"] == 1
-    assert m2.dtype.metadata["ngal"] == 1.0
-    assert m2.dtype.metadata["nbar"] == 1.0
-    assert m2.dtype.metadata["wmean"] == 1.0
-    assert m2.dtype.metadata["bias"] == 0.0
-    assert m2.dtype.metadata["var"] == 1.0
-    assert m2.dtype.metadata["variance"] == 1.0
-    assert m2.dtype.metadata["neff"] == 1.0 / (4 * np.pi)
-    assert m2.dtype.metadata["fsky"] == 1.0
-
-    with pytest.raises(ValueError):
-        add_metadata_to_external_map(np.ones(12), spin=2, verbose=False)
-
-    with pytest.raises(ValueError):
-        add_metadata_to_external_map(np.ones((2, 12)), spin=0, verbose=False)
-
-
 def test_exception_explainer():
     from heracles.core import ExceptionExplainer
 

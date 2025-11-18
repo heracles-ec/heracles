@@ -26,7 +26,6 @@ from collections import UserDict
 from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
-import healpy as hp
 import numpy as np
 
 T = TypeVar("T")
