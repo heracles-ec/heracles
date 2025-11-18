@@ -37,7 +37,6 @@ __all__ = [
     "toc_filter",
     "toc_match",
     "update_metadata",
-    "add_metadata_to_external_map",
     # fields
     "ComplexField",
     "Field",
@@ -101,7 +100,6 @@ from .core import (
     toc_filter,
     toc_match,
     update_metadata,
-    add_metadata_to_external_map,
 )
 
 from .fields import (

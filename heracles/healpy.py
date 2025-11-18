@@ -202,6 +202,21 @@ class HealpixMapper:
 
         return alm
 
+    def set_for_map(self, m: NDArray[Any], spin: int) -> NDArray[Any]:
+        """
+        Reads external data into the mapper's format.
+        """
+        update_metadata(
+            m,
+            geometry="healpix",
+            kernel="healpix",
+            nside=self.__nside,
+            lmax=self.__lmax,
+            deconv=self.__deconv,
+            spin=spin,
+        )
+        return m
+
     def resample(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         Change resolution of HEALPix map.

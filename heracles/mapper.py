@@ -67,6 +67,11 @@ class Mapper(Protocol):
         The spherical harmonic transform for this mapper.
         """
 
+    def set_for_map(self, m: NDArray[Any], spin: int) -> NDArray[Any]:
+        """
+        Reads external data into the mapper's format.
+        """
+
     def resample(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         Change resolution of data, which must be in this mapper's format.
