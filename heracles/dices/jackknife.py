@@ -28,6 +28,12 @@ from ..twopoint import angular_power_spectra
 from ..unmixing import _natural_unmixing, logistic
 from ..transforms import cl2corr
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 
 def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
     """
@@ -96,8 +102,12 @@ def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
         _jkmap = jkmaps[key_mask]
+
+        if _jkmap is None:
+            continue
+
         _mask = np.copy(_jkmap)
-        _mask[_mask != 0] = _mask[_mask != 0] / _mask[_mask != 0]
+        _mask = (_mask > 0).astype(int)
         # Remove jk 2 regions
         cond = np.where((_jkmap == float(jk)) | (_jkmap == float(jk2)))[0]
         _mask[cond] = 0.0
@@ -135,7 +145,7 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0):
     for key in jkmaps.keys():
         jkmap = jkmaps[key]
         mask = np.copy(jkmap)
-        mask[mask != 0] = mask[mask != 0] / mask[mask != 0]
+        mask = (mask > 0).astype(int)
         fsky = sum(mask) / len(mask)
         cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
         rel_fskys[key] = (len(cond) / len(mask)) / fsky
@@ -191,7 +201,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     for key in cls.keys():
         cl = cls[key].array
         update_metadata(cl, bias=b_jk[key])
-        cls[key] = Result(cl)
+        cls[key] = replace(cls[key], array=cl)
     return cls
 
 
@@ -241,6 +251,8 @@ def _jackknife_covariance(samples, nd=1):
         # get reference results
         result1 = first[key1]
         result2 = first[key2]
+        sa1, sb1 = result1.spin
+        sa2, sb2 = result2.spin
         # gather samples for this key combination
         samples1 = np.stack([result1] + [spectra[key1] for spectra in rest])
         samples2 = np.stack([result2] + [spectra[key2] for spectra in rest])
@@ -267,7 +279,7 @@ def _jackknife_covariance(samples, nd=1):
             # add extra axis if needed
             a1, b1, i1, j1 = key1
             a2, b2, i2, j2 = key2
-            result = Result(a, axis=axis, ell=ell)
+            result = Result(a, axis=axis, spin=(sa1, sb1, sa2, sb2), ell=ell)
             # store result
             cov[a1, b1, a2, b2, i1, j1, i2, j2] = result
     return cov
@@ -321,7 +333,7 @@ def delete2_correction(cls0, cls1, cls2):
             _qii -= (Njk - 1) * cls1[(k1,)][key].array
             _qii -= (Njk - 1) * cls1[(k2,)][key].array
             _qii += (Njk - 2) * cls2[kk][key].array
-            _qii = Result(_qii)
+            _qii = replace(cls0[key], array=_qii)
             qii[key] = _qii
         Q_ii.append(qii)
     # Compute the correction from the ensemble
@@ -334,7 +346,7 @@ def delete2_correction(cls0, cls1, cls2):
         q_diag_exp = np.zeros_like(q)
         diag_indices = np.arange(length)  # Indices for the diagonal
         q_diag_exp[..., diag_indices, diag_indices] = q_diag
-        Q[key] = Result(q_diag_exp, axis=q.axis, ell=q.ell)
+        Q[key] = replace(q, array=q_diag_exp)
     return Q
 
 
@@ -361,9 +373,5 @@ def _debias_covariance(cov_jk, Q):
     debiased_cov = {}
     for key in list(cov_jk.keys()):
         c = cov_jk[key].array - Q[key].array
-        debiased_cov[key] = Result(
-            c,
-            ell=cov_jk[key].ell,
-            axis=cov_jk[key].axis,
-        )
+        debiased_cov[key] = replace(cov_jk[key], array=c)
     return debiased_cov

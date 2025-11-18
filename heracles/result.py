@@ -80,6 +80,7 @@ class Result:
 
     array: NDArray[Any]
     ell: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
+    spin: int | tuple[int, ...] | None = None
     axis: int | tuple[int, ...] | None = None
     lower: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
     upper: NDArray[Any] | tuple[NDArray[Any], ...] | None = None
@@ -92,7 +93,12 @@ class Result:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(axis={self.axis!r})"
 
-    def __array__(self, dtype=None, *, copy=None) -> NDArray[Any]:
+    def __array__(
+        self,
+        dtype: np.dtype[Any] | None = None,
+        *,
+        copy: bool | None = None,
+    ) -> NDArray[Any]:
         if copy is not None:
             # copy being set means NumPy v2, so it's safe to pass it on
             return self.array.__array__(dtype, copy=copy)
@@ -127,6 +133,9 @@ def binned(result, bins, weight=None):
         """divide a by b if a is nonzero"""
         out = np.zeros(np.broadcast(a, b).shape)
         return np.divide(a, b, where=(a != 0), out=out)
+
+    # get the spin if instance of Result
+    spin = getattr(result, "spin", None)
 
     # get ell values from result
     ells = get_result_array(result, "ell")
@@ -230,6 +239,7 @@ def binned(result, bins, weight=None):
     # construct the result
     return Result(
         out,
+        spin=spin,
         ell=binned_ell,
         axis=axes,
         lower=binned_lower,
@@ -246,6 +256,8 @@ def truncated(result, ell_max):
     if isinstance(result, Mapping):
         return {key: truncated(value, ell_max) for key, value in result.items()}
 
+    # get the spin if instance of Result
+    spin = getattr(result, "spin", None)
     ells = get_result_array(result, "ell")
     axes = normalize_result_axis(getattr(result, "axis", None), result, ells)
 
@@ -291,6 +303,7 @@ def truncated(result, ell_max):
 
     return Result(
         out,
+        spin=spin,
         ell=truncated_ell,
         axis=axes,
         weight=truncated_weight,
