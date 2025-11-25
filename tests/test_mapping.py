@@ -60,7 +60,7 @@ def test_add_metadata_to_external_map():
 
     # spin = 0 case
     m = np.ones(12 * nside**2)
-    m = mapper.set_for_map(m, spin=0)
+    m = mapper.update_metadata(m, spin=0)
 
     assert m.dtype.metadata is not None
     assert m.dtype.metadata["spin"] == 0
@@ -71,7 +71,7 @@ def test_add_metadata_to_external_map():
     assert m.dtype.metadata["lmax"] == lmax
 
     m2 = np.ones((2, 12 * nside**2))
-    m2 = mapper.set_for_map(m2, spin=2)
+    m2 = mapper.update_metadata(m2, spin=2)
     assert m2.dtype.metadata is not None
     assert m2.dtype.metadata["spin"] == 2
     assert m2.dtype.metadata["geometry"] == "healpix"
