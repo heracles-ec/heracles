@@ -27,19 +27,25 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
+def natural_unmixing(d, m, options={}, rtol=0.2, smoothing=50):
     wm = {}
     m_keys = list(m.keys())
     for m_key in m_keys:
+        if m_key in list(options.keys()):
+            _rtol = options[m_key].get("rtol", rtol)
+            _smoothing = options[m_key].get("smoothing", smoothing)
+        else:
+            _rtol = rtol
+            _smoothing = smoothing
         _m = m[m_key].array
         _wm = cl2corr(_m).T[0]
-        if patch_hole:
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
+        _tol = _rtol * np.max(abs(_wm))
+        _wm *= logistic(np.log10(abs(_wm)), tol=np.log10(_tol), smoothing=_smoothing)
         wm[m_key] = _wm
-    return _natural_unmixing(d, wm, lmax=lmax)
+    return _natural_unmixing(d, wm)
 
 
-def _natural_unmixing(d, wm, lmax=None):
+def _natural_unmixing(d, wm):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -54,8 +60,11 @@ def _natural_unmixing(d, wm, lmax=None):
     wm_keys = list(wm.keys())
     for d_key, wm_key in zip(d_keys, wm_keys):
         a, b, i, j = d_key
-        if lmax is None:
+        ell = d[d_key].ell
+        if ell is None:
             *_, lmax = d[d_key].shape
+        else:
+            lmax = ell[-1] + 1
         s1, s2 = d[d_key].spin
         _d = np.atleast_2d(d[d_key])
         _wm = wm[wm_key]
@@ -115,5 +124,5 @@ def _natural_unmixing(d, wm, lmax=None):
     return corr_d
 
 
-def logistic(x, x0=-5, k=50):
-    return 1.0 + np.exp(-k * (x - x0))
+def logistic(x, tol=-5, smoothing=50):
+    return 1.0 + np.exp(-smoothing * (x - tol))

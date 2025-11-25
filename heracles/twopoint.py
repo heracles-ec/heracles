@@ -398,6 +398,7 @@ def mixing_matrices(
 
 def invert_mixing_matrix(
     M,
+    options: dict = {},
     rtol: float = 1e-5,
     progress: Progress | None = None,
 ):
@@ -427,6 +428,11 @@ def invert_mixing_matrix(
         *_, _n, _m = _M.shape
         new_ell = np.arange(_m)
 
+        if key in list(options.keys()):
+            _rtol = options[key].get("rtol", rtol)
+        else:
+            _rtol = rtol
+
         with progress.task(f"invert {key}"):
             if (s1 != 0) and (s2 != 0):
                 _inv_m = np.linalg.pinv(
@@ -435,10 +441,10 @@ def invert_mixing_matrix(
                 )
                 _inv_M_EEEE = _inv_m[:_m, :_n]
                 _inv_M_EEBB = _inv_m[_m:, :_n]
-                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
+                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=_rtol)
                 _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
             else:
-                _inv_M = np.linalg.pinv(_M, rcond=rtol)
+                _inv_M = np.linalg.pinv(_M, rcond=_rtol)
 
             inv_M[key] = Result(_inv_M, axis=value.axis, ell=new_ell)
 

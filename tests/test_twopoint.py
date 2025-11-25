@@ -402,3 +402,15 @@ def test_inverting_mixing_matrices():
         _mixed_cls = np.sum(mixed_cls[key].array)
         print(key, _mixed_cls)
         np.testing.assert_allclose(_mixed_cls, (n + 1) * 1.0)
+
+    # test options
+    options = {("POS", "POS", 1, 1): {"rtol": 1}}
+    opt_inv_mms = invert_mixing_matrix(mms, options=options)
+    opt_mixed_cls = apply_mixing_matrix(cls, opt_inv_mms)
+    for key in opt_mixed_cls:
+        if key in list(options.keys()):
+            assert np.all(
+                opt_mixed_cls[key].array == np.zeros_like(mixed_cls[key].array)
+            )
+        else:
+            assert np.all(opt_mixed_cls[key].array == mixed_cls[key].array)

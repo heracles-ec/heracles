@@ -2,9 +2,9 @@ import numpy as np
 import heracles
 
 
-def test_cl2corr():
-    # Is there something more clever we can do here?
-    # Like transforming the legendre nodes and return ones?
+def test_cl_transform(cls0):
+    from heracles.dices.utils import get_cl
+
     cl = np.array(
         [
             np.ones(10),
@@ -16,8 +16,6 @@ def test_cl2corr():
     corr = heracles.cl2corr(cl.T).T
     assert corr.shape == cl.shape
 
-
-def test_corr2cl():
     corr = np.array(
         [
             np.ones(10),
@@ -28,3 +26,16 @@ def test_corr2cl():
     )
     cl = heracles.corr2cl(corr.T).T
     assert corr.shape == cl.shape
+
+    cls = np.array(
+        [
+            get_cl(("POS", "POS", 1, 1), cls0),
+            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
+            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
+            get_cl(("POS", "SHE", 1, 1), cls0)[0],
+        ]
+    ).T
+    corrs = heracles.cl2corr(cls)
+    _cls = heracles.corr2cl(corrs)
+    for cl, _cl in zip(cls.T, _cls.T):
+        assert np.isclose(cl[2:], _cl[2:]).all()
