@@ -27,25 +27,39 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, options={}, rtol=0.2, smoothing=50):
-    wm = {}
-    m_keys = list(m.keys())
-    for m_key in m_keys:
-        if m_key in list(options.keys()):
-            _rtol = options[m_key].get("rtol", rtol)
-            _smoothing = options[m_key].get("smoothing", smoothing)
+def correct_correlation(wm, options={}, rtol=0.2, smoothing=50):
+    """
+    Correct the correlation function of the mask to avoid
+    dividing by very small numbers during unmixing.
+    Args:
+        wm: mask correlation functions
+        options: dictionary of options for each mask
+        rtol: relative tolerance to apply
+        smoothing: smoothing parameter for the logistic function
+    Returns:
+        wm: corrected mask correlation functions
+    """
+    wm_keys = list(wm.keys())
+    corr_wm = {}
+    for wm_key in wm_keys:
+        if wm_key in list(options.keys()):
+            _rtol = options[wm_key].get("rtol", rtol)
+            _smoothing = options[wm_key].get("smoothing", smoothing)
         else:
             _rtol = rtol
             _smoothing = smoothing
-        _m = m[m_key].array
-        _wm = cl2corr(_m).T[0]
+        _wm = wm[wm_key]
         _tol = _rtol * np.max(abs(_wm))
-        _wm *= logistic(np.log10(abs(_wm)), tol=np.log10(_tol), smoothing=_smoothing)
-        wm[m_key] = _wm
-    return _natural_unmixing(d, wm)
+        _wm *= logistic(
+            np.log10(abs(_wm)),
+            tol=np.log10(_tol),
+            smoothing=_smoothing,
+        )
+        corr_wm[wm_key] = _wm
+    return corr_wm
 
 
-def _natural_unmixing(d, wm):
+def natural_unmixing(d, m, options={}, rtol=0.2, smoothing=50):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -55,11 +69,36 @@ def _natural_unmixing(d, wm):
     Returns:
         corr_d: Corrected Cl
     """
+    wm = {}
+    m_keys = list(m.keys())
+    for m_key in m_keys:
+        _m = m[m_key].array
+        _wm = cl2corr(_m).T[0]
+        wm[m_key] = _wm
+
+    wm = correct_correlation(
+        wm,
+        options=options,
+        rtol=rtol,
+        smoothing=smoothing,
+    )
+    return _natural_unmixing(d, wm)
+
+
+def _natural_unmixing(d, wm):
+    """
+    Natural unmixing of the data Cl.
+    Args:
+        d: Data Cl
+        m: mask correlation function
+        patch_hole: If True, apply the patch hole correction
+    Returns:
+        corr_d: Corrected Cl
+    """
     corr_d = {}
     d_keys = list(d.keys())
     wm_keys = list(wm.keys())
     for d_key, wm_key in zip(d_keys, wm_keys):
-        a, b, i, j = d_key
         ell = d[d_key].ell
         if ell is None:
             *_, lmax = d[d_key].shape

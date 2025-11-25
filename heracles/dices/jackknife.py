@@ -25,7 +25,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _natural_unmixing, logistic
+from ..unmixing import _natural_unmixing, correct_correlation
 from ..transforms import cl2corr
 
 try:
@@ -205,7 +205,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def mask_correction(Mljk, Mls0):
+def mask_correction(Mljk, Mls0, options={}, rtol=0.2, smoothing=50):
     """
     Internal method to compute the mask correction.
     input:
@@ -225,9 +225,14 @@ def mask_correction(Mljk, Mls0):
         wmljk = wmljk.T[0]
         # Compute alpha
         alpha = wmljk / wmls0
-        alpha *= logistic(np.log10(abs(wmljk)))
         alphas[key] = alpha
-    return alphas
+    corr_alphas = correct_correlation(
+        alphas,
+        options=options,
+        rtol=rtol,
+        smoothing=smoothing,
+    )
+    return corr_alphas
 
 
 def jackknife_covariance(dict, nd=1):
