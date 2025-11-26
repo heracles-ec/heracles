@@ -91,15 +91,24 @@ def test_get_delete2_fsky(jk_maps, njk):
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction(cls0, mls0):
+def test_mask_correction(cls0, mls0, fields):
     # test natural umixing
+    masks = {}
+    for key, field in fields.items():
+        if field.mask is not None:
+            masks[field.mask] = key
     wm = {}
     m_keys = list(mls0.keys())
     for m_key in m_keys:
+        a, b, i, j = m_key
+        # Get corresponding mask keys
+        a = masks[a]
+        b = masks[b]
+        # Transform to real space
         _m = mls0[m_key].array
         _wm = heracles.transforms.cl2corr(_m).T[0]
-        wm[m_key] = _wm
-    cls = heracles.unmixing.natural_unmixing(cls0, mls0)
+        wm[(a, b, i, j)] = _wm
+    cls = heracles.unmixing.natural_unmixing(cls0, mls0, fields)
     _cls = heracles.unmixing._natural_unmixing(cls0, wm)
     for key in list(cls0.keys()):
         cl = cls[key].array
@@ -110,19 +119,24 @@ def test_mask_correction(cls0, mls0):
     wm = {}
     m_keys = list(mls0.keys())
     for m_key in m_keys:
+        a, b, i, j = m_key
+        # Get corresponding mask keys
+        a = masks[a]
+        b = masks[b]
+        # Transform to real space
         _m = mls0[m_key].array
         _wm = heracles.transforms.cl2corr(_m).T[0]
         _wm = np.abs(_wm)
         _wm /= np.max(_wm)
-        wm[m_key] = _wm
+        wm[(a, b, i, j)] = _wm
     _wm = heracles.correct_correlation(wm, rtol=_wm)
-    for m_key in m_keys:
-        _w = wm[m_key]
-        __w = _wm[m_key]
+    for key in wm.keys():
+        _w = wm[key]
+        __w = _wm[key]
         assert np.isclose(__w, _w).all()
 
     # test dices mask correction
-    alphas = dices.mask_correction(mls0, mls0)
+    alphas = dices.mask_correction(mls0, mls0, fields)
     _cls = heracles.unmixing._natural_unmixing(cls0, alphas)
     for key in list(cls0.keys()):
         cl = cls0[key].array

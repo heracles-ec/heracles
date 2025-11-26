@@ -57,7 +57,7 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Mask correction
-        alphas = mask_correction(_cls_mm, mls0)
+        alphas = mask_correction(_cls_mm, mls0, fields)
         _cls = _natural_unmixing(_cls, alphas)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
@@ -205,7 +205,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def mask_correction(Mljk, Mls0, options={}, rtol=0.2, smoothing=50):
+def mask_correction(Mljk, Mls0, fields, options={}, rtol=0.2, smoothing=50):
     """
     Internal method to compute the mask correction.
     input:
@@ -214,8 +214,19 @@ def mask_correction(Mljk, Mls0, options={}, rtol=0.2, smoothing=50):
     returns:
         alpha: Mask correction factor
     """
+    # inverse mapping of masks to fields
+    masks = {}
+    for key, field in fields.items():
+        if field.mask is not None:
+            masks[field.mask] = key
+
+
     alphas = {}
     for key in list(Mljk.keys()):
+        a, b, i, j = key
+        # Get corresponding mask keys
+        a = masks[a]
+        b = masks[b]
         mljk = Mljk[key]
         mls0 = Mls0[key]
         # Transform to real space
@@ -225,7 +236,7 @@ def mask_correction(Mljk, Mls0, options={}, rtol=0.2, smoothing=50):
         wmljk = wmljk.T[0]
         # Compute alpha
         alpha = wmljk / wmls0
-        alphas[key] = alpha
+        alphas[(a, b, i, j)] = alpha
     corr_alphas = correct_correlation(
         alphas,
         options=options,

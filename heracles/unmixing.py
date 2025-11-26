@@ -19,6 +19,7 @@
 import numpy as np
 from .result import truncated
 from .transforms import cl2corr, corr2cl
+from .utils import get_cl
 
 try:
     from copy import replace
@@ -59,22 +60,34 @@ def correct_correlation(wm, options={}, rtol=0.2, smoothing=50):
     return corr_wm
 
 
-def natural_unmixing(d, m, options={}, rtol=0.2, smoothing=50):
+def natural_unmixing(d, m, fields, options={}, rtol=0.2, smoothing=50):
     """
     Natural unmixing of the data Cl.
     Args:
         d: data cls
         m: mask cls
+        fields: list of fields
         patch_hole: If True, apply the patch hole correction
     Returns:
         corr_d: Corrected Cl
     """
+    # inverse mapping of masks to fields
+    masks = {}
+    for key, field in fields.items():
+        if field.mask is not None:
+            masks[field.mask] = key
+
     wm = {}
     m_keys = list(m.keys())
     for m_key in m_keys:
+        a, b, i, j = m_key
+        # Get corresponding mask keys
+        a = masks[a]
+        b = masks[b]
+        # Transform to real space
         _m = m[m_key].array
         _wm = cl2corr(_m).T[0]
-        wm[m_key] = _wm
+        wm[(a, b, i, j)] = _wm
 
     wm = correct_correlation(
         wm,
@@ -96,24 +109,33 @@ def _natural_unmixing(d, wm):
         corr_d: Corrected Cl
     """
     corr_d = {}
-    d_keys = list(d.keys())
-    wm_keys = list(wm.keys())
-    for d_key, wm_key in zip(d_keys, wm_keys):
-        ell = d[d_key].ell
+    for key in list(d.keys()):
+        ell = d[key].ell
         if ell is None:
-            *_, lmax = d[d_key].shape
+            *_, lmax = d[key].shape
         else:
             lmax = ell[-1] + 1
-        s1, s2 = d[d_key].spin
-        _d = np.atleast_2d(d[d_key])
-        _wm = wm[wm_key]
-        lmax_mask = len(wm[wm_key])
+        s1, s2 = d[key].spin
+        _d = np.atleast_2d(d[key])
+        # Get corresponding mask correlation function
+        if key in wm:
+            _wm = wm[key]
+        else:
+            a, b, i, j = key
+            if a==b and (a, b, j, i) in wm:
+                _wm = wm[(a, b, j, i)]
+            elif (b, a, j, i) in wm:
+                _wm = wm[(b, a, j, i)]
+            else:
+                raise KeyError(f"Key {key} not found in mask correlation functions.")
+
+        lmax_mask = len(_wm)
         # pad cls
         pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
         pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
         _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
         # Grab metadata
-        dtype = d[d_key].array.dtype
+        dtype = d[key].array.dtype
         if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
@@ -157,7 +179,7 @@ def _natural_unmixing(d, wm):
             _corr_d = np.squeeze(_corr_d)
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = replace(d[d_key], array=_corr_d)
+        corr_d[key] = replace(d[key], array=_corr_d)
     # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d
