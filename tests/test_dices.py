@@ -92,6 +92,20 @@ def test_get_delete2_fsky(jk_maps, njk):
 
 
 def test_mask_correction(cls0, mls0):
+    # test natural umixing
+    wm = {}
+    m_keys = list(mls0.keys())
+    for m_key in m_keys:
+        _m = mls0[m_key].array
+        _wm = heracles.transforms.cl2corr(_m).T[0]
+        wm[m_key] = _wm
+    cls = heracles.unmixing.natural_unmixing(cls0, mls0)
+    _cls = heracles.unmixing._natural_unmixing(cls0, wm)
+    for key in list(cls0.keys()):
+        cl = cls[key].array
+        _cl = _cls[key].array
+        assert np.isclose(cl[2:], _cl[2:]).all()
+
     # test logistic correction
     wm = {}
     m_keys = list(mls0.keys())
