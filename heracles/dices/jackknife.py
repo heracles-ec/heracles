@@ -20,7 +20,7 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
-from .utils import add_to_Cls, sub_to_Cls
+from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform

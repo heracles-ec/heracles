@@ -3,7 +3,7 @@ import heracles
 
 
 def test_cl_transform(cls0):
-    from heracles.dices.utils import get_cl
+    from heracles.utils import get_cl
 
     cl = np.array(
         [

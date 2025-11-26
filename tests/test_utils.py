@@ -8,8 +8,8 @@ def test_add_to_cls():
     cls[("P", "P", 1, 1)] = heracles.Result(np.ones(10))
     x = {}
     x[("P", "P", 1, 1)] = -1.0
-    _cls = dices.utils.add_to_Cls(cls, x)
-    __cls = dices.utils.sub_to_Cls(_cls, x)
+    _cls = heracles.utils.add_to_Cls(cls, x)
+    __cls = heracles.utils.sub_to_Cls(_cls, x)
     for key in list(cls.keys()):
         assert np.all(_cls[key] == np.zeros(10))
         assert np.all(cls[key].__array__() == __cls[key].__array__())
@@ -25,9 +25,9 @@ def test_get_cl():
         np.array([[a, ab], [ba, a]]), spin=(2, 2)
     )
 
-    cl = dices.utils.get_cl(("POS", "SHE", 1, 1), cls)
+    cl = heracles.utils.get_cl(("POS", "SHE", 1, 1), cls)
     assert np.all(cl == np.array([a, a]))
-    cl = dices.utils.get_cl(("SHE", "SHE", 1, 2), cls)
+    cl = heracles.utils.get_cl(("SHE", "SHE", 1, 2), cls)
     assert np.all(cl == np.array([[a, ba], [ab, a]]))
 
 
@@ -37,11 +37,11 @@ def test_expand_squeeze_spin0_dims(cls0, cov_jk):
         s1, s2 = cl.spin
         dof1 = 1 if s1 == 0 else 2
         dof2 = 1 if s2 == 0 else 2
-        _cl = dices.utils.expand_spin0_dims(cl)
+        _cl = heracles.utils.expand_spin0_dims(cl)
         (_ax,) = _cl.axis
         assert _cl.shape == (dof1, dof2, cl.shape[-1])
         assert _ax == 2
-        __cl = dices.utils.squeeze_spin0_dims(_cl)
+        __cl = heracles.utils.squeeze_spin0_dims(_cl)
         assert np.all(cl.__array__() == __cl.__array__())
         assert cl.axis == __cl.axis
 
@@ -52,7 +52,7 @@ def test_expand_squeeze_spin0_dims(cls0, cov_jk):
         dof_b1 = 1 if sb1 == 0 else 2
         dof_a2 = 1 if sa2 == 0 else 2
         dof_b2 = 1 if sb2 == 0 else 2
-        _cov = dices.utils.expand_spin0_dims(cov)
+        _cov = heracles.utils.expand_spin0_dims(cov)
         _ax1, _ax2 = _cov.axis
         assert _cov.shape == (
             dof_a1,
@@ -63,6 +63,6 @@ def test_expand_squeeze_spin0_dims(cls0, cov_jk):
             cov.shape[-1],
         )
         assert (_ax1, _ax2) == (4, 5)
-        __cov = dices.utils.squeeze_spin0_dims(_cov)
+        __cov = heracles.utils.squeeze_spin0_dims(_cov)
         assert np.all(cov.__array__() == __cov.__array__())
         assert cov.axis == __cov.axis
