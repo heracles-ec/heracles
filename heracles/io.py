@@ -260,11 +260,14 @@ def _write_result(fits, ext, result):
 
     # construct the result header
     kw_ellaxis = str(axis).replace(" ", "")
-    kw_spin = str(spin).replace(" ", "")
     header = [
         dict(name="ELLAXIS", value=kw_ellaxis, comment="angular axis indices"),
-        dict(name="SPIN", value=kw_spin, comment="spin values"),
     ]
+    if spin is not None:
+        kw_spin = str(spin).replace(" ", "")
+        header += [
+            dict(name="SPIN", value=kw_spin, comment="spin values"),
+        ]
 
     # write the result as columnar data
     fits.write_table(
