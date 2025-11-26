@@ -209,10 +209,10 @@ def mask_correction(Mljk, Mls0, options={}, rtol=0.2, smoothing=50):
     """
     Internal method to compute the mask correction.
     input:
-        Mljk (np.array): mask of delete1 Cls
-        Mls0 (np.array): mask Cls
+        Mljk: mask of delete1 Cls
+        Mls0: mask Cls
     returns:
-        alpha (Float64): Mask correction factor
+        alpha: Mask correction factor
     """
     alphas = {}
     for key in list(Mljk.keys()):
