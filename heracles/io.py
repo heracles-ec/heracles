@@ -256,7 +256,7 @@ def _write_result(fits, ext, result):
     weight = _prepare_result_array(get_result_array(result, "weight"), order, nrows)
 
     # get spin array
-    spin = getattr(result, "spin", (-1,))
+    spin = getattr(result, "spin", None)
 
     # construct the result header
     kw_ellaxis = str(axis).replace(" ", "")
