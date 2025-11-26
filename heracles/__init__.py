@@ -76,6 +76,7 @@ __all__ = [
     "cl2corr",
     "corr2cl",
     # unmixing
+    "correct_correlation",
     "natural_unmixing",
 ]
 
@@ -157,5 +158,6 @@ from .transforms import (
 )
 
 from .unmixing import (
+    correct_correlation,
     natural_unmixing,
 )
