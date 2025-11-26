@@ -63,7 +63,7 @@ def natural_unmixing(d, m, options={}, rtol=0.2, smoothing=50):
     """
     Natural unmixing of the data Cl.
     Args:
-        d: Data Cl
+        d: data cls
         m: mask cls
         patch_hole: If True, apply the patch hole correction
     Returns:
@@ -89,7 +89,7 @@ def _natural_unmixing(d, wm):
     """
     Natural unmixing of the data Cl.
     Args:
-        d: Data Cl
+        d: data cls
         m: mask correlation function
         patch_hole: If True, apply the patch hole correction
     Returns:
