@@ -303,8 +303,9 @@ def _read_result(hdu):
 
     # the angular axis
     axis = literal_eval(h["ELLAXIS"])
-    spin = literal_eval(h["SPIN"])
-    if spin == (-1,):
+    if "SPIN" in h:
+        spin = literal_eval(h["SPIN"])
+    else:
         spin = None
 
     # get data array and move axis back to right position
