@@ -101,7 +101,7 @@ def test_mask_correction(cls0, mls0):
         _wm = np.abs(_wm)
         _wm /= np.max(_wm)
         wm[m_key] = _wm
-    _wm = heracles.correct_correlation(wm, rtol= _wm)
+    _wm = heracles.correct_correlation(wm, rtol=_wm)
     for m_key in m_keys:
         _w = wm[m_key]
         __w = _wm[m_key]
