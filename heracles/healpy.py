@@ -130,15 +130,7 @@ class HealpixMapper:
         Create a new HEALPix map.
         """
         m = np.zeros((*dims, hp.nside2npix(self.__nside)), dtype=self.__dtype)
-        update_metadata(
-            m,
-            geometry="healpix",
-            kernel="healpix",
-            nside=self.__nside,
-            lmax=self.__lmax,
-            deconv=self.__deconv,
-            spin=spin,
-        )
+        self.update_metadata(m, spin=spin)
         return m
 
     def map_values(
@@ -201,6 +193,21 @@ class HealpixMapper:
         update_metadata(alm, **md)
 
         return alm
+
+    def update_metadata(self, m: NDArray[Any], spin: int) -> NDArray[Any]:
+        """
+        Reads external data into the mapper's format.
+        """
+        update_metadata(
+            m,
+            geometry="healpix",
+            kernel="healpix",
+            nside=self.__nside,
+            lmax=self.__lmax,
+            deconv=self.__deconv,
+            spin=spin,
+        )
+        return m
 
     def resample(self, data: NDArray[Any]) -> NDArray[Any]:
         """
