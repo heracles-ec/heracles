@@ -256,12 +256,7 @@ def _write_result(fits, ext, result):
     weight = _prepare_result_array(get_result_array(result, "weight"), order, nrows)
 
     # get spin array
-    spin = getattr(result, "spin", None)
-    if spin is None:
-        # We always have twice as many spin dof as ell axes
-        spin = (0,) * (2 * len(ell))
-    else:
-        print(spin)
+    spin = getattr(result, "spin", (-1,))
 
     # construct the result header
     kw_ellaxis = str(axis).replace(" ", "")
@@ -309,6 +304,8 @@ def _read_result(hdu):
     # the angular axis
     axis = literal_eval(h["ELLAXIS"])
     spin = literal_eval(h["SPIN"])
+    if spin == (-1,):
+        spin = None
 
     # get data array and move axis back to right position
     arr = np.moveaxis(data["ARRAY"], tuple(range(len(axis))), axis)

@@ -105,7 +105,7 @@ def mock_cls(rng):
         ("SHE", "SHE", 0, 0): Result(cl22, axis=2, spin=(2, 2)),
         ("POS", "POS", 0, 1): Result(cl00, axis=0, spin=(0, 0)),
         ("POS", "SHE", 0, 1): Result(cl02, axis=1, spin=(0, 2)),
-        ("SHE", "SHE", 0, 1): Result(cl22x, axis=2, spin=(2, 2)),
+        ("SHE", "SHE", 0, 1): Result(cl22x, axis=2, spin=(0, 0)),
         ("POS", "SHE", 1, 0): Result(cl02, axis=1, spin=(0, 2)),
         ("POS", "POS", 1, 1): Result(cl00, axis=0, spin=(0, 0)),
         ("POS", "SHE", 1, 1): Result(cl02, axis=1, spin=(0, 2)),
@@ -363,6 +363,9 @@ def test_write_read_mms(rng, tmp_path):
     path = tmp_path / "test.fits"
 
     mms = {
+        ("POS", "POS", 1, 1): heracles.Result(
+            rng.standard_normal((10, 10)), spin=None, axis=0
+        ),
         ("POS", "POS", 0, 1): heracles.Result(
             rng.standard_normal((10, 10)), spin=(0, 0), axis=0
         ),
