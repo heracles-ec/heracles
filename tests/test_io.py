@@ -363,9 +363,15 @@ def test_write_read_mms(rng, tmp_path):
     path = tmp_path / "test.fits"
 
     mms = {
-        ("POS", "POS", 0, 1): heracles.Result(rng.standard_normal((10, 10)), spin=(0, 0), axis=0),
-        ("POS", "SHE", 1, 2): heracles.Result(rng.standard_normal((20, 5)), spin=(0, 2), axis=0),
-        ("SHE", "SHE", 2, 3): heracles.Result(rng.standard_normal((10, 5, 2)), spin=(2, 2), axis=1),
+        ("POS", "POS", 0, 1): heracles.Result(
+            rng.standard_normal((10, 10)), spin=(0, 0), axis=0
+        ),
+        ("POS", "SHE", 1, 2): heracles.Result(
+            rng.standard_normal((20, 5)), spin=(0, 2), axis=0
+        ),
+        ("SHE", "SHE", 2, 3): heracles.Result(
+            rng.standard_normal((10, 5, 2)), spin=(2, 2), axis=1
+        ),
     }
 
     assert not path.exists()
@@ -400,7 +406,9 @@ def test_write_read_cov(mock_cls, tmp_path):
         sa1, sb1 = cl1.spin
         sa2, sb2 = cl2.spin
         c = cl1[..., None, : cl1.shape[-1] // 2, None] * cl2[..., None, :]
-        cov[a1, b1, a2, b2, i1, j1, i2, j2] = heracles.Result(c, spin=(sa1, sa2, sb1, sb2), axis=(-2, -1))
+        cov[a1, b1, a2, b2, i1, j1, i2, j2] = heracles.Result(
+            c, spin=(sa1, sa2, sb1, sb2), axis=(-2, -1)
+        )
 
     path = tmp_path / "cov.fits"
 

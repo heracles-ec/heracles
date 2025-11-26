@@ -258,8 +258,8 @@ def _write_result(fits, ext, result):
     # get spin array
     spin = getattr(result, "spin", None)
     if spin is None:
-       # We always have twice as many spin dof as ell axes
-       spin = (0,) * (2*len(ell))
+        # We always have twice as many spin dof as ell axes
+        spin = (0,) * (2 * len(ell))
     else:
         print(spin)
 
@@ -268,7 +268,7 @@ def _write_result(fits, ext, result):
     kw_spin = str(spin).replace(" ", "")
     header = [
         dict(name="ELLAXIS", value=kw_ellaxis, comment="angular axis indices"),
-        dict(name="SPIN", value=kw_spin, comment="spin values")
+        dict(name="SPIN", value=kw_spin, comment="spin values"),
     ]
 
     # write the result as columnar data
