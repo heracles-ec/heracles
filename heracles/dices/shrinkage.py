@@ -18,7 +18,7 @@
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import itertools
-from ..utils import (
+from .utils import (
     expand_spin0_dims,
     squeeze_spin0_dims,
 )
@@ -29,7 +29,7 @@ from ..result import (
 from .jackknife import (
     bias,
 )
-from ..utils import (
+from .utils import (
     add_to_Cls,
     impose_correlation,
     get_cl,

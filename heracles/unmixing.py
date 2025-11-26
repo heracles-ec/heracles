@@ -19,7 +19,6 @@
 import numpy as np
 from .result import truncated
 from .transforms import cl2corr, corr2cl
-from .utils import get_cl
 
 try:
     from copy import replace
@@ -122,7 +121,7 @@ def _natural_unmixing(d, wm):
             _wm = wm[key]
         else:
             a, b, i, j = key
-            if a==b and (a, b, j, i) in wm:
+            if a == b and (a, b, j, i) in wm:
                 _wm = wm[(a, b, j, i)]
             elif (b, a, j, i) in wm:
                 _wm = wm[(b, a, j, i)]

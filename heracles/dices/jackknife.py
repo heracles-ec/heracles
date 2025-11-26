@@ -20,7 +20,7 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
-from ..utils import add_to_Cls, sub_to_Cls
+from .utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
@@ -219,7 +219,6 @@ def mask_correction(Mljk, Mls0, fields, options={}, rtol=0.2, smoothing=50):
     for key, field in fields.items():
         if field.mask is not None:
             masks[field.mask] = key
-
 
     alphas = {}
     for key in list(Mljk.keys()):
