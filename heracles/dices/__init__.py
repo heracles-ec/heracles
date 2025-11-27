@@ -58,7 +58,7 @@ from .shrinkage import (
     shrinkage_factor,
     gaussian_covariance,
 )
-from .utils import (
+from ..utils import (
     impose_correlation,
     get_cl,
     flatten,
