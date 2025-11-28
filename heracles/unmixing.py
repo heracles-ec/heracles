@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .result import truncated
-from .transforms import cl2corr, corr2cl
+from .transforms import transform_cls, transform_corrs
+from .utils import get_cl
 
 try:
     from copy import replace
@@ -27,92 +27,194 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, x0=-2, k=50, patch_hole=True, lmax=None):
-    wm = {}
-    m_keys = list(m.keys())
-    for m_key in m_keys:
-        _m = m[m_key].array
-        _wm = cl2corr(_m).T[0]
-        if patch_hole:
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
-        wm[m_key] = _wm
-    return _natural_unmixing(d, wm, lmax=lmax)
+def tune_direct_inversion(data_cls, mms, target_cls, cov, maxiter=10):
+    """
+    Tune the natural unmixing parameters to minimize the difference between
+    the unmixing-corrected data Cl and the target Cl.
+    Args:
+        data_cls: Data Cl
+        mls: mask Cl
+        target_cls: Target Cl
+        cov: Covariance of the data Cl
+        fields: list of fields
+    Returns:
+        tuned_params: Dictionary with the tuned parameters
+    """
+    from scipy.optimize import minimize_scalar
+
+    options = {}
+    for key, data_cl in data_cls.items():
+        print(f"Tuning natural unmixing for key: {key}")
+        # create a dictionary only with the current key
+        a, b, i, j = key
+        cov_key = (a, b, a, b, i, j, i, j)
+        # The objective function to minimize depends
+        # on the spin of the wcl
+        s1, s2 = data_cl.spin
+        if s1 == 0 and s2 == 0:
+            _data_cl = data_cl.array
+            _target_cl = target_cls[key].array
+            mm = get_cl(key, mms).array
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array)
+        if (s1 != 0 and s2 == 0) or (s1 == 0 and s2 != 0):
+            _data_cl = data_cl.array[0, :]
+            _target_cl = target_cls[key].array[0, :]
+            mm = get_cl(key, mms).array
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array[0, 0, :, :])
+        if s1 != 0 and s2 != 0:
+            _data_cl = data_cl.array[0, 0, :]
+            _target_cl = target_cls[key].array[0, 0, :]
+            mm = get_cl(key, mms)[0, :, :]
+            print("mm shape: ", get_cl(key, mms).shape)
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array[0, 0, 0, 0, :, :])
+
+        def objective(rtol):
+            # Invert singular values with cutoff
+            cutoff = rtol * np.max(s)
+            s_inv = np.array([1 / si if si > cutoff else 0 for si in s])
+            inv_mm = (Vt.T * s_inv) @ U.T
+            corr_cl = inv_mm @ _data_cl
+            diff = corr_cl - _target_cl
+            xi2 = diff.T @ inv_cov @ diff
+            return xi2
+
+        opt_xi2 = minimize_scalar(
+            objective, bounds=(0.2, 1), method="bounded", options={"maxiter": maxiter}
+        )
+        options[key] = opt_xi2.x
+    return options
 
 
-def _natural_unmixing(d, wm, lmax=None):
+def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
+    """
+    Tune the natural unmixing parameters to minimize the difference between
+    the unmixing-corrected data Cl and the target Cl.
+    Args:
+        data_cls: Data Cl
+        mls: mask Cl
+        target_cls: Target Cl
+        cov: Covariance of the data Cl
+        fields: list of fields
+    Returns:
+        tuned_params: Dictionary with the tuned parameters
+    """
+    from scipy.optimize import minimize_scalar
+
+    data_wcls = transform_cls(data_cls)
+    wmls = transform_cls(mls)
+
+    options = {}
+    inv_covs = {}
+    for key, data_wcl in data_wcls.items():
+        print(f"Tuning natural unmixing for key: {key}")
+        # create a dictionary only with the current key
+        a, b, i, j = key
+        cov_key = (a, b, a, b, i, j, i, j)
+        _data_wcls = {key: data_wcl}
+        _target_cls = {key: target_cls[key]}
+        # The objective function to minimize depends
+        # on the spin of the wcl
+        s1, s2 = data_wcl.spin
+
+        def objective(rtol):
+            corr_wmls = correct_correlation(wmls, rtol=rtol)
+            corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
+            corr_cl = get_cl(key, corr_cls).array
+            target_cl = get_cl(key, _target_cls).array
+            if s1 == 0 and s2 == 0:
+                diff = corr_cl - target_cl
+                if cov_key not in inv_covs:
+                    inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array)
+            if (s1 != 0 and s2 == 0) or (s1 == 0 and s2 != 0):
+                diff = corr_cl[0, :] - target_cl[0, :]
+                if cov_key not in inv_covs:
+                    inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array[0, 0, :, :])
+            if s1 != 0 and s2 != 0:
+                diff = corr_cl[0, 0, :] - target_cl[0, 0, :]
+                if cov_key not in inv_covs:
+                    inv_covs[cov_key] = np.linalg.pinv(
+                        cov[cov_key].array[0, 0, 0, 0, :, :]
+                    )
+            inv_cov = inv_covs[cov_key]
+            xi2 = diff.T @ inv_cov @ diff
+            return xi2
+
+        opt_xi2 = minimize_scalar(
+            objective, bounds=(0.2, 1), method="bounded", options={"maxiter": maxiter}
+        )
+        options[key] = opt_xi2.x
+    return options
+
+
+def natural_unmixing(cls, mls, fields, options={}, rtol=0.3, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
-        d: Data Cl
-        m: mask cls
+        cls: Data Cl
+        mls: mask Cl
+        fields: list of fields
         patch_hole: If True, apply the patch hole correction
     Returns:
-        corr_d: Corrected Cl
+        corr_cls: Corrected Cl
     """
-    corr_d = {}
-    d_keys = list(d.keys())
-    wm_keys = list(wm.keys())
-    for d_key, wm_key in zip(d_keys, wm_keys):
-        a, b, i, j = d_key
-        if lmax is None:
-            *_, lmax = d[d_key].shape
-        s1, s2 = d[d_key].spin
-        _d = np.atleast_2d(d[d_key])
-        _wm = wm[wm_key]
-        lmax_mask = len(wm[wm_key])
-        # pad cls
-        pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
-        pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
-        _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
-        # Grab metadata
-        dtype = d[d_key].array.dtype
-        if (s1 != 0) and (s2 != 0):
-            __d = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    _d[0, 0],  # EE like spin-2
-                    _d[1, 1],  # BB like spin-2
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            __id = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    -_d[0, 1],  # EB like spin-0
-                    _d[1, 0],  # EB like spin-0
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            # Correct by alpha
-            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd / _wm).real
-            icorr_wd = (wd / _wm).imag
-            # Transform back to Cl
-            __corr_d = corr2cl(corr_wd.T).T
-            __icorr_d = corr2cl(icorr_wd.T).T
-            # reorder
-            _corr_d = np.zeros_like(_d)
-            _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
-            _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
-            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
+    mask_lmax = mls[list(mls.keys())[0]].shape[-1] - 1
+    wmls = transform_cls(mls)
+    wmls = correct_correlation(wmls, options=options, rtol=rtol)
+    wcls = transform_cls(cls, lmax_out=mask_lmax)
+    return _natural_unmixing(wcls, wmls, fields, lmax=lmax)
+
+
+def _natural_unmixing(wcls, wmls, fields, lmax=None):
+    """
+    Natural unmixing of the data Cl.
+    Args:
+        wcls: data correlation function
+        wmls: mask correlation function
+        fields: list of fields
+        patch_hole: If True, apply the patch hole correction
+    Returns:
+        corr_cls: Corrected Cl
+    """
+    corr_wcls = {}
+    masks = {}
+    for key, field in fields.items():
+        if field.mask is not None:
+            masks[key] = field.mask
+    for key in wcls.keys():
+        a, b, i, j = key
+        m_key = (masks[a], masks[b], i, j)
+        wml = get_cl(m_key, wmls).array
+        wcl = wcls[key].array
+        wcl /= wml
+        corr_wcls[key] = replace(wcls[key], array=wcl)
+
+    corr_cls = transform_corrs(corr_wcls)
+    return corr_cls
+
+
+def correct_correlation(wms, options, rtol=0.3):
+    """
+    Correct correlation functions using a logistic function.
+    Args:
+        wms: mask correlation functions
+        rtol: relative tolerance for the cutoff
+    Returns:
+        corrected_wms: corrected mask correlation functions
+    """
+    corrected_wms = {}
+    for key, wm in wms.items():
+        if key in options:
+            rtol = options[key]
         else:
-            # Treat everything as spin-0
-            _corr_d = []
-            for cl in _d:
-                wd = cl2corr(cl).T
-                corr_wd = wd / _wm
-                # Transform back to Cl
-                __corr_d = corr2cl(corr_wd.T).T
-                _corr_d.append(__corr_d[0])
-            # remove extra axis
-            _corr_d = np.squeeze(_corr_d)
-        # Add metadata back
-        _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[d_key] = replace(d[d_key], array=_corr_d)
-    # truncate to lmax
-    corr_d = truncated(corr_d, lmax)
-    return corr_d
+            rtol = rtol
+        wm = wm.array
+        cutoff = rtol * np.max(np.abs(wm))
+        wm *= logistic(np.log10(abs(wm)), x0=np.log10(cutoff))
+        corrected_wms[key] = replace(wms[key], array=wm)
+    return corrected_wms
 
 
 def logistic(x, x0=-5, k=50):

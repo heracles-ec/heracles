@@ -44,7 +44,10 @@ def get_cl(key, cls):
             arr = cls[key_sym].array
             s1, s2 = cls[key_sym].spin
             if s1 != 0 and s2 != 0:
-                arr = np.transpose(arr, axes=(1, 0, 2))
+                # check this is not a mixing matrix
+                n, _, _ = arr.shape
+                if n != 3:
+                    arr = np.transpose(arr, axes=(1, 0, 2))
             # always transpose spins
             s1, s2 = s2, s1
         else:
