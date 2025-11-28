@@ -17,8 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from .result import truncated
-from .transforms import cl2corr, corr2cl, transform_cls, transform_corrs
+from .transforms import transform_cls, transform_corrs
 from .utils import get_cl
 
 try:
