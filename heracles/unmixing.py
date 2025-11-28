@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import truncated
-from .transforms import cl2corr, corr2cl
+from .transforms import cl2corr, corr2cl, transform_cls
 from .utils import get_cl
 
 try:
@@ -28,7 +28,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
+def natural_unmixing(cls, mls, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -39,15 +39,9 @@ def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     Returns:
         corr_d: Corrected Cl
     """
-    wm = {}
-    m_keys = list(m.keys())
-    for m_key in m_keys:
-        _m = m[m_key].array
-        _wm = cl2corr(_m).T[0]
-        if patch_hole:
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
-        wm[m_key] = replace(d[m_key], array=_wm)
-    return _natural_unmixing(d, wm, fields, lmax=lmax)
+    wmls = transform_cls(mls, fields)
+    wmls = correct_correlation(wmls, x0=x0, k=k)
+    return _natural_unmixing(cls, wmls, fields, lmax=lmax)
 
 
 def _natural_unmixing(d, wm, fields, lmax=None):
@@ -131,6 +125,25 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     corr_d = truncated(corr_d, lmax)
     return corr_d
 
+
+def correct_correlation(wms, x0=-5, k=50):
+    """
+    Correct correlation functions using a logistic function.
+    Args:
+        wms: mask correlation functions
+        x0: midpoint of the logistic function
+        k: steepness of the logistic function
+    Returns:
+        corrected_wms: corrected mask correlation functions
+    """
+    corrected_wms = {}
+    for key, wm in wms.items():
+        wm = wm.array
+        x = np.log10(np.abs(wm))
+        correction = logistic(x, x0=x0, k=k)
+        corrected_array = wm * correction
+        corrected_wms[key] = replace(wms[key], array=corrected_array)
+    return corrected_wms
 
 def logistic(x, x0=-5, k=50):
     return 1.0 + np.exp(-k * (x - x0))
