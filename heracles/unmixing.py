@@ -74,7 +74,7 @@ def tune_direct_inversion(data_cls, mms, target_cls, cov, maxiter=10):
         def objective(rtol):
             # Invert singular values with cutoff
             cutoff = rtol * np.max(s)
-            s_inv = np.array([1/si if si > cutoff else 0 for si in s])
+            s_inv = np.array([1 / si if si > cutoff else 0 for si in s])
             inv_mm = (Vt.T * s_inv) @ U.T
             corr_cl = inv_mm @ _data_cl
             diff = corr_cl - _target_cl
@@ -118,6 +118,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
         # The objective function to minimize depends
         # on the spin of the wcl
         s1, s2 = data_wcl.spin
+
         def objective(rtol):
             corr_wmls = correct_correlation(wmls, rtol=rtol)
             corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
