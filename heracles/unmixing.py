@@ -162,7 +162,7 @@ def natural_unmixing(cls, mls, fields, options={}, rtol=0.3, lmax=None):
     """
     mask_lmax = mls[list(mls.keys())[0]].shape[-1] - 1
     wmls = transform_cls(mls)
-    wmls = correct_correlation(wmls, rtol=rtol)
+    wmls = correct_correlation(wmls, options=options, rtol=rtol)
     wcls = transform_cls(cls, lmax_out=mask_lmax)
     return _natural_unmixing(wcls, wmls, fields, lmax=lmax)
 
@@ -195,7 +195,7 @@ def _natural_unmixing(wcls, wmls, fields, lmax=None):
     return corr_cls
 
 
-def correct_correlation(wms, rtol=0.3):
+def correct_correlation(wms, options, rtol=0.3):
     """
     Correct correlation functions using a logistic function.
     Args:
@@ -206,6 +206,10 @@ def correct_correlation(wms, rtol=0.3):
     """
     corrected_wms = {}
     for key, wm in wms.items():
+        if key in options:
+            rtol = options[key]
+        else:
+            rtol = rtol
         wm = wm.array
         cutoff = rtol * np.max(np.abs(wm))
         wm *= logistic(np.log10(abs(wm)), x0=np.log10(cutoff))
