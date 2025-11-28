@@ -56,30 +56,36 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
         # The objective function to minimize depends
         # on the spin of the wcl
         s1, s2 = wcl.spin
+
         def objective(x0):
             corr_wmls = correct_correlation(wmls, x0=x0)
             corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
             corr_cl = get_cl(key, corr_cls).array
             target_cl = get_cl(key, _target_cls).array
             if s1 == 0 and s2 == 0:
-                diff = (corr_cl - target_cl)
+                diff = corr_cl - target_cl
                 if cov_key not in inv_covs:
                     inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array)
                 cov_inv = inv_covs[cov_key]
                 cov_inv = np.linalg.pinv(cov[cov_key].array)
             if s1 != 0 or s2 != 0:
-                diff = (corr_cl[0, :]- target_cl[0, :])
+                diff = corr_cl[0, :] - target_cl[0, :]
                 if cov_key not in inv_covs:
                     inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array[0, 0, :, :])
                 cov_inv = inv_covs[cov_key]
             if s1 != 0 and s2 != 0:
-                diff = (corr_cl[:, :, :] - target_cl[0, 0, :])
+                diff = corr_cl[:, :, :] - target_cl[0, 0, :]
                 if cov_key not in inv_covs:
-                    inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array[0, 0, 0, 0, :, :])
+                    inv_covs[cov_key] = np.linalg.pinv(
+                        cov[cov_key].array[0, 0, 0, 0, :, :]
+                    )
                 cov_inv = inv_covs[cov_key]
             xi2 = diff.T @ cov_inv @ diff
             return xi2
-        opt_xi2 = minimize_scalar(objective, bounds=(0.2, 1), method='bounded', options={'maxiter': maxiter})
+
+        opt_xi2 = minimize_scalar(
+            objective, bounds=(0.2, 1), method="bounded", options={"maxiter": maxiter}
+        )
         options[key] = opt_xi2
     return options
 
