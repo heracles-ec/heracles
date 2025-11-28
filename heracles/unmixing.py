@@ -48,6 +48,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
     options = {}
     inv_covs = {}
     for key, wcl in data_wcls.items():
+        print(f"Tuning natural unmixing for key: {key}")
         # create a dictionary only with the current key
         a, b, i, j = key
         cov_key = (a, b, a, b, i, j, i, j)
@@ -56,6 +57,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
         # The objective function to minimize depends
         # on the spin of the wcl
         s1, s2 = wcl.spin
+        print(f"Cov key: {cov_key}")
 
         def objective(x0):
             corr_wmls = correct_correlation(wmls, x0=x0)
@@ -66,27 +68,24 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
                 diff = corr_cl - target_cl
                 if cov_key not in inv_covs:
                     inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array)
-                cov_inv = inv_covs[cov_key]
-                cov_inv = np.linalg.pinv(cov[cov_key].array)
-            if s1 != 0 or s2 != 0:
+            if (s1 != 0 and s2 == 0) or (s1 == 0 and s2 != 0):
                 diff = corr_cl[0, :] - target_cl[0, :]
                 if cov_key not in inv_covs:
                     inv_covs[cov_key] = np.linalg.pinv(cov[cov_key].array[0, 0, :, :])
-                cov_inv = inv_covs[cov_key]
             if s1 != 0 and s2 != 0:
-                diff = corr_cl[:, :, :] - target_cl[0, 0, :]
+                diff = corr_cl[0, 0, :] - target_cl[0, 0, :]
                 if cov_key not in inv_covs:
                     inv_covs[cov_key] = np.linalg.pinv(
                         cov[cov_key].array[0, 0, 0, 0, :, :]
                     )
-                cov_inv = inv_covs[cov_key]
+            cov_inv = inv_covs[cov_key]
             xi2 = diff.T @ cov_inv @ diff
             return xi2
 
         opt_xi2 = minimize_scalar(
             objective, bounds=(0.2, 1), method="bounded", options={"maxiter": maxiter}
         )
-        options[key] = opt_xi2
+        options[key] = opt_xi2.x
     return options
 
 

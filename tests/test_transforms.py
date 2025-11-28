@@ -2,6 +2,16 @@ import numpy as np
 import heracles
 
 
+def test_tune_natural_unmixing(cls0, mls0, cov_jk, fields):
+    tuned_params = heracles.unmixing.tune_natural_unmixing(
+        cls0, mls0, cls0, cov_jk, fields, maxiter=3
+    )
+    assert list(cls0.keys()) == list(tuned_params.keys())
+    for key in list(cls0.keys()):
+        x0 = tuned_params[key]
+        assert 0.2 <= x0 <= 1.0
+
+
 def test_transforms(cls0):
     wcls0 = heracles.transforms.transform_cls(cls0)
     for key in list(cls0.keys()):
