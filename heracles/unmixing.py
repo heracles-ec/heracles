@@ -58,8 +58,8 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
         # on the spin of the wcl
         s1, s2 = wcl.spin
 
-        def objective(x0):
-            corr_wmls = correct_correlation(wmls, x0=x0)
+        def objective(rtol):
+            corr_wmls = correct_correlation(wmls, rtol=rtol)
             corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
             corr_cl = get_cl(key, corr_cls).array
             target_cl = get_cl(key, _target_cls).array
@@ -88,7 +88,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
     return options
 
 
-def natural_unmixing(cls, mls, fields, x0=-2, k=50, lmax=None):
+def natural_unmixing(cls, mls, fields, options={}, rtol=0.3, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -101,7 +101,7 @@ def natural_unmixing(cls, mls, fields, x0=-2, k=50, lmax=None):
     """
     mask_lmax = mls[list(mls.keys())[0]].shape[-1] - 1
     wmls = transform_cls(mls)
-    wmls = correct_correlation(wmls, x0=x0, k=k)
+    wmls = correct_correlation(wmls, rtol=rtol)
     wcls = transform_cls(cls, lmax_out=mask_lmax)
     return _natural_unmixing(wcls, wmls, fields, lmax=lmax)
 
@@ -134,23 +134,21 @@ def _natural_unmixing(wcls, wmls, fields, lmax=None):
     return corr_cls
 
 
-def correct_correlation(wms, x0=-5, k=50):
+def correct_correlation(wms, rtol=0.3):
     """
     Correct correlation functions using a logistic function.
     Args:
         wms: mask correlation functions
-        x0: midpoint of the logistic function
-        k: steepness of the logistic function
+        rtol: relative tolerance for the cutoff
     Returns:
         corrected_wms: corrected mask correlation functions
     """
     corrected_wms = {}
     for key, wm in wms.items():
         wm = wm.array
-        x = np.log10(np.abs(wm))
-        correction = logistic(x, x0=x0, k=k)
-        corrected_array = wm * correction
-        corrected_wms[key] = replace(wms[key], array=corrected_array)
+        cutoff = rtol * np.max(np.abs(wm))
+        wm *= logistic(np.log10(abs(wm)), x0=np.log10(cutoff))
+        corrected_wms[key] = replace(wms[key], array=wm)
     return corrected_wms
 
 
