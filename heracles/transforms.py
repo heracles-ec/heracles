@@ -162,6 +162,10 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     :return: array of power spectra, cl[L, ix], where L starts at zero and ix=0,1,2,3 in order TT, EE, BB, TE.
       They include :math:`\ell(\ell+1)/2\pi` factors.
     """
+    if corrs.ndim == 1:
+        corrs = np.array(
+            [corrs, np.zeros_like(corrs), np.zeros_like(corrs), np.zeros_like(corrs)]
+        ).T
 
     if lmax is None:
         lmax = corrs.shape[0] - 1

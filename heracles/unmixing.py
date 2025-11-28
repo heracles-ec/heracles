@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import truncated
-from .transforms import cl2corr, corr2cl, transform_cls
+from .transforms import cl2corr, corr2cl, transform_cls, transform_corrs
 from .utils import get_cl
 
 try:
@@ -32,98 +32,46 @@ def natural_unmixing(cls, mls, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
-        d: Data Cl
-        m: mask Cl
+        cls: Data Cl
+        mls: mask Cl
         fields: list of fields
         patch_hole: If True, apply the patch hole correction
     Returns:
-        corr_d: Corrected Cl
+        corr_cls: Corrected Cl
     """
-    wmls = transform_cls(mls, fields)
+    mask_lmax = mls[list(mls.keys())[0]].shape[-1] - 1
+    wmls = transform_cls(mls)
     wmls = correct_correlation(wmls, x0=x0, k=k)
-    return _natural_unmixing(cls, wmls, fields, lmax=lmax)
+    wcls = transform_cls(cls, lmax_out=mask_lmax)
+    return _natural_unmixing(wcls, wmls, fields, lmax=lmax)
 
 
-def _natural_unmixing(d, wm, fields, lmax=None):
+def _natural_unmixing(wcls, wmls, fields, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
-        d: Data Cl
-        wm: mask correlation function
+        wcls: data correlation function
+        wmls: mask correlation function
         fields: list of fields
         patch_hole: If True, apply the patch hole correction
     Returns:
-        corr_d: Corrected Cl
+        corr_cls: Corrected Cl
     """
-    corr_d = {}
+    corr_wcls = {}
     masks = {}
     for key, field in fields.items():
         if field.mask is not None:
             masks[key] = field.mask
-
-    for key in d.keys():
+    for key in wcls.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        _wm = get_cl(m_key, wm)
-        _d = d[key]
-        s1, s2 = _d.spin
-        if lmax is None:
-            *_, lmax = _d.shape
-        lmax_mask = len(_wm.array)
-        # Grab metadata
-        dtype = _d.array.dtype
-        # pad cls
-        _d = np.atleast_2d(_d.array)
-        pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
-        pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
-        _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
-        if (s1 != 0) and (s2 != 0):
-            __d = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    _d[0, 0],  # EE like spin-2
-                    _d[1, 1],  # BB like spin-2
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            __id = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    -_d[0, 1],  # EB like spin-0
-                    _d[1, 0],  # EB like spin-0
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            # Correct by alpha
-            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd / _wm).real
-            icorr_wd = (wd / _wm).imag
-            # Transform back to Cl
-            __corr_d = corr2cl(corr_wd.T).T
-            __icorr_d = corr2cl(icorr_wd.T).T
-            # reorder
-            _corr_d = np.zeros_like(_d)
-            _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
-            _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
-            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
-        else:
-            # Treat everything as spin-0
-            _corr_d = []
-            for cl in _d:
-                wd = cl2corr(cl).T
-                corr_wd = wd / _wm
-                # Transform back to Cl
-                __corr_d = corr2cl(corr_wd.T).T
-                _corr_d.append(__corr_d[0])
-            # remove extra axis
-            _corr_d = np.squeeze(_corr_d)
-        # Add metadata back
-        _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = replace(d[key], array=_corr_d)
-    # truncate to lmax
-    corr_d = truncated(corr_d, lmax)
-    return corr_d
+        wml = get_cl(m_key, wmls).array
+        wcl = wcls[key].array
+        wcl /= wml
+        corr_wcls[key] = replace(wcls[key], array=wcl)
+
+    corr_cls = transform_corrs(corr_wcls)
+    return corr_cls
 
 
 def correct_correlation(wms, x0=-5, k=50):
@@ -144,6 +92,7 @@ def correct_correlation(wms, x0=-5, k=50):
         corrected_array = wm * correction
         corrected_wms[key] = replace(wms[key], array=corrected_array)
     return corrected_wms
+
 
 def logistic(x, x0=-5, k=50):
     return 1.0 + np.exp(-k * (x - x0))
