@@ -57,7 +57,6 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
         # The objective function to minimize depends
         # on the spin of the wcl
         s1, s2 = wcl.spin
-        print(f"Cov key: {cov_key}")
 
         def objective(x0):
             corr_wmls = correct_correlation(wmls, x0=x0)
