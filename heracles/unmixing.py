@@ -27,6 +27,67 @@ except ImportError:
     from dataclasses import replace
 
 
+def tune_direct_inversion(data_cls, mms, target_cls, cov, maxiter=10):
+    """
+    Tune the natural unmixing parameters to minimize the difference between
+    the unmixing-corrected data Cl and the target Cl.
+    Args:
+        data_cls: Data Cl
+        mls: mask Cl
+        target_cls: Target Cl
+        cov: Covariance of the data Cl
+        fields: list of fields
+    Returns:
+        tuned_params: Dictionary with the tuned parameters
+    """
+    from scipy.optimize import minimize_scalar
+
+    options = {}
+    for key, data_cl in data_cls.items():
+        print(f"Tuning natural unmixing for key: {key}")
+        # create a dictionary only with the current key
+        a, b, i, j = key
+        cov_key = (a, b, a, b, i, j, i, j)
+        # The objective function to minimize depends
+        # on the spin of the wcl
+        s1, s2 = data_cl.spin
+        if s1 == 0 and s2 == 0:
+            _data_cl = data_cl.array
+            _target_cl = target_cls[key].array
+            mm = get_cl(key, mms).array
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array)
+        if (s1 != 0 and s2 == 0) or (s1 == 0 and s2 != 0):
+            _data_cl = data_cl.array[0, :]
+            _target_cl = target_cls[key].array[0, :]
+            mm = get_cl(key, mms).array
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array[0, 0, :, :])
+        if s1 != 0 and s2 != 0:
+            _data_cl = data_cl.array[0, 0, :]
+            _target_cl = target_cls[key].array[0, 0, :]
+            mm = get_cl(key, mms)[0, :, :]
+            print("mm shape: ", get_cl(key, mms).shape)
+            U, s, Vt = np.linalg.svd(mm, full_matrices=False)
+            inv_cov = np.linalg.pinv(cov[cov_key].array[0, 0, 0, 0, :, :])
+
+        def objective(rtol):
+            # Invert singular values with cutoff
+            cutoff = rtol * np.max(s)
+            s_inv = np.array([1/si if si > cutoff else 0 for si in s])
+            inv_mm = (Vt.T * s_inv) @ U.T
+            corr_cl = inv_mm @ _data_cl
+            diff = corr_cl - _target_cl
+            xi2 = diff.T @ inv_cov @ diff
+            return xi2
+
+        opt_xi2 = minimize_scalar(
+            objective, bounds=(0.2, 1), method="bounded", options={"maxiter": maxiter}
+        )
+        options[key] = opt_xi2.x
+    return options
+
+
 def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
     """
     Tune the natural unmixing parameters to minimize the difference between
@@ -47,17 +108,16 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
 
     options = {}
     inv_covs = {}
-    for key, wcl in data_wcls.items():
+    for key, data_wcl in data_wcls.items():
         print(f"Tuning natural unmixing for key: {key}")
         # create a dictionary only with the current key
         a, b, i, j = key
         cov_key = (a, b, a, b, i, j, i, j)
-        _data_wcls = {key: wcl}
+        _data_wcls = {key: data_wcl}
         _target_cls = {key: target_cls[key]}
         # The objective function to minimize depends
         # on the spin of the wcl
-        s1, s2 = wcl.spin
-
+        s1, s2 = data_wcl.spin
         def objective(rtol):
             corr_wmls = correct_correlation(wmls, rtol=rtol)
             corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
@@ -77,8 +137,8 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
                     inv_covs[cov_key] = np.linalg.pinv(
                         cov[cov_key].array[0, 0, 0, 0, :, :]
                     )
-            cov_inv = inv_covs[cov_key]
-            xi2 = diff.T @ cov_inv @ diff
+            inv_cov = inv_covs[cov_key]
+            xi2 = diff.T @ inv_cov @ diff
             return xi2
 
         opt_xi2 = minimize_scalar(
