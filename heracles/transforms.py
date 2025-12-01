@@ -218,6 +218,7 @@ def transform_cls(cls, lmax_out=None):
             pad_width = [(0, 0)] * cl.ndim  # no padding for other dims
             pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
             cl = np.pad(cl, pad_width, mode="constant", constant_values=0)
+            lmax = lmax_out
         if (s1 != 0) and (s2 != 0):
             _cl = np.array(
                 [
@@ -256,10 +257,10 @@ def transform_cls(cls, lmax_out=None):
         # Add metadata back
         wd = np.array(list(wd), dtype=dtype)
         wds[key] = replace(cls[key],
-                           ell=np.arange(lmax_out),
-                           lower=np.arange(lmax_out)[:-1],
-                           upper=np.arange(lmax_out)[1:],
-                           weight=np.ones(lmax_out),
+                           ell=np.arange(lmax),
+                           lower=np.arange(lmax)[:-1],
+                           upper=np.arange(lmax)[1:],
+                           weight=np.ones(lmax),
                            array=wd)
     # truncate to lmax
     wds = truncated(wds, lmax_out)
@@ -289,6 +290,7 @@ def transform_corrs(wds, lmax_out=None):
             pad_width = [(0, 0)] * wd.ndim  # no padding for other dims
             pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
             wd = np.pad(wd, pad_width, mode="constant", constant_values=0)
+            lmax = lmax_out
         if (s1 != 0) and (s2 != 0):
             _wd = np.array(
                 [
@@ -326,10 +328,10 @@ def transform_corrs(wds, lmax_out=None):
         # Add metadata back
         cl = np.array(list(cl), dtype=dtype)
         cls[key] = replace(wds[key],
-                           ell=np.arange(lmax_out),
-                           lower=np.arange(lmax_out)[:-1],
-                           upper=np.arange(lmax_out)[1:],
-                           weight=np.ones(lmax_out), 
+                           ell=np.arange(lmax),
+                           lower=np.arange(lmax)[:-1],
+                           upper=np.arange(lmax)[1:],
+                           weight=np.ones(lmax),
                            array=cl)
     # truncate to lmax
     cls = truncated(cls, lmax_out)
