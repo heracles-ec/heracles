@@ -188,7 +188,8 @@ def _natural_unmixing(wcls, wmls, fields, lmax=None):
     for key in wcls.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        corr_wcls[key] = replace(wcls[key], array=wcls[key].array / wmls[m_key].array)
+        wml = get_cl(m_key, wmls).array
+        corr_wcls[key] = replace(wcls[key], array=wcls[key].array / wml)
 
     corr_cls = transform_corrs(corr_wcls, lmax_out=lmax)
     return corr_cls
