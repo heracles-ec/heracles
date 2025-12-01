@@ -256,7 +256,7 @@ def transform_cls(cls, lmax_out=None):
         wd = np.array(list(wd), dtype=dtype)
         wds[key] = replace(cls[key], array=wd)
     # truncate to lmax
-    wds = truncated(wds, lmax)
+    wds = truncated(wds, lmax_out)
     return wds
 
 
@@ -320,5 +320,5 @@ def transform_corrs(wds, lmax_out=None):
         cl = np.array(list(cl), dtype=dtype)
         cls[key] = replace(wds[key], array=cl)
     # truncate to lmax
-    cls = truncated(cls, lmax)
+    cls = truncated(cls, lmax_out)
     return cls
