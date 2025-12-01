@@ -256,7 +256,7 @@ def transform_cls(cls, lmax_out=None):
         wd = np.array(list(wd), dtype=dtype)
         wds[key] = replace(cls[key], array=wd)
     # truncate to lmax
-    #wds = truncated(wds, lmax)
+    wds = truncated(wds, lmax)
     return wds
 
 

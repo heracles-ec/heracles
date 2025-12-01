@@ -150,7 +150,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
     return options
 
 
-def natural_unmixing(cls, mls, fields, options={}, rtol=0.3, lmax=None):
+def natural_unmixing(cls, mls, fields, options={}, rtol=0.3):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -162,6 +162,7 @@ def natural_unmixing(cls, mls, fields, options={}, rtol=0.3, lmax=None):
         corr_cls: Corrected Cl
     """
     mask_lmax = mls[list(mls.keys())[0]].shape[-1]
+    lmax = cls[list(cls.keys())[0]].shape[-1]
     wmls = transform_cls(mls)
     wmls = correct_correlation(wmls, options=options, rtol=rtol)
     wcls = transform_cls(cls, lmax_out=mask_lmax)
