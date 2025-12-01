@@ -1,4 +1,5 @@
 from scipy.special import lpn as legendrep
+from heracles.twopoint import truncated
 import numpy as np
 
 
@@ -254,6 +255,8 @@ def transform_cls(cls, lmax_out=None):
         # Add metadata back
         wd = np.array(list(wd), dtype=dtype)
         wds[key] = replace(cls[key], array=wd)
+    # truncate to lmax
+    wds = truncated(wds, lmax)
     return wds
 
 
@@ -316,4 +319,6 @@ def transform_corrs(wds, lmax_out=None):
         # Add metadata back
         cl = np.array(list(cl), dtype=dtype)
         cls[key] = replace(wds[key], array=cl)
+    # truncate to lmax
+    cls = truncated(cls, lmax)
     return cls
