@@ -32,6 +32,12 @@ from .core import TocDict, toc_match, update_metadata
 from .progress import NoProgress, Progress
 from .result import Result, binned, truncated
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
 
@@ -446,7 +452,7 @@ def invert_mixing_matrix(
             else:
                 _inv_M = np.linalg.pinv(_M, rcond=rtol)
 
-            inv_M[key] = Result(_inv_M, axis=value.axis, ell=new_ell)
+            inv_M[key] = replace(M[key], array=_inv_M)
 
     return inv_M
 
@@ -482,7 +488,7 @@ def apply_mixing_matrix(d, M, lmax=None):
                 _corr_d.append(_M @ cl)
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = Result(_corr_d, axis=axis, ell=ell_mask)
+        corr_d[key] = replace(d[key], array=_corr_d)
     # truncate
     corr_d = truncated(corr_d, lmax)
     return corr_d
