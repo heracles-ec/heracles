@@ -13,6 +13,13 @@ def test_tune_direct_inversion(cls0, mls0, cov_jk, fields):
         x0 = tuned_params[key]
         assert 0.2 <= x0 <= 1.0
 
+    inv_mms0 = heracles.twopoint.invert_mixing_matrix(
+        mms0,
+        options=tuned_params,
+        rtol=None,
+    )
+    assert list(mms0.keys()) == list(inv_mms0.keys())
+
 
 def test_tune_natural_unmixing(cls0, mls0, cov_jk, fields):
     tuned_params = heracles.unmixing.tune_natural_unmixing(

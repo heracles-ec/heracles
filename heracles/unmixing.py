@@ -195,7 +195,7 @@ def _natural_unmixing(wcls, wmls, fields, lmax=None):
     return corr_cls
 
 
-def correct_correlation(wms, options, rtol=0.3):
+def correct_correlation(wms, options={}, rtol=0.3):
     """
     Correct correlation functions using a logistic function.
     Args:
