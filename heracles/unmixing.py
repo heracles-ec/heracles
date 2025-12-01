@@ -192,7 +192,7 @@ def _natural_unmixing(wcls, wmls, fields, lmax=None):
         wcl /= wml
         corr_wcls[key] = replace(wcls[key], array=wcl)
 
-    corr_cls = transform_corrs(corr_wcls)
+    corr_cls = transform_corrs(corr_wcls, lmax_out=lmax)
     return corr_cls
 
 
