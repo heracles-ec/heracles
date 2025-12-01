@@ -103,6 +103,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
     """
     from scipy.optimize import minimize_scalar
 
+    lmax = data_cls[list(data_cls.keys())[0]].shape[-1]
     mask_lmax = mls[list(mls.keys())[0]].shape[-1]
     wmls = transform_cls(mls)
     data_wcls = transform_cls(data_cls, lmax_out=mask_lmax)
@@ -122,7 +123,7 @@ def tune_natural_unmixing(data_cls, mls, target_cls, cov, fields, maxiter=10):
 
         def objective(rtol):
             corr_wmls = correct_correlation(wmls, rtol=rtol)
-            corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields)
+            corr_cls = _natural_unmixing(_data_wcls, corr_wmls, fields, lmax=lmax)
             corr_cl = get_cl(key, corr_cls).array
             target_cl = get_cl(key, _target_cls).array
             if s1 == 0 and s2 == 0:
