@@ -214,9 +214,10 @@ def transform_cls(cls, lmax_out=None):
         dtype = cl.array.dtype
         # pad cls
         cl = np.atleast_2d(cl.array)
-        pad_width = [(0, 0)] * cl.ndim  # no padding for other dims
-        pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
-        cl = np.pad(cl, pad_width, mode="constant", constant_values=0)
+        if lmax_out > lmax:
+            pad_width = [(0, 0)] * cl.ndim  # no padding for other dims
+            pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
+            cl = np.pad(cl, pad_width, mode="constant", constant_values=0)
         if (s1 != 0) and (s2 != 0):
             _cl = np.array(
                 [
@@ -284,9 +285,10 @@ def transform_corrs(wds, lmax_out=None):
         dtype = wd.array.dtype
         # pad cls
         wd = np.atleast_2d(wd.array)
-        pad_width = [(0, 0)] * wd.ndim  # no padding for other dims
-        pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
-        wd = np.pad(wd, pad_width, mode="constant", constant_values=0)
+        if lmax_out > lmax:
+            pad_width = [(0, 0)] * wd.ndim  # no padding for other dims
+            pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
+            wd = np.pad(wd, pad_width, mode="constant", constant_values=0)
         if (s1 != 0) and (s2 != 0):
             _wd = np.array(
                 [
