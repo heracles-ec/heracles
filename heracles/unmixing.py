@@ -212,8 +212,8 @@ def correct_correlation(wms, options={}, rtol=0.3):
             rtol = rtol
         wm = wm.array
         cutoff = rtol * np.max(np.abs(wm))
-        wm *= logistic(np.log10(abs(wm)), x0=np.log10(cutoff))
-        corrected_wms[key] = replace(wms[key], array=wm)
+        _wm = wm * logistic(np.log10(abs(wm)), x0=np.log10(cutoff))
+        corrected_wms[key] = replace(wms[key], array=_wm)
     return corrected_wms
 
 
