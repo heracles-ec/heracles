@@ -161,8 +161,8 @@ def natural_unmixing(cls, mls, fields, options={}, rtol=0.3):
     Returns:
         corr_cls: Corrected Cl
     """
-    mask_lmax = mls[list(mls.keys())[0]].shape[-1]-1
-    lmax = cls[list(cls.keys())[0]].shape[-1]-1
+    mask_lmax = mls[list(mls.keys())[0]].shape[-1]
+    lmax = cls[list(cls.keys())[0]].shape[-1]
     wmls = transform_cls(mls)
     wmls = correct_correlation(wmls, options=options, rtol=rtol)
     wcls = transform_cls(cls, lmax_out=mask_lmax)
