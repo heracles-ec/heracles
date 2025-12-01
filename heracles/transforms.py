@@ -254,7 +254,12 @@ def transform_cls(cls, lmax_out=None):
             wd = np.squeeze(wd)
         # Add metadata back
         wd = np.array(list(wd), dtype=dtype)
-        wds[key] = replace(cls[key], array=wd)
+        wds[key] = replace(cls[key],
+                           ell=np.arange(lmax_out),
+                           lower=np.arange(lmax_out)[:-1],
+                           upper=np.arange(lmax_out)[1:],
+                           weight=np.ones(lmax_out),
+                           array=wd)
     # truncate to lmax
     wds = truncated(wds, lmax_out)
     return wds
@@ -318,7 +323,12 @@ def transform_corrs(wds, lmax_out=None):
             cl = np.squeeze(cl)
         # Add metadata back
         cl = np.array(list(cl), dtype=dtype)
-        cls[key] = replace(wds[key], array=cl)
+        cls[key] = replace(wds[key],
+                           ell=np.arange(lmax_out),
+                           lower=np.arange(lmax_out)[:-1],
+                           upper=np.arange(lmax_out)[1:],
+                           weight=np.ones(lmax_out), 
+                           array=cl)
     # truncate to lmax
     cls = truncated(cls, lmax_out)
     return cls
