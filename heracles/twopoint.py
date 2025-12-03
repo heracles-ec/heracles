@@ -471,8 +471,6 @@ def apply_mixing_matrix(d, M, lmax=None):
         if lmax is None:
             *_, lmax = d[key].shape
         dtype = d[key].array.dtype
-        ell_mask = M[key].ell
-        axis = d[key].axis
         s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array

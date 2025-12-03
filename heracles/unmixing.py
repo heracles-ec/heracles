@@ -44,7 +44,7 @@ def tune_direct_inversion(data_cls, mms, target_cls, cov, maxiter=10):
 
     options = {}
     for key, data_cl in data_cls.items():
-        print(f"Tuning natural unmixing for key: {key}")
+        print(f"Tuning direct inversion for key: {key}")
         # create a dictionary only with the current key
         a, b, i, j = key
         cov_key = (a, b, a, b, i, j, i, j)
@@ -67,7 +67,6 @@ def tune_direct_inversion(data_cls, mms, target_cls, cov, maxiter=10):
             _data_cl = data_cl.array[0, 0, :]
             _target_cl = target_cls[key].array[0, 0, :]
             mm = get_cl(key, mms)[0, :, :]
-            print("mm shape: ", get_cl(key, mms).shape)
             U, s, Vt = np.linalg.svd(mm, full_matrices=False)
             inv_cov = np.linalg.pinv(cov[cov_key].array[0, 0, 0, 0, :, :])
 
@@ -163,7 +162,7 @@ def natural_unmixing(cls, mls, fields, options={}, rtol=0.3):
         corr_cls: Corrected Cl
     """
     mask_lmax = mls[list(mls.keys())[0]].shape[-1]
-    lmax = cls[list(cls.keys())[0]].shape[-1]
+    lmax = cls[list(cls.keys())[0]].shape[-1]-1
     wmls = transform_cls(mls)
     wmls = correct_correlation(wmls, options=options, rtol=rtol)
     wcls = transform_cls(cls, lmax_out=mask_lmax)
