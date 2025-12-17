@@ -101,6 +101,23 @@ def test_mask_correction(cls0, mls0, fields):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
+def test_polspice(cls0):
+    from heracles.utils import get_cl
+
+    cls = np.array(
+        [
+            get_cl(("POS", "POS", 1, 1), cls0),
+            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
+            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
+            get_cl(("POS", "SHE", 1, 1), cls0)[0],
+        ]
+    ).T
+    corrs = heracles.cl2corr(cls)
+    _cls = heracles.corr2cl(corrs)
+    for cl, _cl in zip(cls.T, _cls.T):
+        assert np.isclose(cl[2:], _cl[2:]).all()
+
+
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):
     assert len(cls1) == njk
     for key in cls1.keys():
