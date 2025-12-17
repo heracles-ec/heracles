@@ -46,7 +46,7 @@ def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
         _wm = cl2corr(_m).T[0]
         if patch_hole:
             _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
-        wm[m_key] = replace(d[m_key], array=_wm)
+        wm[m_key] = replace(m[m_key], array=_wm)
     return _natural_unmixing(d, wm, fields, lmax=lmax)
 
 
