@@ -1,6 +1,7 @@
 import pytest
 
 import heracles
+from heracles.result import Result
 
 
 @pytest.fixture
@@ -72,7 +73,7 @@ def mock_cls(rng):
         },
     )
 
-    cl22 = rng.random((3, 101))
+    cl22 = rng.random((2, 2, 101))
     cl22.dtype = np.dtype(
         cl22.dtype,
         metadata={
@@ -85,7 +86,7 @@ def mock_cls(rng):
         },
     )
 
-    cl22x = rng.random((4, 101))
+    cl22x = rng.random((2, 2, 101))
     cl22x.dtype = np.dtype(
         cl22x.dtype,
         metadata={
@@ -99,16 +100,16 @@ def mock_cls(rng):
     )
 
     return {
-        ("POS", "POS", 0, 0): cl00,
-        ("POS", "SHE", 0, 0): cl02,
-        ("SHE", "SHE", 0, 0): cl22,
-        ("POS", "POS", 0, 1): cl00,
-        ("POS", "SHE", 0, 1): cl02,
-        ("SHE", "SHE", 0, 1): cl22x,
-        ("POS", "SHE", 1, 0): cl02,
-        ("POS", "POS", 1, 1): cl00,
-        ("POS", "SHE", 1, 1): cl02,
-        ("SHE", "SHE", 1, 1): cl22,
+        ("POS", "POS", 0, 0): Result(cl00, axis=0, spin=(0, 0)),
+        ("POS", "SHE", 0, 0): Result(cl02, axis=1, spin=(0, 2)),
+        ("SHE", "SHE", 0, 0): Result(cl22, axis=2, spin=(2, 2)),
+        ("POS", "POS", 0, 1): Result(cl00, axis=0, spin=(0, 0)),
+        ("POS", "SHE", 0, 1): Result(cl02, axis=1, spin=(0, 2)),
+        ("SHE", "SHE", 0, 1): Result(cl22x, axis=2, spin=(0, 0)),
+        ("POS", "SHE", 1, 0): Result(cl02, axis=1, spin=(0, 2)),
+        ("POS", "POS", 1, 1): Result(cl00, axis=0, spin=(0, 0)),
+        ("POS", "SHE", 1, 1): Result(cl02, axis=1, spin=(0, 2)),
+        ("SHE", "SHE", 1, 1): Result(cl22, axis=2, spin=(2, 2)),
     }
 
 
@@ -349,6 +350,7 @@ def test_write_read_cls(mock_cls, tmp_path):
         assert key in cls
         cl, mock_cl = cls[key], mock_cls[key]
         assert cl.axis == (cl.ndim - 1,)
+        assert cl.spin == mock_cl.spin
         lmax = mock_cl.shape[-1] - 1
         np.testing.assert_array_equal(cl, mock_cl)
         np.testing.assert_array_equal(cl.ell, np.arange(lmax + 1))
@@ -361,9 +363,18 @@ def test_write_read_mms(rng, tmp_path):
     path = tmp_path / "test.fits"
 
     mms = {
-        ("POS", "POS", 0, 1): heracles.Result(rng.standard_normal((10, 10)), axis=0),
-        ("POS", "SHE", 1, 2): heracles.Result(rng.standard_normal((20, 5)), axis=0),
-        ("SHE", "SHE", 2, 3): heracles.Result(rng.standard_normal((10, 5, 2)), axis=1),
+        ("POS", "POS", 1, 1): heracles.Result(
+            rng.standard_normal((10, 10)), spin=None, axis=0
+        ),
+        ("POS", "POS", 0, 1): heracles.Result(
+            rng.standard_normal((10, 10)), spin=(0, 0), axis=0
+        ),
+        ("POS", "SHE", 1, 2): heracles.Result(
+            rng.standard_normal((20, 5)), spin=(0, 2), axis=0
+        ),
+        ("SHE", "SHE", 2, 3): heracles.Result(
+            rng.standard_normal((10, 5, 2)), spin=(2, 2), axis=1
+        ),
     }
 
     assert not path.exists()
@@ -379,6 +390,7 @@ def test_write_read_mms(rng, tmp_path):
         assert key in mms_
         mm = mms_[key]
         assert mm.axis == (mm.ndim - 2,)
+        assert mm.spin == mms[key].spin
         lmax = mm.shape[-2] - 1
         np.testing.assert_array_equal(mm, mms[key])
         np.testing.assert_array_equal(mm.ell, np.arange(lmax + 1))
@@ -394,8 +406,12 @@ def test_write_read_cov(mock_cls, tmp_path):
         mock_cls, 2
     ):
         cl1, cl2 = mock_cls[a1, b1, i1, j1], mock_cls[a2, b2, i2, j2]
+        sa1, sb1 = cl1.spin
+        sa2, sb2 = cl2.spin
         c = cl1[..., None, : cl1.shape[-1] // 2, None] * cl2[..., None, :]
-        cov[a1, b1, a2, b2, i1, j1, i2, j2] = heracles.Result(c, axis=(-2, -1))
+        cov[a1, b1, a2, b2, i1, j1, i2, j2] = heracles.Result(
+            c, spin=(sa1, sa2, sb1, sb2), axis=(-2, -1)
+        )
 
     path = tmp_path / "cov.fits"
 
