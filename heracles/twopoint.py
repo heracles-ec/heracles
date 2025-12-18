@@ -432,7 +432,6 @@ def invert_mixing_matrix(
         _M = value.array
         s1, s2 = value.spin
         *_, _n, _m = _M.shape
-        new_ell = np.arange(_m)
 
         if key in options:
             rtol = options[key]
