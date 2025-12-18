@@ -242,7 +242,7 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
 
 def get_mask_correlation_ratio(Mljk, Mls0):
     """
-    Computes the ratio of the correlation 
+    Computes the ratio of the correlation
     functions of the masks Cls.
     input:
         Mljk (np.array): mask of delete1 Cls
