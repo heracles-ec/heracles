@@ -404,6 +404,7 @@ def mixing_matrices(
 
 def invert_mixing_matrix(
     M,
+    options={},
     rtol: float = 1e-5,
     progress: Progress | None = None,
 ):
@@ -431,6 +432,11 @@ def invert_mixing_matrix(
         _M = value.array
         s1, s2 = value.spin
         *_, _n, _m = _M.shape
+
+        if key in options:
+            rtol = options[key]
+        else:
+            rtol = rtol
 
         with progress.task(f"invert {key}"):
             if (s1 != 0) and (s2 != 0):

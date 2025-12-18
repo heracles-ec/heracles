@@ -1,5 +1,14 @@
 from scipy.special import lpn as legendrep
+from heracles.twopoint import truncated
 import numpy as np
+
+
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 
 gauss_legendre = None
 _gauss_legendre_cache = {}
@@ -154,6 +163,10 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     :return: array of power spectra, cl[L, ix], where L starts at zero and ix=0,1,2,3 in order TT, EE, BB, TE.
       They include :math:`\ell(\ell+1)/2\pi` factors.
     """
+    if corrs.ndim == 1:
+        corrs = np.array(
+            [corrs, np.zeros_like(corrs), np.zeros_like(corrs), np.zeros_like(corrs)]
+        ).T
 
     if lmax is None:
         lmax = corrs.shape[0] - 1
@@ -180,3 +193,150 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     cls[1, :] *= 2
     cls[2:, :] = cls[2:, :]
     return 2 * np.pi * cls
+
+
+def transform_cls(cls, lmax_out=None):
+    """
+    Natural unmixing of the data Cl.
+    Args:
+        cls: Data Cl
+    Returns:
+        corr: correlation function
+    """
+    wds = {}
+    for key in cls.keys():
+        cl = cls[key]
+        s1, s2 = cl.spin
+        lmax = cl.shape[-1]
+        if lmax_out is None:
+            lmax_out = lmax
+        # Grab metadata
+        dtype = cl.array.dtype
+        # pad cls
+        cl = np.atleast_2d(cl.array)
+        if lmax_out > lmax:
+            pad_width = [(0, 0)] * cl.ndim  # no padding for other dims
+            pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
+            cl = np.pad(cl, pad_width, mode="constant", constant_values=0)
+            lmax = lmax_out
+        if (s1 != 0) and (s2 != 0):
+            _cl = np.array(
+                [
+                    np.zeros_like(cl[0, 0]),
+                    cl[0, 0],  # EE like spin-2
+                    cl[1, 1],  # BB like spin-2
+                    np.zeros_like(cl[0, 0]),
+                ]
+            )
+            _icl = np.array(
+                [
+                    np.zeros_like(cl[0, 0]),
+                    -cl[0, 1],  # EB like spin-0
+                    cl[1, 0],  # EB like spin-0
+                    np.zeros_like(cl[0, 0]),
+                ]
+            )
+            # transform to corr
+            _wd = cl2corr(_cl.T).T + 1j * cl2corr(_icl.T).T
+            _iwd = _wd.imag
+            _wd = _wd.real
+            # reorganize
+            wd = np.zeros_like(cl)
+            wd[0, 0] = _wd[1]  # EE like spin-2
+            wd[1, 1] = _wd[2]  # BB like spin-2
+            wd[0, 1] = _iwd[1]  # EB like spin-0
+            wd[1, 0] = _iwd[2]  # EB like spin-0
+        else:
+            # Treat everything as spin-0
+            wd = []
+            for _cl in cl:
+                _wd = cl2corr(_cl).T
+                wd.append(_wd[0])
+            # remove extra axis
+            wd = np.squeeze(wd)
+        # Add metadata back
+        wd = np.array(list(wd), dtype=dtype)
+        wds[key] = replace(
+            cls[key],
+            ell=np.arange(lmax),
+            lower=np.arange(lmax)[:-1],
+            upper=np.arange(lmax)[1:],
+            weight=np.ones(lmax),
+            array=wd,
+        )
+    # truncate to lmax
+    wds = truncated(wds, lmax_out)
+    return wds
+
+
+def transform_corrs(wds, lmax_out=None):
+    """
+    Natural unmixing of the data Cl.
+    Args:
+        corrs: data corrs
+    Returns:
+        corr: correlation function
+    """
+    cls = {}
+    for key in wds.keys():
+        wd = wds[key]
+        s1, s2 = wd.spin
+        lmax = wd.shape[-1]
+        if lmax_out is None:
+            lmax_out = lmax
+        # Grab metadata
+        dtype = wd.array.dtype
+        # pad cls
+        wd = np.atleast_2d(wd.array)
+        if lmax_out > lmax:
+            pad_width = [(0, 0)] * wd.ndim  # no padding for other dims
+            pad_width[-1] = (0, lmax_out - lmax)  # pad only last dim
+            wd = np.pad(wd, pad_width, mode="constant", constant_values=0)
+            lmax = lmax_out
+        if (s1 != 0) and (s2 != 0):
+            _wd = np.array(
+                [
+                    np.zeros_like(wd[0, 0]),
+                    wd[0, 0],  # EE like spin-2
+                    wd[1, 1],  # BB like spin-2
+                    np.zeros_like(wd[0, 0]),
+                ]
+            )
+            _iwd = np.array(
+                [
+                    np.zeros_like(wd[0, 0]),
+                    wd[0, 1],  # EB like spin-0
+                    wd[1, 0],  # EB like spin-0
+                    np.zeros_like(wd[0, 0]),
+                ]
+            )
+            # transform to cls
+            _wd = corr2cl(_wd.T).T
+            _iwd = corr2cl(_iwd.T).T
+            # reorganize
+            cl = np.zeros_like(wd)
+            cl[0, 0] = _wd[1]  # EE like spin-2
+            cl[1, 1] = _wd[2]  # BB like spin-2
+            cl[0, 1] = _iwd[1]  # EB like spin-0
+            cl[1, 0] = _iwd[2]  # EB like spin-0
+        else:
+            # Treat everything as spin-0
+            cl = []
+            for _wd in wd:
+                _wd = corr2cl(_wd).T
+                cl.append(_wd[0])
+            # remove extra axis
+            cl = np.squeeze(cl)
+        # Add metadata back
+        cl = np.array(list(cl), dtype=dtype)
+        cls[key] = replace(
+            wds[key],
+            ell=np.arange(lmax),
+            lower=np.arange(lmax)[:-1],
+            upper=np.arange(lmax)[1:],
+            weight=np.ones(lmax),
+            array=cl,
+        )
+    # truncate to lmax
+    cls = truncated(cls, lmax_out)
+    return cls

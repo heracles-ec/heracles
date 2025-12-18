@@ -93,7 +93,8 @@ def test_get_delete2_fsky(jk_maps, njk):
 
 def test_mask_correction(cls0, mls0, fields):
     alphas = dices.mask_correction(mls0, mls0)
-    _cls = heracles.unmixing._natural_unmixing(cls0, alphas, fields)
+    wcls0 = heracles.transforms.transform_cls(cls0)
+    _cls = heracles.unmixing._natural_unmixing(wcls0, alphas, fields)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
