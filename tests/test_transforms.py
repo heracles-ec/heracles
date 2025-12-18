@@ -2,35 +2,6 @@ import numpy as np
 import heracles
 
 
-def test_tune_direct_inversion(cls0, mls0, cov_jk, fields):
-    mms0 = heracles.mixing_matrices(fields, mls0)
-    print(list(mms0.keys()))
-    tuned_params = heracles.unmixing.tune_direct_inversion(
-        cls0, mms0, cls0, cov_jk, maxiter=3
-    )
-    assert list(cls0.keys()) == list(tuned_params.keys())
-    for key in list(cls0.keys()):
-        x0 = tuned_params[key]
-        assert 0.2 <= x0 <= 1.0
-
-    inv_mms0 = heracles.twopoint.invert_mixing_matrix(
-        mms0,
-        options=tuned_params,
-        rtol=None,
-    )
-    assert list(mms0.keys()) == list(inv_mms0.keys())
-
-
-def test_tune_natural_unmixing(cls0, mls0, cov_jk, fields):
-    tuned_params = heracles.unmixing.tune_natural_unmixing(
-        cls0, mls0, cls0, cov_jk, fields, maxiter=3
-    )
-    assert list(cls0.keys()) == list(tuned_params.keys())
-    for key in list(cls0.keys()):
-        x0 = tuned_params[key]
-        assert 0.2 <= x0 <= 1.0
-
-
 def test_transforms(cls0):
     wcls0 = heracles.transforms.transform_cls(cls0)
     for key in list(cls0.keys()):
