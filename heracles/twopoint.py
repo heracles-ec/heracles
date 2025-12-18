@@ -452,7 +452,6 @@ def invert_mixing_matrix(
                 _inv_M = np.linalg.pinv(_M, rcond=rtol)
 
             inv_M[key] = replace(M[key], array=_inv_M)
-
     return inv_M
 
 
@@ -470,6 +469,7 @@ def apply_mixing_matrix(d, M, lmax=None):
         if lmax is None:
             *_, lmax = d[key].shape
         dtype = d[key].array.dtype
+        ell_mask = M[key].ell
         s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array
@@ -485,7 +485,7 @@ def apply_mixing_matrix(d, M, lmax=None):
                 _corr_d.append(_M @ cl)
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = replace(d[key], array=_corr_d)
+        corr_d[key] = replace(d[key], array=_corr_d, ell=ell_mask)
     # truncate
     corr_d = truncated(corr_d, lmax)
     return corr_d
