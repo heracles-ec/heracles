@@ -32,6 +32,12 @@ from .core import TocDict, toc_match, update_metadata
 from .progress import NoProgress, Progress
 from .result import Result, binned, truncated
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
 
@@ -425,7 +431,6 @@ def invert_mixing_matrix(
         _M = value.array
         s1, s2 = value.spin
         *_, _n, _m = _M.shape
-        new_ell = np.arange(_m)
 
         with progress.task(f"invert {key}"):
             if (s1 != 0) and (s2 != 0):
@@ -440,8 +445,7 @@ def invert_mixing_matrix(
             else:
                 _inv_M = np.linalg.pinv(_M, rcond=rtol)
 
-            inv_M[key] = Result(_inv_M, axis=value.axis, ell=new_ell)
-
+            inv_M[key] = replace(M[key], array=_inv_M)
     return inv_M
 
 
@@ -460,7 +464,6 @@ def apply_mixing_matrix(d, M, lmax=None):
             *_, lmax = d[key].shape
         dtype = d[key].array.dtype
         ell_mask = M[key].ell
-        axis = d[key].axis
         s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array
@@ -476,7 +479,7 @@ def apply_mixing_matrix(d, M, lmax=None):
                 _corr_d.append(_M @ cl)
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = Result(_corr_d, axis=axis, ell=ell_mask)
+        corr_d[key] = replace(d[key], array=_corr_d, ell=ell_mask)
     # truncate
     corr_d = truncated(corr_d, lmax)
     return corr_d

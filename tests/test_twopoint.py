@@ -374,6 +374,10 @@ def test_inverting_mixing_matrices():
     for key in mms.keys():
         *_, n, m = mms[key].shape
         *_, _n, _m = inv_mms[key].shape
+        s1, s2 = mms[key].spin
+        _s1, _s2 = inv_mms[key].spin
+        assert s1 == _s1
+        assert s2 == _s2
         assert n == _m
         assert m == _n
 
@@ -396,6 +400,11 @@ def test_inverting_mixing_matrices():
 
     # test application of mixing matrices
     mixed_cls = apply_mixing_matrix(cls, inv_mms)
+    for key in cls:
+        s1, s2 = cls[key].spin
+        _s1, _s2 = mixed_cls[key].spin
+        assert s1 == _s1
+        assert s2 == _s2
     assert mixed_cls.keys() == cls.keys()
     for key in mixed_cls:
         (n,) = mixed_cls[key].axis
