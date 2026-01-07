@@ -61,8 +61,8 @@ def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
         *_, nells = _cl.shape
         assert nells == nside // 4 + 1
     for key in list(cls0.keys()):
-        cl = cls0[key].__array__()
-        _cl = _cls0[key].__array__()
+        cl = cls0[key].array
+        _cl = _cls0[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
@@ -91,12 +91,20 @@ def test_get_delete2_fsky(jk_maps, njk):
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_mask_correction(cls0, mls0, fields):
-    alphas = dices.mask_correction(mls0, mls0)
+def test_full_mask_correction(cls0, mls0, fields):
+    alphas = dices.get_mask_correlation_ratio(mls0, mls0)
     _cls = heracles.unmixing._natural_unmixing(cls0, alphas, fields)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
+        assert np.isclose(cl[2:], _cl[2:]).all()
+
+
+def test_fast_mask_correction(cls0, fields, jk_maps):
+    _cls0 = dices.correct_footprint_reduction(cls0, jk_maps, fields, 0, 0)
+    for key in list(cls0.keys()):
+        cl = cls0[key].array
+        _cl = _cls0[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
