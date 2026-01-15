@@ -434,9 +434,17 @@ def invert_mixing_matrix(
 
         with progress.task(f"invert {key}"):
             if (s1 != 0) and (s2 != 0):
-                _inv_m = np.linalg.pinv(
-                    np.vstack((np.hstack((_M[0], _M[1])), np.hstack((_M[1], _M[0])))),
-                    rcond=rtol,
+                # Cl^EE+Cl^BB and Cl^EE-Cl^BB transformation
+                # makes the mixing matrix block-diagonal
+                M_p = _M[0] + _M[1]
+                M_m = _M[0] - _M[1]
+                inv_M_p = np.linalg.pinv(M_p, rcond=rtol)
+                inv_M_m = np.linalg.pinv(M_m, rcond=rtol)
+                _inv_m = np.vstack(
+                    (
+                        np.hstack(((inv_M_p + inv_M_m) / 2, (inv_M_p - inv_M_m) / 2)),
+                        np.hstack(((inv_M_p - inv_M_m) / 2, (inv_M_p + inv_M_m) / 2)),
+                    )
                 )
                 _inv_M_EEEE = _inv_m[:_m, :_n]
                 _inv_M_EEBB = _inv_m[_m:, :_n]
