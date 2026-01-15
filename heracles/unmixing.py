@@ -28,14 +28,14 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, fields, rtol=0.0, lmax=None):
+def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
         d: Data Cl
         m: mask Cl
         fields: list of fields
-        rtol: Relative tolerance for logistic correction
+        patch_hole: If True, apply the patch hole correction
     Returns:
         corr_d: Corrected Cl
     """
@@ -44,11 +44,8 @@ def natural_unmixing(d, m, fields, rtol=0.0, lmax=None):
     for m_key in m_keys:
         _m = m[m_key].array
         _wm = cl2corr(_m).T[0]
-        if rtol != 0.0:
-            if rtol is None:
-                rtol = naive_tuning(_wm)
-            tol = rtol * np.max(np.abs(wm))
-            _wm *= logistic(np.log10(abs(_wm)), tol=np.log10(tol))
+        if patch_hole:
+            _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
         wm[m_key] = replace(m[m_key], array=_wm)
     return _natural_unmixing(d, wm, fields, lmax=lmax)
 
@@ -135,28 +132,5 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     return corr_d
 
 
-def naive_tuning(f):
-    # Compute the gradient
-    df = np.diff((f-f[-1])[::-1])
-    # Find numerical divergences
-    # by looking for numerical oscillations
-    divs = np.where(df[1:]*df[:-1] < 0)[0]
-    if len(divs) == 0:
-        # No divergences
-        tolerance = 0
-    else:
-        idx = divs[0]
-        # Find the value of f for which it is half
-        # way through its divergence
-        cusp_df = df[idx-1]
-        target = np.exp(0.5*(np.log(cusp_df/df[0])))
-        target_idx = np.argmin(np.abs(f - target))
-        # find the associated value of wm
-        target_f = f[target_idx]
-        # Compute relative tolerance
-        tolerance = np.abs(target_f)/np.max(np.abs(f))
-    return tolerance
-
-
-def logistic(x, tol=-5, k=50):
-    return 1.0 + np.exp(-k * (x - tol))
+def logistic(x, x0=-5, k=50):
+    return 1.0 + np.exp(-k * (x - x0))
