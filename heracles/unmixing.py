@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from heracles.twopoint import mixing_matrices, invert_mixing_matrix, apply_mixing_matrix
 from .result import truncated
 from .transforms import cl2corr, corr2cl
 from .utils import get_cl
@@ -28,7 +29,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, fields, rtol=0.0, lmax=None):
+def naturalspice(d, m, fields, mode="Harmonic", rtol=0.0, lmax=None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -39,23 +40,47 @@ def natural_unmixing(d, m, fields, rtol=0.0, lmax=None):
     Returns:
         corr_d: Corrected Cl
     """
-    wm = {}
-    m_keys = list(m.keys())
-    for m_key in m_keys:
-        _m = m[m_key].array
-        _wm = cl2corr(_m).T[0]
-        if rtol != 0.0:
-            if rtol is None:
-                rtol = naive_tuning(_wm)
+    # Step 1: Transform.
+    # In harmonic space this means computing the singular values
+    # of the mixing matrix.
+    # In real space this means computing the correlation function.
+    if mode == "Harmonic":
+        M = mixing_matrices(fields, m)
+
+    elif mode == "Real":
+        wm = {}
+        m_keys = list(m.keys())
+        for m_key in m_keys:
+            _m = m[m_key].array
+            _wm = cl2corr(_m).T[0]
+            wm[m_key] = replace(m[m_key], array=_wm)
+
+    # Step 2: Regularize
+    if mode == "Harmonic":
+        iM, inv_s = invert_mixing_matrix(M, rtol=rtol)
+    elif mode == "Real":
+        inv_s = {}
+        m_keys = list(m.keys())
+        for m_key in m_keys:
+            _m = m[m_key].array
+            # Apply logistic correction
             tol = rtol * np.max(np.abs(wm))
             _wm *= logistic(np.log10(abs(_wm)), tol=np.log10(tol))
-        wm[m_key] = replace(m[m_key], array=_wm)
-    return _natural_unmixing(d, wm, fields, lmax=lmax)
+            inv_s[m_key] = replace(m[m_key], array=1 / _wm)
+
+    # Step 3: Apply correction
+    if mode == "Harmonic":
+        corr_d = apply_mixing_matrix(d, iM)
+    elif mode == "Real":
+        corr_d = real_naturalspice(d, inv_s, fields, lmax=lmax)
+    return corr_d, inv_s
 
 
-def _natural_unmixing(d, wm, fields, lmax=None):
+def real_naturalspice(d, inv_wm, fields, lmax=None):
     """
-    Natural unmixing of the data Cl.
+    Computes the correlation function of the data Cl,
+    divides multiplies it by the provided inverse mask correlation function,
+    and transforms back to Cl.
     Args:
         d: Data Cl
         wm: mask correlation function
@@ -73,12 +98,12 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     for key in d.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        _wm = get_cl(m_key, wm)
+        _inv_wm = get_cl(m_key, inv_wm)
         _d = d[key]
         s1, s2 = _d.spin
         if lmax is None:
             *_, lmax = _d.shape
-        lmax_mask = len(_wm.array)
+        lmax_mask = len(_inv_wm.array)
         # Grab metadata
         dtype = _d.array.dtype
         # pad cls
@@ -105,8 +130,8 @@ def _natural_unmixing(d, wm, fields, lmax=None):
             )
             # Correct by alpha
             wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
-            corr_wd = (wd / _wm).real
-            icorr_wd = (wd / _wm).imag
+            corr_wd = (wd * _inv_wm).real
+            icorr_wd = (wd * _inv_wm).imag
             # Transform back to Cl
             __corr_d = corr2cl(corr_wd.T).T
             __icorr_d = corr2cl(icorr_wd.T).T
@@ -121,7 +146,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
             _corr_d = []
             for cl in _d:
                 wd = cl2corr(cl).T
-                corr_wd = wd / _wm
+                corr_wd = wd * _inv_wm
                 # Transform back to Cl
                 __corr_d = corr2cl(corr_wd.T).T
                 _corr_d.append(__corr_d[0])
@@ -133,29 +158,6 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     # truncate to lmax
     corr_d = truncated(corr_d, lmax)
     return corr_d
-
-
-def naive_tuning(f):
-    # Compute the gradient
-    df = np.diff((f-f[-1])[::-1])
-    # Find numerical divergences
-    # by looking for numerical oscillations
-    divs = np.where(df[1:]*df[:-1] < 0)[0]
-    if len(divs) == 0:
-        # No divergences
-        tolerance = 0
-    else:
-        idx = divs[0]
-        # Find the value of f for which it is half
-        # way through its divergence
-        cusp_df = df[idx-1]
-        target = np.exp(0.5*(np.log(cusp_df/df[0])))
-        target_idx = np.argmin(np.abs(f - target))
-        # find the associated value of wm
-        target_f = f[target_idx]
-        # Compute relative tolerance
-        tolerance = np.abs(target_f)/np.max(np.abs(f))
-    return tolerance
 
 
 def logistic(x, tol=-5, k=50):

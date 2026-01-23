@@ -402,6 +402,37 @@ def mixing_matrices(
     return out
 
 
+def svd_pinv(A, rtol=1e-2):
+    """`
+    Compute the Moore–Penrose pseudoinverse of a matrix A
+    using its Singular Value Decomposition (SVD).
+
+    Parameters
+    ----------
+    A : (m, n) array_like
+        Input matrix to be pseudoinverted.
+    rtol : float, optional
+        Cutoff for small singular values.
+        Singular values smaller than rtol * max(s) are set to zero.
+
+    Returns
+    -------
+    A_pinv : (n, m) ndarray
+        The pseudoinverse of A.
+    """
+    # Step 1: Compute SVD
+    U, s, Vt = np.linalg.svd(A, full_matrices=False)
+
+    # Step 2: Invert singular values with tolerance
+    tol = rtol * np.max(s)
+    s_pinv = np.array([1 / si if si > tol else 0 for si in s])
+
+    # Step 3: Reconstruct pseudoinverse
+    # A^+ = V * Σ^+ * U^T
+    A_pinv = (Vt.T * s_pinv) @ U.T
+    return A_pinv, s_pinv
+
+
 def invert_mixing_matrix(
     M,
     rtol: float = 1e-5,
@@ -417,11 +448,13 @@ def invert_mixing_matrix(
 
     Returns:
         inv_M: inverted Cls in the same mapping form
+        inv_s: singular values of the mixing matrices
     """
     if progress is None:
         progress = NoProgress()
 
     inv_M = {}
+    inv_s = {}
     current, total = 0, len(M)
 
     for key, value in M.items():
@@ -438,8 +471,8 @@ def invert_mixing_matrix(
                 # makes the mixing matrix block-diagonal
                 M_p = _M[0] + _M[1]
                 M_m = _M[0] - _M[1]
-                inv_M_p = np.linalg.pinv(M_p, rcond=rtol)
-                inv_M_m = np.linalg.pinv(M_m, rcond=rtol)
+                inv_M_p, inv_s_p = svd_pinv(M_p, rtol=rtol)
+                inv_M_m, inv_s_m = svd_pinv(M_m, rtol=rtol)
                 _inv_m = np.vstack(
                     (
                         np.hstack(((inv_M_p + inv_M_m) / 2, (inv_M_p - inv_M_m) / 2)),
@@ -448,13 +481,15 @@ def invert_mixing_matrix(
                 )
                 _inv_M_EEEE = _inv_m[:_m, :_n]
                 _inv_M_EEBB = _inv_m[_m:, :_n]
-                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
+                _inv_M_EBEB, inv_s_eb = svd_pinv(_M[2], rtol=rtol)
                 _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
+                _inv_s = np.array([inv_s_p, inv_s_m, inv_s_eb])
             else:
-                _inv_M = np.linalg.pinv(_M, rcond=rtol)
+                _inv_M, _inv_s = np.linalg.pinv(_M, rcond=rtol)
 
             inv_M[key] = replace(M[key], array=_inv_M)
-    return inv_M
+            inv_s[key] = replace(M[key], array=_inv_s)
+    return inv_M, inv_s
 
 
 def apply_mixing_matrix(d, M, lmax=None):
