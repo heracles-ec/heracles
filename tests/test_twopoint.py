@@ -368,18 +368,20 @@ def test_inverting_mixing_matrices():
         ("WHT", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
     }
     mms = mixing_matrices(fields, cls2, l1max=10, l2max=20)
-    inv_mms = invert_mixing_matrix(mms)
+    inv_mms, inv_s = invert_mixing_matrix(mms)
 
     # test for correct shape
     for key in mms.keys():
         *_, n, m = mms[key].shape
         *_, _n, _m = inv_mms[key].shape
+        *_, __n = inv_s[key].shape
         s1, s2 = mms[key].spin
         _s1, _s2 = inv_mms[key].spin
         assert s1 == _s1
         assert s2 == _s2
         assert n == _m
         assert m == _n
+        assert n == __n
 
     # test that the inverse is correct
     mms = mixing_matrices(fields, cls2)
@@ -387,15 +389,17 @@ def test_inverting_mixing_matrices():
         _m = np.ones_like(mms[key].array)
         mms[key] = Result(_m, spin=mms[key].spin, axis=mms[key].axis, ell=mms[key].ell)
 
-    inv_mms = invert_mixing_matrix(mms)
+    inv_mms, inv_s = invert_mixing_matrix(mms)
     assert inv_mms.keys() == mms.keys()
     for key in mms:
         inv_mm = inv_mms[key].array
         if inv_mm.ndim == 3:
             _inv_m = np.sum(inv_mm)
+            np.testing.assert_allclose( inv_s[key].array.T[0], [1/(2*(lmax+1)), 0.0, 1/(lmax+1)])
             np.testing.assert_allclose(_inv_m, 1.5)
         else:
             _inv_m = np.sum(inv_mm)
+            np.isclose(inv_s[key][0], 1/(lmax+1))
             np.testing.assert_allclose(_inv_m, 1.0)
 
     # test application of mixing matrices

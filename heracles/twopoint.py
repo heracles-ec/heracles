@@ -485,7 +485,7 @@ def invert_mixing_matrix(
                 _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
                 _inv_s = np.array([inv_s_p, inv_s_m, inv_s_eb])
             else:
-                _inv_M, _inv_s = np.linalg.pinv(_M, rcond=rtol)
+                _inv_M, _inv_s = svd_pinv(_M, rtol=rtol)
 
             inv_M[key] = replace(M[key], array=_inv_M)
             inv_s[key] = replace(M[key], array=_inv_s)
