@@ -395,11 +395,13 @@ def test_inverting_mixing_matrices():
         inv_mm = inv_mms[key].array
         if inv_mm.ndim == 3:
             _inv_m = np.sum(inv_mm)
-            np.testing.assert_allclose( inv_s[key].array.T[0], [1/(2*(lmax+1)), 0.0, 1/(lmax+1)])
+            np.testing.assert_allclose(
+                inv_s[key].array.T[0], [1 / (2 * (lmax + 1)), 0.0, 1 / (lmax + 1)]
+            )
             np.testing.assert_allclose(_inv_m, 1.5)
         else:
             _inv_m = np.sum(inv_mm)
-            np.isclose(inv_s[key][0], 1/(lmax+1))
+            np.isclose(inv_s[key][0], 1 / (lmax + 1))
             np.testing.assert_allclose(_inv_m, 1.0)
 
     # test application of mixing matrices
