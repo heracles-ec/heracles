@@ -35,15 +35,16 @@ except ImportError:
     from dataclasses import replace
 
 
-def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", nd=1):
+def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction_type="Fast", cls_type="PseudoCls", nd=1):
     """
     Compute the Cls of removing 1 Jackknife.
     inputs:
         data_maps (dict): Dictionary of data maps
         vis_maps (dict): Dictionary of visibility maps
-        jkmaps (dict): Dictionary of mask maps
+        jk_maps (dict): Dictionary of mask maps
         fields (dict): Dictionary of fields
-        mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
+        mask_correction_type (str): Type of mask correction to apply ("Fast" or "Full")
+        cls_type (str): Type of Cls to compute ("PseudoCls" or "Cls")
         nd (int): Number of Jackknife regions
     returns:
         cls (dict): Dictionary of data Cls
@@ -56,17 +57,32 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
     for regions in combinations(range(1, njk + 1), nd):
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
-        _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
+        _mlsjk = get_cls(vis_maps, jk_maps, fields, *regions)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         # Mask correction
-        if mask_correction == "Full":
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0)
+        if mask_correction_type == "Full":
+            alphas = {}
+            for key in list(_mlsjk.keys()):
+                mljk = _mlsjk[key]
+                # Transform to real space
+                wmljk = cl2corr(mljk)
+                wmljk = wmljk.T[0]
+                # Compute alpha
+                alpha = wmljk
+                alpha *= logistic(np.log10(abs(wmljk)))
+                if cls_type == "PseudoCls":
+                    mls0 = mls0[key].array
+                    wmls0 = cl2corr(mls0)
+                    wmls0 = wmls0.T[0]
+                    alpha /= wmls0
+                alphas[key] = replace(mls0[key], array=alpha)
+            alphas = get_mask_correlation_ratio(_mlsjk, mls0)
             _cls = _natural_unmixing(_cls, alphas, fields)
-        elif mask_correction == "Fast":
+        elif mask_correction_type == "Fast":
             _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions)
         else:
-            raise ValueError("mask_correction must be 'Fast' or 'Full'")
+            raise ValueError("mask_correction_type must be 'Fast' or 'Full'")
         cls[regions] = _cls
     return cls
 
