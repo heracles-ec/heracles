@@ -35,7 +35,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", nd=1):
+def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", mode="PseudoCls", nd=1):
     """
     Compute the Cls of removing 1 Jackknife.
     inputs:
@@ -45,6 +45,7 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
+        mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -61,10 +62,10 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         # Mask correction
         if mask_correction == "Full":
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0)
+            alphas = get_mask_correlation_ratio(_cls_mm, mls0, mode=mode)
             _cls = _natural_unmixing(_cls, alphas, fields)
         elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions)
+            _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions, mode=mode)
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
         cls[regions] = _cls
@@ -211,7 +212,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
+def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, mode="PseudoCls"):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -220,11 +221,18 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
         fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
+        mode (str): Type of statistic correction ("Cls" or "PseudoCls")
     returns:
         cls_cf (dict): Corrected Cls
     """
     fsky_ratio = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
-    print(list(fsky_ratio.keys()))
+    if mode == "Cls":
+        for key in jkmaps.keys():
+            jkmap = jkmaps[key]
+            mask = np.copy(jkmap)
+            mask = (mask > 0).astype(int)
+            fsky = sum(mask) / len(mask)
+            fsky_ratio[key] *= fsky
     _cls = {}
     for key in cls.keys():
         a, b, i, j = key
@@ -232,7 +240,6 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
         f_b = fields[b]
         m_a = f_a.mask
         m_b = f_b.mask
-        print(m_a)
         fsky_a = fsky_ratio[(m_a, i)]
         fsky_b = fsky_ratio[(m_b, j)]
         _cl = np.sqrt(fsky_a * fsky_b) * cls[key].array
@@ -240,13 +247,14 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
     return _cls
 
 
-def get_mask_correlation_ratio(Mljk, Mls0):
+def get_mask_correlation_ratio(Mljk, Mls0, mode="PseudoCls"):
     """
     Computes the ratio of the correlation
     functions of the masks Cls.
     input:
         Mljk (np.array): mask of delete1 Cls
         Mls0 (np.array): mask Cls
+        mode (str): Type of statistic correction ("Cls" or "PseudoCls")
     returns:
         alpha (Float64): Mask correction factor
     """
@@ -255,13 +263,16 @@ def get_mask_correlation_ratio(Mljk, Mls0):
         mljk = Mljk[key]
         mls0 = Mls0[key]
         # Transform to real space
-        wmls0 = cl2corr(mls0)
-        wmls0 = wmls0.T[0]
         wmljk = cl2corr(mljk)
         wmljk = wmljk.T[0]
+        wmljk *= logistic(np.log10(abs(wmljk)))
         # Compute alpha
-        alpha = wmljk / wmls0
-        alpha *= logistic(np.log10(abs(wmljk)))
+        if mode == "PseudoCls":
+            wmls0 = cl2corr(mls0)
+            wmls0 = wmls0.T[0]
+            alpha = wmljk / wmls0
+        elif mode == "Cls":
+            alpha = 1.0 / wmljk
         alphas[key] = replace(Mls0[key], array=alpha)
     return alphas
 
