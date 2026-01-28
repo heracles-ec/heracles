@@ -35,7 +35,9 @@ except ImportError:
     from dataclasses import replace
 
 
-def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", mode="PseudoCls", nd=1):
+def jackknife_cls(
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", mode="PseudoCls", nd=1
+):
     """
     Compute the Cls of removing 1 Jackknife.
     inputs:
@@ -65,7 +67,9 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, mode=mode)
             _cls = _natural_unmixing(_cls, alphas, fields)
         elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions, mode=mode)
+            _cls = correct_footprint_reduction(
+                _cls, jk_maps, fields, *regions, mode=mode
+            )
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
         cls[regions] = _cls
