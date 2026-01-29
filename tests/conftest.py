@@ -144,10 +144,12 @@ def jk_maps(nside, njk):
 
 
 @pytest.fixture(scope="session")
-def cls0(fields, data_maps, jk_maps):
-    from heracles.dices.jackknife import get_cls
-
-    return get_cls(data_maps, jk_maps, fields)
+def cls0(fields, data_maps):
+    from heracles import transform, angular_power_spectra
+    alms = transform(fields, data_maps)
+    # compute cls
+    cls = angular_power_spectra(alms)
+    return cls
 
 
 @pytest.fixture(scope="session")
