@@ -36,7 +36,7 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", mode="PseudoCls", nd=1
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -64,11 +64,11 @@ def jackknife_cls(
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         # Mask correction
         if mask_correction == "Full":
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0, mode=mode)
+            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
             _cls = _natural_unmixing(_cls, alphas, fields)
         elif mask_correction == "Fast":
             _cls = correct_footprint_reduction(
-                _cls, jk_maps, fields, *regions, mode=mode
+                _cls, jk_maps, fields, *regions, unmixed=unmixed
             )
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
@@ -216,7 +216,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, mode="PseudoCls"):
+def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -225,12 +225,12 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, mode="PseudoCl
         fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
-        mode (str): Type of statistic correction ("Cls" or "PseudoCls")
+        unmixed (bool): unmix the Cls
     returns:
         cls_cf (dict): Corrected Cls
     """
     fsky_ratio = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
-    if mode == "Cls":
+    if not unmixed:
         for key in jkmaps.keys():
             jkmap = jkmaps[key]
             mask = np.copy(jkmap)
@@ -251,14 +251,14 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, mode="PseudoCl
     return _cls
 
 
-def get_mask_correlation_ratio(Mljk, Mls0, mode="PseudoCls"):
+def get_mask_correlation_ratio(Mljk, Mls0, unmixed=False):
     """
     Computes the ratio of the correlation
     functions of the masks Cls.
     input:
         Mljk (np.array): mask of delete1 Cls
         Mls0 (np.array): mask Cls
-        mode (str): Type of statistic correction ("Cls" or "PseudoCls")
+        unmixed (bool): unmix the Cls
     returns:
         alpha (Float64): Mask correction factor
     """
@@ -271,12 +271,12 @@ def get_mask_correlation_ratio(Mljk, Mls0, mode="PseudoCls"):
         wmljk = wmljk.T[0]
         wmljk *= logistic(np.log10(abs(wmljk)))
         # Compute alpha
-        if mode == "PseudoCls":
+        if unmixed:
+            alpha = 1.0 / wmljk
+        else:
             wmls0 = cl2corr(mls0)
             wmls0 = wmls0.T[0]
             alpha = wmljk / wmls0
-        elif mode == "Cls":
-            alpha = 1.0 / wmljk
         alphas[key] = replace(Mls0[key], array=alpha)
     return alphas
 
