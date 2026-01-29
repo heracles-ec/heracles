@@ -74,9 +74,14 @@ def test_bias(cls0):
 
 def test_get_delete1_fsky(jk_maps, njk):
     for jk in range(1, njk + 1):
-        alphas = dices.jackknife_fsky(jk_maps, jk, jk)
+        alphas = dices.jackknife_fsky(jk_maps, jk, jk, ratio=True)
         for key in list(alphas.keys()):
             _alpha = 1 - 1 / njk
+            alpha = alphas[key]
+            assert alpha == pytest.approx(_alpha, rel=1e-1)
+        alphas = dices.jackknife_fsky(jk_maps, jk, jk, ratio=False)
+        for key in list(alphas.keys()):
+            _alpha = (njk - 1) / njk
             alpha = alphas[key]
             assert alpha == pytest.approx(_alpha, rel=1e-1)
 
@@ -89,15 +94,27 @@ def test_get_delete2_fsky(jk_maps, njk):
                 _alpha = 1 - 2 / njk
                 alpha = alphas[key]
                 assert alpha == pytest.approx(_alpha, rel=1e-1)
+            alphas = dices.jackknife_fsky(jk_maps, jk, jk2, ratio=False)
+            for key in list(alphas.keys()):
+                _alpha = (njk - 2) / njk
+                alpha = alphas[key]
+                assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
 def test_full_mask_correction(cls0, mls0, fields):
-    alphas = dices.get_mask_correlation_ratio(mls0, mls0)
+    alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=False)
     _cls = heracles.unmixing._natural_unmixing(cls0, alphas, fields)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
+
+    _alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=True)
+    for key in list(_alphas.keys()):
+        wmls0 = heracles.transforms.cl2corr(mls0[key]).T[0]
+        alpha = alphas[key].array
+        _alpha = _alphas[key].array / wmls0
+        assert np.isclose(alpha, _alpha).all()
 
 
 def test_fast_mask_correction(cls0, fields, jk_maps):

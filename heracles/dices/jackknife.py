@@ -142,25 +142,29 @@ def bias(cls):
     return bias
 
 
-def jackknife_fsky(jkmaps, jk=0, jk2=0):
+def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
         jkmaps (dict): Dictionary of Jackknife maps
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
+        ratio (bool): Return the ratio of fskyjk to fsky
     returns:
         fskyjk2 (np.array): Fraction of the sky after deleting two regions.
     """
-    rel_fskys = {}
+    fskysjk = {}
     for key in jkmaps.keys():
         jkmap = jkmaps[key]
         mask = np.copy(jkmap)
         mask = (mask > 0).astype(int)
         fsky = sum(mask) / len(mask)
         cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
-        rel_fskys[key] = (len(cond) / len(mask)) / fsky
-    return rel_fskys
+        fskyjk = len(cond) / len(mask)
+        if ratio:
+            fskysjk[key] = fskyjk / fsky
+        fskysjk[key] = fskyjk
+    return fskysjk
 
 
 def jackknife_bias(bias, fsky, fields):
@@ -229,14 +233,8 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False)
     returns:
         cls_cf (dict): Corrected Cls
     """
-    fsky_ratio = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
-    if not unmixed:
-        for key in jkmaps.keys():
-            jkmap = jkmaps[key]
-            mask = np.copy(jkmap)
-            mask = (mask > 0).astype(int)
-            fsky = sum(mask) / len(mask)
-            fsky_ratio[key] *= fsky
+    ratio = not unmixed
+    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2, ratio=ratio)
     _cls = {}
     for key in cls.keys():
         a, b, i, j = key
@@ -244,8 +242,8 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False)
         f_b = fields[b]
         m_a = f_a.mask
         m_b = f_b.mask
-        fsky_a = fsky_ratio[(m_a, i)]
-        fsky_b = fsky_ratio[(m_b, j)]
+        fsky_a = fskyjk[(m_a, i)]
+        fsky_b = fskyjk[(m_b, j)]
         _cl = np.sqrt(fsky_a * fsky_b) * cls[key].array
         _cls[key] = replace(cls[key], array=_cl)
     return _cls
@@ -271,12 +269,11 @@ def get_mask_correlation_ratio(Mljk, Mls0, unmixed=False):
         wmljk = wmljk.T[0]
         wmljk *= logistic(np.log10(abs(wmljk)))
         # Compute alpha
-        if unmixed:
-            alpha = 1.0 / wmljk
-        else:
+        alpha = wmljk
+        if not unmixed:
             wmls0 = cl2corr(mls0)
             wmls0 = wmls0.T[0]
-            alpha = wmljk / wmls0
+            alpha /= wmls0
         alphas[key] = replace(Mls0[key], array=alpha)
     return alphas
 
