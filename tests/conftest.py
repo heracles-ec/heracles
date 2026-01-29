@@ -146,6 +146,7 @@ def jk_maps(nside, njk):
 @pytest.fixture(scope="session")
 def cls0(fields, data_maps):
     from heracles import transform, angular_power_spectra
+
     alms = transform(fields, data_maps)
     # compute cls
     cls = angular_power_spectra(alms)
