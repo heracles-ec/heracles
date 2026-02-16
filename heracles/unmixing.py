@@ -170,22 +170,10 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
             _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
         else:
             # Treat everything as spin-0
-<<<<<<< HEAD
-            _corr_d = []
-            for cl in _d:
-                wd = cl2corr(cl).T
-                corr_wd = wd * _inv_wm
-                # Transform back to Cl
-                __corr_d = corr2cl(corr_wd.T).T
-                _corr_d.append(__corr_d[0])
-            # remove extra axis
-            _corr_d = np.squeeze(_corr_d)
-=======
             wd = cl2corr(_d).T
             corr_wd = wd / _wm
             # Transform back to Cl
             _corr_d = corr2cl(corr_wd.T).T[0]
->>>>>>> main
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d)
