@@ -159,8 +159,8 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
             # Correct by alpha
             wplus = cl2corr(__dp.T).T
             wminus = cl2corr(__dm.T).T
-            corr_wplus = wplus / _wm
-            corr_wminus = wminus / _wm
+            corr_wplus = wplus / _inv_wm
+            corr_wminus = wminus / _inv_wm
             # Transform back to Cl
             corr_dp = corr2cl(corr_wplus.T).T
             corr_dm = corr2cl(corr_wminus.T).T
@@ -171,7 +171,7 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
         else:
             # Treat everything as spin-0
             wd = cl2corr(_d).T
-            corr_wd = wd / _wm
+            corr_wd = wd / _inv_wm
             # Transform back to Cl
             _corr_d = corr2cl(corr_wd.T).T[0]
         # Add metadata back
