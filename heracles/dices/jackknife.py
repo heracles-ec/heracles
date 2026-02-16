@@ -35,7 +35,9 @@ except ImportError:
     from dataclasses import replace
 
 
-def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", nd=1):
+def jackknife_cls(
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
+):
     """
     Compute the Cls of removing 1 Jackknife.
     inputs:
@@ -45,6 +47,7 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
+        mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -61,10 +64,12 @@ def jackknife_cls(data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", 
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         # Mask correction
         if mask_correction == "Full":
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0)
+            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
             _cls = real_naturalspice(_cls, alphas, fields)
         elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions)
+            _cls = correct_footprint_reduction(
+                _cls, jk_maps, fields, *regions, unmixed=unmixed
+            )
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
         cls[regions] = _cls
@@ -137,25 +142,29 @@ def bias(cls):
     return bias
 
 
-def jackknife_fsky(jkmaps, jk=0, jk2=0):
+def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
         jkmaps (dict): Dictionary of Jackknife maps
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
+        ratio (bool): Return the ratio of fskyjk to fsky
     returns:
         fskyjk2 (np.array): Fraction of the sky after deleting two regions.
     """
-    rel_fskys = {}
+    fskysjk = {}
     for key in jkmaps.keys():
         jkmap = jkmaps[key]
         mask = np.copy(jkmap)
         mask = (mask > 0).astype(int)
         fsky = sum(mask) / len(mask)
         cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
-        rel_fskys[key] = (len(cond) / len(mask)) / fsky
-    return rel_fskys
+        fskyjk = len(cond) / len(mask)
+        if ratio:
+            fskysjk[key] = fskyjk / fsky
+        fskysjk[key] = fskyjk
+    return fskysjk
 
 
 def jackknife_bias(bias, fsky, fields):
@@ -211,7 +220,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
+def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -220,11 +229,12 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
         fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
+        unmixed (bool): unmix the Cls
     returns:
         cls_cf (dict): Corrected Cls
     """
-    fsky_ratio = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
-    print(list(fsky_ratio.keys()))
+    ratio = not unmixed
+    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2, ratio=ratio)
     _cls = {}
     for key in cls.keys():
         a, b, i, j = key
@@ -232,21 +242,21 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0):
         f_b = fields[b]
         m_a = f_a.mask
         m_b = f_b.mask
-        print(m_a)
-        fsky_a = fsky_ratio[(m_a, i)]
-        fsky_b = fsky_ratio[(m_b, j)]
+        fsky_a = fskyjk[(m_a, i)]
+        fsky_b = fskyjk[(m_b, j)]
         _cl = np.sqrt(fsky_a * fsky_b) * cls[key].array
         _cls[key] = replace(cls[key], array=_cl)
     return _cls
 
 
-def get_mask_correlation_ratio(Mljk, Mls0):
+def get_mask_correlation_ratio(Mljk, Mls0, unmixed=False):
     """
     Computes the ratio of the correlation
     functions of the masks Cls.
     input:
         Mljk (np.array): mask of delete1 Cls
         Mls0 (np.array): mask Cls
+        unmixed (bool): unmix the Cls
     returns:
         alpha (Float64): Mask correction factor
     """
@@ -255,12 +265,15 @@ def get_mask_correlation_ratio(Mljk, Mls0):
         mljk = Mljk[key]
         mls0 = Mls0[key]
         # Transform to real space
-        wmls0 = cl2corr(mls0)
-        wmls0 = wmls0.T[0]
         wmljk = cl2corr(mljk)
         wmljk = wmljk.T[0]
+        wmljk *= logistic(np.log10(abs(wmljk)))
         # Compute alpha
-        alpha = wmls0 / (wmljk * logistic(np.log10(abs(wmljk))))
+        alpha = wmljk
+        if not unmixed:
+            wmls0 = cl2corr(mls0)
+            wmls0 = wmls0.T[0]
+            alpha /= wmls0
         alphas[key] = replace(Mls0[key], array=alpha)
     return alphas
 

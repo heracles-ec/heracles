@@ -107,10 +107,8 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
         # Grab metadata
         dtype = _d.array.dtype
         # pad cls
-        _d = np.atleast_2d(_d.array)
-        pad_width = [(0, 0)] * _d.ndim  # no padding for other dims
-        pad_width[-1] = (0, lmax_mask - lmax)  # pad only last dim
-        _d = np.pad(_d, pad_width, mode="constant", constant_values=0)
+        pad_width = [(0, 0)] * (_d.ndim - 1) + [(0, lmax_mask - lmax)]
+        _d = np.pad(_d, pad_width)
         if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
@@ -141,8 +139,38 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
             _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
             _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
             _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
+        elif (s1 != 0) or (s2 != 0):
+            __dp = np.array(
+                [
+                    np.zeros_like(_d[0]),
+                    np.zeros_like(_d[0]),
+                    np.zeros_like(_d[0]),
+                    _d[0] + _d[1],  # TE like spin-2
+                ]
+            )
+            __dm = np.array(
+                [
+                    np.zeros_like(_d[0]),
+                    np.zeros_like(_d[0]),
+                    np.zeros_like(_d[0]),
+                    _d[0] - _d[1],  # TE like spin-2
+                ]
+            )
+            # Correct by alpha
+            wplus = cl2corr(__dp.T).T
+            wminus = cl2corr(__dm.T).T
+            corr_wplus = wplus / _wm
+            corr_wminus = wminus / _wm
+            # Transform back to Cl
+            corr_dp = corr2cl(corr_wplus.T).T
+            corr_dm = corr2cl(corr_wminus.T).T
+            # reorder
+            _corr_d = np.zeros_like(_d)
+            _corr_d[0] = 0.5 * (corr_dp[3] + corr_dm[3])  # TE
+            _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
         else:
             # Treat everything as spin-0
+<<<<<<< HEAD
             _corr_d = []
             for cl in _d:
                 wd = cl2corr(cl).T
@@ -152,6 +180,12 @@ def real_naturalspice(d, inv_wm, fields, lmax=None):
                 _corr_d.append(__corr_d[0])
             # remove extra axis
             _corr_d = np.squeeze(_corr_d)
+=======
+            wd = cl2corr(_d).T
+            corr_wd = wd / _wm
+            # Transform back to Cl
+            _corr_d = corr2cl(corr_wd.T).T[0]
+>>>>>>> main
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d)
