@@ -131,8 +131,8 @@ def _natural_unmixing(d, wm, fields, lmax=None):
             # Correct by alpha
             wplus = cl2corr(__dp.T).T
             wminus = cl2corr(__dm.T).T
-            corr_wplus = (wplus / _wm).real
-            corr_wminus = (wminus / _wm).imag
+            corr_wplus = wplus / _wm
+            corr_wminus = wminus / _wm
             # Transform back to Cl
             corr_dp = corr2cl(corr_wplus.T).T
             corr_dm = corr2cl(corr_wminus.T).T
