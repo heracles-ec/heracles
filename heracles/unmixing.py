@@ -117,15 +117,17 @@ def _natural_unmixing(d, wm, fields, lmax=None):
                     np.zeros_like(_d[0]),
                     np.zeros_like(_d[0]),
                     np.zeros_like(_d[0]),
-                    _d[0]+_d[1],  # TE like spin-2
-                ])
+                    _d[0] + _d[1],  # TE like spin-2
+                ]
+            )
             __dm = np.array(
                 [
                     np.zeros_like(_d[0]),
                     np.zeros_like(_d[0]),
                     np.zeros_like(_d[0]),
-                    _d[0]-_d[1],  # TE like spin-2
-                ])
+                    _d[0] - _d[1],  # TE like spin-2
+                ]
+            )
             # Correct by alpha
             wp = cl2corr(__dp.T).T
             wm = cl2corr(__dm.T).T
@@ -136,8 +138,8 @@ def _natural_unmixing(d, wm, fields, lmax=None):
             corr_dm = corr2cl(corr_wm.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
-            _corr_d[0] = 0.5 * (corr_dp[3]+corr_dm[3])  # TE 
-            _corr_d[1] = 0.5 * (corr_dp[3]-corr_dm[3])  # TB
+            _corr_d[0] = 0.5 * (corr_dp[3] + corr_dm[3])  # TE
+            _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
             print("shape of _d:", np.zeros_like(_d).shape)
             print("shape of corr_d:", np.zeros_like(_corr_d).shape)
             print(corr_dp[3].shape, corr_dm[3].shape)
