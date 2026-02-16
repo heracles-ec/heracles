@@ -70,8 +70,6 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     for key in d.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        print("Processing key:", key, "with mask key:", m_key)
-        print(wm)
         _wm = get_cl(m_key, wm)
         _d = d[key]
         s1, s2 = _d.spin
