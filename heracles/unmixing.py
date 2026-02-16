@@ -70,6 +70,8 @@ def _natural_unmixing(d, wm, fields, lmax=None):
     for key in d.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
+        print("Processing key:", key, "with mask key:", m_key)
+        print(wm)
         _wm = get_cl(m_key, wm)
         _d = d[key]
         s1, s2 = _d.spin
@@ -129,20 +131,17 @@ def _natural_unmixing(d, wm, fields, lmax=None):
                 ]
             )
             # Correct by alpha
-            wp = cl2corr(__dp.T).T
-            wm = cl2corr(__dm.T).T
-            corr_wp = (wp / _wm).real
-            corr_wm = (wm / _wm).imag
+            wplus = cl2corr(__dp.T).T
+            wminus = cl2corr(__dm.T).T
+            corr_wplus = (wplus / _wm).real
+            corr_wminus = (wminus / _wm).imag
             # Transform back to Cl
-            corr_dp = corr2cl(corr_wp.T).T
-            corr_dm = corr2cl(corr_wm.T).T
+            corr_dp = corr2cl(corr_wplus.T).T
+            corr_dm = corr2cl(corr_wminus.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
             _corr_d[0] = 0.5 * (corr_dp[3] + corr_dm[3])  # TE
             _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
-            print("shape of _d:", np.zeros_like(_d).shape)
-            print("shape of corr_d:", np.zeros_like(_corr_d).shape)
-            print(corr_dp[3].shape, corr_dm[3].shape)
         else:
             # Treat everything as spin-0
             wd = cl2corr(_d).T
