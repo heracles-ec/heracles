@@ -59,8 +59,10 @@ def _naturalspice(wd, wm, fields):
     Returns:
         corr_d: Corrected Cl
     """
-    lmax = len(wd[list(wd.keys())[0]][:])
-    lmax_mask = len(wm[list(wm.keys())[0]][:])
+    first_wd = list(wd.values())[0]
+    first_wm = list(wm.values())[0]
+    lmax = first_wd.shape[first_wd.axis[0]]
+    lmax_mask = first_wm.shape[first_wm.axis[0]]
 
     masks = {}
     for key, field in fields.items():
