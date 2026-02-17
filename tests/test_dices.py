@@ -110,6 +110,13 @@ def test_full_mask_correction(cls0, mls0, fields):
         _cl = _cls[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
 
+    cls_alphas = heracles.corr2cl(alphas)
+    __cls = heracles.unmixing.naturalspice(cls0, cls_alphas, fields, rcond=1.0)
+    for key in list(cls0.keys()):
+        cl = cls0[key].array
+        _cl = __cls[key].array
+        assert np.isclose(cl[2:],2 * _cl[2:]).all()
+
     _alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
         wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
