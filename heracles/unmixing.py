@@ -18,11 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import binned
-<<<<<<< HEAD
 from .transforms import _cl2corr, _corr2cl
-=======
-from .transforms import cl2corr, corr2cl
->>>>>>> 17553afc6b64725a1b6e60b38168f0feac133d7e
 from .utils import get_cl
 
 try:
@@ -148,7 +144,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
             wd = _cl2corr(_d).T
             corr_wd = wd / _wm
             # Transform back to Cl
-            _corr_d = corr2cl(corr_wd.T).T[0]
+            _corr_d = _corr2cl(corr_wd.T).T[0]
         else:
             raise ValueError(f"Invalid spin combination: {s1}, {s2}")
         # Add metadata back
