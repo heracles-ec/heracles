@@ -28,7 +28,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def naturalspice(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
+def naturalspice(d, m, fields, rcond=0.01):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -43,13 +43,12 @@ def naturalspice(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     wm = cl2corr(m)
     for m_key in list(wm.keys()):
         _wm = wm[m_key].array
-        if patch_hole:
-            _wm = _wm * logistic(np.log10(abs(_wm)), x0=x0, k=k)
+        _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(rcond * np.max(_wm)))
         wm[m_key] = replace(wm[m_key], array=_wm)
-    return _naturalspice(wd, wm, fields, lmax=lmax)
+    return _naturalspice(wd, wm, fields)
 
 
-def _naturalspice(wd, wm, fields, lmax=None):
+def _naturalspice(wd, wm, fields):
     """
     Natural unmixing of the data correlation function.
     Args:
