@@ -251,6 +251,10 @@ def binned(result, bins, weight=None):
 def truncated(result, ell_max):
     """
     Truncate result arrays at given maximum ell values.
+
+    If an ``ell_max`` is larger than the available ell values on an axis,
+    the result is padded with zeros up to ``ell_max`` (inclusive) and the
+    corresponding padded weights are set to zero.
     """
 
     if isinstance(result, Mapping):
@@ -279,19 +283,28 @@ def truncated(result, ell_max):
 
     for axis, ell, w, maxval in zip(axes, ells, result_weight, ell_max):
         mask = ell <= maxval
-        n = np.count_nonzero(mask)
-
         ell_trunc = ell[mask]
         w_trunc = w[mask]
 
-        shape = out.shape[:axis] + (n,) + out.shape[axis + 1 :]
+        n = ell_trunc.size
+        pad_n = int(maxval - ell_trunc[-1]) if n and ell_trunc[-1] < maxval else 0
+
+        if pad_n:
+            ell_pad = np.arange(ell_trunc[-1] + 1, maxval + 1, dtype=ell_trunc.dtype)
+            ell_trunc = np.concatenate((ell_trunc, ell_pad))
+            w_trunc = np.concatenate((w_trunc, np.zeros(pad_n, dtype=w_trunc.dtype)))
+
+        shape = out.shape[:axis] + (n + pad_n,) + out.shape[axis + 1 :]
         tmp = np.empty(shape, dtype=dt)
 
         for before in np.ndindex(shape[:axis]):
             for after in np.ndindex(shape[axis + 1 :]):
                 k_in = (*before, mask, *after)
-                k_out = (*before, slice(None), *after)
+                k_out = (*before, slice(0, n), *after)
                 tmp[k_out] = out[k_in]
+                if pad_n:
+                    k_pad = (*before, slice(n, n + pad_n), *after)
+                    tmp[k_pad] = 0.0
 
         out = tmp
         truncated_ell += (ell_trunc,)
