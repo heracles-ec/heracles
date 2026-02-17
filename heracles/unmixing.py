@@ -153,7 +153,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d)
     # truncate to lmax
-    #corr_d = binned(corr_d, np.arange(-1, lmax))
+    corr_d = binned(corr_d, np.arange(0, lmax+1))
     return corr_d
 
 

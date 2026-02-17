@@ -30,7 +30,7 @@ import numpy as np
 
 from .core import TocDict, toc_match, update_metadata
 from .progress import NoProgress, Progress
-from .result import Result, binned, truncated
+from .result import Result, binned
 
 try:
     from copy import replace
@@ -489,5 +489,5 @@ def apply_mixing_matrix(d, M, lmax=None):
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d, ell=ell_mask)
     # truncate
-    corr_d = truncated(corr_d, lmax)
+    corr_d = binned(corr_d, np.arange(0, lmax+1))
     return corr_d

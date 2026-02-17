@@ -200,11 +200,3 @@ def test_binned_metadata():
 
     binned = heracles.binned(result, np.array([0, 1, 2]))
     assert binned.dtype.metadata == md
-
-
-def trunc1(data, ell_max, axis):
-    """truncate data over a single axis"""
-    ell = np.arange(data.shape[axis])
-    mask = ell <= ell_max
-    out = np.take(data, np.where(mask)[0], axis=axis)
-    return out, ell[mask], np.ones_like(ell[mask])
