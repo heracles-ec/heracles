@@ -79,7 +79,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
         # Grab metadata
         dtype = _d.array.dtype
         # pad cls
-        _d = truncated(_d, lmax_mask-1).array
+        _d = truncated(_d, lmax_mask - 1).array
         if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
@@ -151,7 +151,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d)
 
-    corr_d = truncated(corr_d, lmax-1)
+    corr_d = truncated(corr_d, lmax - 1)
     return corr_d
 
 

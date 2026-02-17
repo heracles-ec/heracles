@@ -216,7 +216,9 @@ def trunc1(data, ell_max, axis):
         pad_shape = list(out.shape)
         pad_shape[axis] = pad_n
         out = np.concatenate((out, np.zeros(pad_shape)), axis=axis)
-        ell_trunc = np.concatenate((ell_trunc, np.arange(ell_trunc[-1] + 1, ell_max + 1)))
+        ell_trunc = np.concatenate(
+            (ell_trunc, np.arange(ell_trunc[-1] + 1, ell_max + 1))
+        )
         weight = np.concatenate((weight, np.zeros(pad_n, dtype=weight.dtype)))
 
     return out, ell_trunc, weight
