@@ -1,6 +1,12 @@
 from scipy.special import lpn as legendrep
 import numpy as np
 
+try:
+    from copy import replace
+except ImportError:
+    # Python < 3.13
+    from dataclasses import replace
+
 gauss_legendre = None
 _gauss_legendre_cache = {}
 
@@ -91,7 +97,7 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
     return res
 
 
-def cl2corr(cls, lmax=None, sampling_factor=1):
+def _cl2corr(cls, lmax=None, sampling_factor=1):
     """
     Get the correlation function from the power spectra, evaluated at points cos(theta) = xvals.
     Use roots of Legendre polynomials (np.polynomial.legendre.leggauss) for accurate back integration with corr2cl.
@@ -137,11 +143,11 @@ def cl2corr(cls, lmax=None, sampling_factor=1):
         corrs[i, 1] = np.dot(cp, d22)  # Q+U
         corrs[i, 2] = np.dot(cm, d2m2)  # Q-U
         corrs[i, 3] = np.dot(cc, d20)  # cross
-    corrs[:, 0] += corrs[:, 0][0] / (4 * np.pi)
+    # corrs[:, 0] += corrs[:, 0][0] / (4 * np.pi)
     return corrs
 
 
-def corr2cl(corrs, lmax=None, sampling_factor=1):
+def _corr2cl(corrs, lmax=None, sampling_factor=1):
     """
     Transform from correlation functions to power spectra.
     Note that using cl2corr followed by corr2cl is generally very accurate (< 1e-5 relative error) if
@@ -154,6 +160,11 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
     :return: array of power spectra, cl[L, ix], where L starts at zero and ix=0,1,2,3 in order TT, EE, BB, TE.
       They include :math:`\ell(\ell+1)/2\pi` factors.
     """
+
+    if corrs.ndim == 1:
+        corrs = np.array(
+            [corrs, np.zeros_like(corrs), np.zeros_like(corrs), np.zeros_like(corrs)]
+        ).T
 
     if lmax is None:
         lmax = corrs.shape[0] - 1
@@ -177,6 +188,157 @@ def corr2cl(corrs, lmax=None, sampling_factor=1):
         cls[2:, 2] += T2 - T4
         cls[2:, 3] += (weight * corrs[i, 3]) * d20
 
-    cls[1, :] *= 2
-    cls[2:, :] = cls[2:, :]
+    # cls[1, :] *= 2
+    # cls[2:, :] = cls[2:, :]
     return 2 * np.pi * cls
+
+
+def cl2corr(cls):
+    """
+    Transforms cls to correlation functions
+    Args:
+        cls: Data Cl
+    Returns:
+        corr: correlation function
+    """
+    wds = {}
+    for key in cls.keys():
+        cl = cls[key]
+        s1, s2 = cl.spin
+        # Grab metadata
+        dtype = cl.array.dtype
+        # Initialize wd
+        wd = np.zeros_like(cl)
+        if (s1 != 0) and (s2 != 0):
+            _cl = np.array(
+                [
+                    np.zeros_like(cl[0, 0]),
+                    cl[0, 0],  # EE like spin-2
+                    cl[1, 1],  # BB like spin-2
+                    np.zeros_like(cl[0, 0]),
+                ]
+            )
+            _icl = np.array(
+                [
+                    np.zeros_like(cl[0, 0]),
+                    -cl[0, 1],  # EB like spin-0
+                    cl[1, 0],  # EB like spin-0
+                    np.zeros_like(cl[0, 0]),
+                ]
+            )
+            # transform to corrs
+            _wd = _cl2corr(_cl.T).T + 1j * _cl2corr(_icl.T).T
+            _rwd = _wd.real
+            _iwd = _wd.imag
+            # reorder
+            wd[0, 0] = _rwd[1]  # EE like spin-2
+            wd[1, 1] = _rwd[2]  # BB like spin-2
+            wd[0, 1] = _iwd[1]  # EB like spin-0
+            wd[1, 0] = _iwd[2]  # EB like spin-0
+        elif (s1 != 0) or (s2 != 0):
+            _clp = np.array(
+                [
+                    np.zeros_like(cl[0]),
+                    np.zeros_like(cl[0]),
+                    np.zeros_like(cl[0]),
+                    cl[0] + cl[1],  # TE like spin-2
+                ]
+            )
+            _clm = np.array(
+                [
+                    np.zeros_like(cl[0]),
+                    np.zeros_like(cl[0]),
+                    np.zeros_like(cl[0]),
+                    cl[0] - cl[1],  # TE like spin-2
+                ]
+            )
+            # trnsform to corrs
+            wd[0] = _cl2corr(_clp.T).T[3]
+            wd[1] = _cl2corr(_clm.T).T[3]
+        elif (s1 == 0) and (s2 == 0):
+            wd = _cl2corr(cl).T[0]
+        else:
+            raise ValueError("Invalid spin combination")
+        # Add metadata back
+        wd = np.array(list(wd), dtype=dtype)
+        wds[key] = replace(
+            cls[key],
+            array=wd,
+        )
+    return wds
+
+
+def corr2cl(wds):
+    """
+    Transforms correlation functions to cls
+    Args:
+        corrs: data corrs
+    Returns:
+        corr: correlation function
+    """
+    cls = {}
+    for key in wds.keys():
+        wd = wds[key]
+        s1, s2 = wd.spin
+        # Grab metadata
+        dtype = wd.array.dtype
+        # initialize cl
+        cl = np.zeros_like(wd)
+        if (s1 != 0) and (s2 != 0):
+            _rwd = np.array(
+                [
+                    np.zeros_like(wd[0, 0]),
+                    wd[0, 0],  # EE like spin-2
+                    wd[1, 1],  # BB like spin-2
+                    np.zeros_like(wd[0, 0]),
+                ]
+            )
+            _iwd = np.array(
+                [
+                    np.zeros_like(wd[0, 0]),
+                    wd[0, 1],  # EB like spin-0
+                    wd[1, 0],  # EB like spin-0
+                    np.zeros_like(wd[0, 0]),
+                ]
+            )
+            # transform back to Cl
+            _rcl = _corr2cl(_rwd.T).T
+            _icl = _corr2cl(_iwd.T).T
+            # reorder
+            cl[0, 0] = _rcl[1]  # EE like spin-2
+            cl[1, 1] = _rcl[2]  # BB like spin-2
+            cl[0, 1] = -_icl[1]  # EB like spin-0
+            cl[1, 0] = _icl[2]  # EB like spin-0
+        elif (s1 != 0) or (s2 != 0):
+            _wp = np.array(
+                [
+                    np.zeros_like(wd[0]),
+                    np.zeros_like(wd[0]),
+                    np.zeros_like(wd[0]),
+                    wd[0],  # TE like spin-2
+                ]
+            )
+            _wm = np.array(
+                [
+                    np.zeros_like(wd[0]),
+                    np.zeros_like(wd[0]),
+                    np.zeros_like(wd[0]),
+                    wd[1],  # TE like spin-2
+                ]
+            )
+            _clp = _corr2cl(_wp.T).T[3]
+            _clm = _corr2cl(_wm.T).T[3]
+            cl[0] = (_clp + _clm) / 2
+            cl[1] = (_clp - _clm) / 2
+        elif (s1 == 0) and (s2 == 0):
+            # Treat everything as spin-0 and preserve 1D shape.
+            cl = _corr2cl(wd).T[0]
+        else:
+            raise ValueError("Invalid spin combination")
+        # Add metadata back
+        cl = np.array(list(cl), dtype=dtype)
+        cls[key] = replace(
+            wds[key],
+            array=cl,
+        )
+    return cls

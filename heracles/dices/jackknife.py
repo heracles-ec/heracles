@@ -26,7 +26,7 @@ from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _natural_unmixing, logistic
-from ..transforms import cl2corr
+from ..transforms import _cl2corr
 
 try:
     from copy import replace
@@ -265,13 +265,13 @@ def get_mask_correlation_ratio(Mljk, Mls0, unmixed=False):
         mljk = Mljk[key]
         mls0 = Mls0[key]
         # Transform to real space
-        wmljk = cl2corr(mljk)
+        wmljk = _cl2corr(mljk)
         wmljk = wmljk.T[0]
         wmljk *= logistic(np.log10(abs(wmljk)))
         # Compute alpha
         alpha = wmljk
         if not unmixed:
-            wmls0 = cl2corr(mls0)
+            wmls0 = _cl2corr(mls0)
             wmls0 = wmls0.T[0]
             alpha /= wmls0
         alphas[key] = replace(Mls0[key], array=alpha)

@@ -18,7 +18,7 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .result import binned
-from .transforms import cl2corr, corr2cl
+from .transforms import _cl2corr, _corr2cl
 from .utils import get_cl
 
 try:
@@ -43,7 +43,7 @@ def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     m_keys = list(m.keys())
     for m_key in m_keys:
         _m = m[m_key].array
-        _wm = cl2corr(_m).T[0]
+        _wm = _cl2corr(_m).T[0]
         if patch_hole:
             _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
         wm[m_key] = replace(m[m_key], array=_wm)
@@ -98,12 +98,12 @@ def _natural_unmixing(d, wm, fields, lmax=None):
                 ]
             )
             # Correct by alpha
-            wd = cl2corr(__d.T).T + 1j * cl2corr(__id.T).T
+            wd = _cl2corr(__d.T).T + 1j * _cl2corr(__id.T).T
             corr_wd = (wd / _wm).real
             icorr_wd = (wd / _wm).imag
             # Transform back to Cl
-            __corr_d = corr2cl(corr_wd.T).T
-            __icorr_d = corr2cl(icorr_wd.T).T
+            __corr_d = _corr2cl(corr_wd.T).T
+            __icorr_d = _corr2cl(icorr_wd.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
             _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
@@ -128,23 +128,23 @@ def _natural_unmixing(d, wm, fields, lmax=None):
                 ]
             )
             # Correct by alpha
-            wplus = cl2corr(__dp.T).T
-            wminus = cl2corr(__dm.T).T
+            wplus = _cl2corr(__dp.T).T
+            wminus = _cl2corr(__dm.T).T
             corr_wplus = wplus / _wm
             corr_wminus = wminus / _wm
             # Transform back to Cl
-            corr_dp = corr2cl(corr_wplus.T).T
-            corr_dm = corr2cl(corr_wminus.T).T
+            corr_dp = _corr2cl(corr_wplus.T).T
+            corr_dm = _corr2cl(corr_wminus.T).T
             # reorder
             _corr_d = np.zeros_like(_d)
             _corr_d[0] = 0.5 * (corr_dp[3] + corr_dm[3])  # TE
             _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
         elif (s1 == 0) and (s2 == 0):
             # Treat everything as spin-0
-            wd = cl2corr(_d).T
+            wd = _cl2corr(_d).T
             corr_wd = wd / _wm
             # Transform back to Cl
-            _corr_d = corr2cl(corr_wd.T).T[0]
+            _corr_d = _corr2cl(corr_wd.T).T[0]
         else:
             raise ValueError(f"Invalid spin combination: {s1}, {s2}")
         # Add metadata back
