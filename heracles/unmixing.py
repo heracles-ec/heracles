@@ -79,7 +79,7 @@ def _natural_unmixing(d, wm, fields, lmax=None):
         # Grab metadata
         dtype = _d.array.dtype
         # pad cls
-        _d = binned(_d, np.arange(0, lmax_mask+1))
+        _d = binned(_d, np.arange(0, lmax_mask + 1))
         if (s1 != 0) and (s2 != 0):
             __d = np.array(
                 [
@@ -148,12 +148,12 @@ def _natural_unmixing(d, wm, fields, lmax=None):
         else:
             raise ValueError(f"Invalid spin combination: {s1}, {s2}")
         # Add metadata back
-        _corr_d = binned(_corr_d, np.arange(0, lmax+1))
+        _corr_d = binned(_corr_d, np.arange(0, lmax + 1))
         # Add metadata back
         _corr_d = np.array(list(_corr_d), dtype=dtype)
         corr_d[key] = replace(d[key], array=_corr_d)
     # truncate to lmax
-    corr_d = binned(corr_d, np.arange(0, lmax+1))
+    corr_d = binned(corr_d, np.arange(0, lmax + 1))
     return corr_d
 
 
