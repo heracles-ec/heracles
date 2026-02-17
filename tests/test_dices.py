@@ -117,12 +117,34 @@ def test_full_mask_correction(cls0, mls0, fields):
         _cl = __cls[key].array
         assert np.isclose(cl[2:], 2 * _cl[2:]).all()
 
+    wm_keys = heracles.transforms.cl2corr(cls_alphas).keys()
+    rcond_by_key = {key: 1.0 for key in wm_keys}
+    ___cls = heracles.unmixing.naturalspice(
+        cls0,
+        cls_alphas,
+        fields,
+        rcond=rcond_by_key,
+    )
+    for key in list(cls0.keys()):
+        np.testing.assert_allclose(__cls[key].array, ___cls[key].array)
+
     _alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
         wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
+
+
+def test_full_mask_correction_rcond_missing_key(cls0, mls0, fields):
+    cls_alphas = heracles.corr2cl(
+        dices.get_mask_correlation_ratio(mls0, mls0, unmixed=False)
+    )
+    wm_keys = list(heracles.transforms.cl2corr(cls_alphas).keys())
+    rcond_by_key = {key: 1.0 for key in wm_keys[1:]}
+
+    with pytest.raises(KeyError, match="Missing rcond value for wm key"):
+        heracles.unmixing.naturalspice(cls0, cls_alphas, fields, rcond=rcond_by_key)
 
 
 def test_fast_mask_correction(cls0, fields, jk_maps):
