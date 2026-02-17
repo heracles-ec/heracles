@@ -111,7 +111,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     _alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
-        wmls0 = heracles.transforms.cl2corr(mls0[key]).T[0]
+        wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
@@ -136,8 +136,8 @@ def test_polspice(cls0):
             get_cl(("POS", "SHE", 1, 1), cls0)[0],
         ]
     ).T
-    corrs = heracles.cl2corr(cls)
-    _cls = heracles.corr2cl(corrs)
+    corrs = heracles.transforms._cl2corr(cls)
+    _cls = heracles.transforms._corr2cl(corrs)
     for cl, _cl in zip(cls.T, _cls.T):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
