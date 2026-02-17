@@ -25,7 +25,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _natural_unmixing, logistic
+from ..unmixing import _naturalspice, logistic
 from ..transforms import _cl2corr
 
 try:
@@ -65,7 +65,7 @@ def jackknife_cls(
         # Mask correction
         if mask_correction == "Full":
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
-            _cls = _natural_unmixing(_cls, alphas, fields)
+            _cls = _naturalspice(_cls, alphas, fields)
         elif mask_correction == "Fast":
             _cls = correct_footprint_reduction(
                 _cls, jk_maps, fields, *regions, unmixed=unmixed
