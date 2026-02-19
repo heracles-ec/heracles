@@ -46,7 +46,6 @@ def naturalspice(d, m, fields, rcond=0.01):
     lmax_mask = first_wm.shape[first_wm.axis[0]]
 
     # pad correlation functions to lmax_mask
-    print(f"Padding correlation functions from lmax {lmax} to lmax_mask: {lmax_mask}")
     d = binned(d, np.arange(0, lmax_mask + 1))
 
     wd = cl2corr(d)
