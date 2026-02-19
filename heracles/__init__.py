@@ -73,6 +73,8 @@ __all__ = [
     "apply_mixing_matrix",
     # transforms
     "cl2corr",
+    "cl2cosebis",
+    "cl2cosebis_cosmosis",
     "corr2cl",
     # unmixing
     "naturalspice",
@@ -151,6 +153,8 @@ from .twopoint import (
 
 from .transforms import (
     cl2corr,
+    cl2cosebis,
+    cl2cosebis_cosmosis,
     corr2cl,
 )
 
