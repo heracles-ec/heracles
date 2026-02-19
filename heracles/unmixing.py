@@ -40,6 +40,15 @@ def naturalspice(d, m, fields, rcond=0.01):
     Returns:
         corr_d: Corrected Cl
     """
+    first_wd = list(d.values())[0]
+    first_wm = list(m.values())[0]
+    lmax = first_wd.shape[first_wd.axis[0]]
+    lmax_mask = first_wm.shape[first_wm.axis[0]]
+
+    # pad correlation functions to lmax_mask
+    print(f"Padding correlation functions from lmax {lmax} to lmax_mask: {lmax_mask}")
+    d = binned(d, np.arange(0, lmax_mask + 1))
+
     wd = cl2corr(d)
     wm = cl2corr(m)
     for m_key in list(wm.keys()):
@@ -52,7 +61,16 @@ def naturalspice(d, m, fields, rcond=0.01):
         _wm = wm[m_key].array
         _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(_rcond * np.max(_wm)))
         wm[m_key] = replace(wm[m_key], array=_wm)
-    return _naturalspice(wd, wm, fields)
+
+    corr_wds = _naturalspice(wd, wm, fields)
+
+    # trnasform back to Cl
+    corr_d = corr2cl(corr_wds)
+
+    # truncate to lmax
+    corr_d = binned(corr_d, np.arange(0, lmax + 1))\
+
+    return corr_d
 
 
 def _naturalspice(wd, wm, fields):
@@ -66,34 +84,21 @@ def _naturalspice(wd, wm, fields):
     Returns:
         corr_d: Corrected Cl
     """
-    first_wd = list(wd.values())[0]
-    first_wm = list(wm.values())[0]
-    lmax = first_wd.shape[first_wd.axis[0]]
-    lmax_mask = first_wm.shape[first_wm.axis[0]]
-
     masks = {}
     for key, field in fields.items():
         if field.mask is not None:
             masks[key] = field.mask
 
-    # pad correlation functions to lmax_mask
-    wd = binned(wd, np.arange(0, lmax_mask + 1))
-
-    corr_wd = {}
+    corr_wds = {}
     for key in wd.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
         _wm = get_cl(m_key, wm)
         _wd = wd[key]
         # divide by the mask correlation function
-        corr_wd[key] = replace(wd[key], array=(_wd.array / _wm.array))
+        corr_wds[key] = replace(wd[key], array=(_wd.array / _wm.array))
 
-    # trnasform back to Cl
-    corr_d = corr2cl(corr_wd)
-
-    # truncate to lmax
-    corr_d = binned(corr_d, np.arange(0, lmax + 1))
-    return corr_d
+    return corr_wds
 
 
 def logistic(x, x0=-5, k=50):
