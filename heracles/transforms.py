@@ -143,7 +143,6 @@ def _cl2corr(cls, lmax=None, sampling_factor=1):
         corrs[i, 1] = np.dot(cp, d22)  # Q+U
         corrs[i, 2] = np.dot(cm, d2m2)  # Q-U
         corrs[i, 3] = np.dot(cc, d20)  # cross
-    # corrs[:, 0] += corrs[:, 0][0] / (4 * np.pi)
     return corrs
 
 
@@ -187,9 +186,6 @@ def _corr2cl(corrs, lmax=None, sampling_factor=1):
         cls[2:, 1] += T2 + T4
         cls[2:, 2] += T2 - T4
         cls[2:, 3] += (weight * corrs[i, 3]) * d20
-
-    # cls[1, :] *= 2
-    # cls[2:, :] = cls[2:, :]
     return 2 * np.pi * cls
 
 

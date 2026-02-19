@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from collections.abc import Mapping
 from .result import binned
-from .transforms import _cl2corr, _corr2cl
+from .transforms import cl2corr, corr2cl
 from .utils import get_cl
 
 try:
@@ -28,7 +29,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
+def naturalspice(d, m, fields, rcond=0.01):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -39,122 +40,63 @@ def natural_unmixing(d, m, fields, x0=-2, k=50, patch_hole=True, lmax=None):
     Returns:
         corr_d: Corrected Cl
     """
-    wm = {}
-    m_keys = list(m.keys())
-    for m_key in m_keys:
-        _m = m[m_key].array
-        _wm = _cl2corr(_m).T[0]
-        if patch_hole:
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0, k=k)
-        wm[m_key] = replace(m[m_key], array=_wm)
-    return _natural_unmixing(d, wm, fields, lmax=lmax)
+    first_wd = list(d.values())[0]
+    first_wm = list(m.values())[0]
+    lmax = first_wd.shape[first_wd.axis[0]]
+    lmax_mask = first_wm.shape[first_wm.axis[0]]
+
+    # pad correlation functions to lmax_mask
+    d = binned(d, np.arange(0, lmax_mask + 1))
+
+    wd = cl2corr(d)
+    wm = cl2corr(m)
+    for m_key in list(wm.keys()):
+        if isinstance(rcond, Mapping):
+            if m_key not in rcond:
+                raise KeyError(f"Missing rcond value for wm key: {m_key}")
+            _rcond = rcond[m_key]
+        else:
+            _rcond = rcond
+        _wm = wm[m_key].array
+        _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(_rcond * np.max(_wm)))
+        wm[m_key] = replace(wm[m_key], array=_wm)
+
+    corr_wds = _naturalspice(wd, wm, fields)
+
+    # trnasform back to Cl
+    corr_d = corr2cl(corr_wds)
+
+    # truncate to lmax
+    corr_d = binned(corr_d, np.arange(0, lmax + 1))
+    return corr_d
 
 
-def _natural_unmixing(d, wm, fields, lmax=None):
+def _naturalspice(wd, wm, fields):
     """
-    Natural unmixing of the data Cl.
+    Natural unmixing of the data correlation function.
     Args:
-        d: Data Cl
+        wd: data correlation function
         wm: mask correlation function
         fields: list of fields
         patch_hole: If True, apply the patch hole correction
     Returns:
         corr_d: Corrected Cl
     """
-    corr_d = {}
     masks = {}
     for key, field in fields.items():
         if field.mask is not None:
             masks[key] = field.mask
 
-    for key in d.keys():
+    corr_wds = {}
+    for key in wd.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
         _wm = get_cl(m_key, wm)
-        _d = d[key]
-        s1, s2 = _d.spin
-        if lmax is None:
-            *_, lmax = _d.shape
-        lmax_mask = len(_wm.array)
-        # Grab metadata
-        dtype = _d.array.dtype
-        # pad cls
-        _d = binned(_d, np.arange(0, lmax_mask + 1))
-        if (s1 != 0) and (s2 != 0):
-            __d = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    _d[0, 0],  # EE like spin-2
-                    _d[1, 1],  # BB like spin-2
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            __id = np.array(
-                [
-                    np.zeros_like(_d[0, 0]),
-                    -_d[0, 1],  # EB like spin-0
-                    _d[1, 0],  # EB like spin-0
-                    np.zeros_like(_d[0, 0]),
-                ]
-            )
-            # Correct by alpha
-            wd = _cl2corr(__d.T).T + 1j * _cl2corr(__id.T).T
-            corr_wd = (wd / _wm).real
-            icorr_wd = (wd / _wm).imag
-            # Transform back to Cl
-            __corr_d = _corr2cl(corr_wd.T).T
-            __icorr_d = _corr2cl(icorr_wd.T).T
-            # reorder
-            _corr_d = np.zeros_like(_d)
-            _corr_d[0, 0] = __corr_d[1]  # EE like spin-2
-            _corr_d[1, 1] = __corr_d[2]  # BB like spin-2
-            _corr_d[0, 1] = -__icorr_d[1]  # EB like spin-0
-            _corr_d[1, 0] = __icorr_d[2]  # EB like spin-0
-        elif (s1 != 0) or (s2 != 0):
-            __dp = np.array(
-                [
-                    np.zeros_like(_d[0]),
-                    np.zeros_like(_d[0]),
-                    np.zeros_like(_d[0]),
-                    _d[0] + _d[1],  # TE like spin-2
-                ]
-            )
-            __dm = np.array(
-                [
-                    np.zeros_like(_d[0]),
-                    np.zeros_like(_d[0]),
-                    np.zeros_like(_d[0]),
-                    _d[0] - _d[1],  # TE like spin-2
-                ]
-            )
-            # Correct by alpha
-            wplus = _cl2corr(__dp.T).T
-            wminus = _cl2corr(__dm.T).T
-            corr_wplus = wplus / _wm
-            corr_wminus = wminus / _wm
-            # Transform back to Cl
-            corr_dp = _corr2cl(corr_wplus.T).T
-            corr_dm = _corr2cl(corr_wminus.T).T
-            # reorder
-            _corr_d = np.zeros_like(_d)
-            _corr_d[0] = 0.5 * (corr_dp[3] + corr_dm[3])  # TE
-            _corr_d[1] = 0.5 * (corr_dp[3] - corr_dm[3])  # TB
-        elif (s1 == 0) and (s2 == 0):
-            # Treat everything as spin-0
-            wd = _cl2corr(_d).T
-            corr_wd = wd / _wm
-            # Transform back to Cl
-            _corr_d = _corr2cl(corr_wd.T).T[0]
-        else:
-            raise ValueError(f"Invalid spin combination: {s1}, {s2}")
-        # Add metadata back
-        _corr_d = binned(_corr_d, np.arange(0, lmax + 1))
-        # Add metadata back
-        _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = replace(d[key], array=_corr_d)
-    # truncate to lmax
-    corr_d = binned(corr_d, np.arange(0, lmax + 1))
-    return corr_d
+        _wd = wd[key]
+        # divide by the mask correlation function
+        corr_wds[key] = replace(wd[key], array=(_wd.array / _wm.array))
+
+    return corr_wds
 
 
 def logistic(x, x0=-5, k=50):
