@@ -68,8 +68,7 @@ def naturalspice(d, m, fields, rcond=0.01):
     corr_d = corr2cl(corr_wds)
 
     # truncate to lmax
-    corr_d = binned(corr_d, np.arange(0, lmax + 1))\
-
+    corr_d = binned(corr_d, np.arange(0, lmax + 1))
     return corr_d
 
 
