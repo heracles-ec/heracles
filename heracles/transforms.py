@@ -1,5 +1,5 @@
-from scipy.special import lpn as legendrep
 import numpy as np
+from scipy.special import lpn as legendrep
 
 try:
     from copy import replace
@@ -29,7 +29,7 @@ def _cached_gauss_legendre(npoints, cache=True):
 
 
 def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
-    """
+    r"""
     Utility function to return array of Legendre and :math:`d_{mn}` functions for all :math:`\ell` up to lmax.
     Note that :math:`d_{mn}` arrays start at :math:`\ell_{\rm min} = \max(m,n)`, so returned arrays are different sizes
 
@@ -98,7 +98,7 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
 
 
 def _cl2corr(cls, lmax=None, sampling_factor=1):
-    """
+    r"""
     Get the correlation function from the power spectra, evaluated at points cos(theta) = xvals.
     Use roots of Legendre polynomials (np.polynomial.legendre.leggauss) for accurate back integration with corr2cl.
     Note currently does not work at xvals=1 (can easily calculate that as special case!).
@@ -147,7 +147,7 @@ def _cl2corr(cls, lmax=None, sampling_factor=1):
 
 
 def _corr2cl(corrs, lmax=None, sampling_factor=1):
-    """
+    r"""
     Transform from correlation functions to power spectra.
     Note that using cl2corr followed by corr2cl is generally very accurate (< 1e-5 relative error) if
     xvals, weights = np.polynomial.legendre.leggauss(lmax+1)
@@ -338,3 +338,103 @@ def corr2cl(wds):
             array=cl,
         )
     return cls
+
+
+def _shear_tomographic_bins(cls):
+    bins = set()
+    for key in cls:
+        if len(key) >= 4 and key[0] == "SHE" and key[1] == "SHE":
+            bins.add(key[2])
+            bins.add(key[3])
+    return sorted(bins)
+
+
+def _wrap_cosebis_output(tomo_cosebis, ns):
+    from .result import Result
+
+    out = {}
+    for key, value in tomo_cosebis.items():
+        if isinstance(value, Result):
+            out[key] = value
+            continue
+
+        array = np.asarray(getattr(value, "array", value), dtype=np.float64)
+        mode = np.asarray(getattr(value, "mode", ns))
+        out[key] = Result(
+            array=array,
+            ell=mode,
+            lower=mode,
+            upper=mode + 1,
+            axis=-1,
+            spin=(0, 0),
+        )
+    return out
+
+
+class _CloeTracerProxy:
+    def __init__(self, n_z_bins):
+        self.n_z_bins = n_z_bins
+
+
+class _CloeClsAdapter:
+    def __init__(self, cls, n_z_bins):
+        self._cls = cls
+        self.tracer1 = _CloeTracerProxy(n_z_bins)
+        self.tracer2 = _CloeTracerProxy(n_z_bins)
+
+    def get_Cl(self, ells, nl, ks):
+        return self._cls
+
+    def _software_tag(self, method):
+        return f"{self.__class__.__name__} (heracles), `{method.__name__}` method"
+
+
+def cl2cosebis(
+    cls,
+    n_cosebis,
+    n_thread=1,
+):
+    """
+    Transform shear-shear angular power spectra to COSEBIs.
+
+    This function can call Cloe's ``get_cosebis`` implementation by
+    injecting Heracles ``cls`` through an adapter that overrides
+    ``get_Cl``.
+
+    Args:
+        cls: Dictionary of Heracles Cl results.
+        n_cosebis: Number of COSEBIs modes to compute (1..n_cosebis).
+        n_thread: Number of threads passed to Cloe ``get_W_ell``.
+
+    Returns:
+        Dictionary of COSEBIs stored as Heracles ``Result`` objects.
+    """
+    ns = np.arange(1, int(n_cosebis) + 1, dtype=int)
+
+    _key = list(cls.keys())[0]
+    ells = cls[_key].ell
+    theta_min = np.pi / np.max(ells)
+    theta_max = np.pi / np.min(ells)
+    n_theta = max(64, ells.size)
+    thetagrid = np.geomspace(theta_min, theta_max, n_theta)
+
+    from cloelib.auxiliary.cosebi_helpers import get_W_ell
+
+    w_ell = get_W_ell(
+        thetagrid,
+        n_cosebis,
+        ells,
+        int(n_thread),
+    )
+
+    from cloelib.summary_statistics.angular_two_point import AngularTwoPoint
+
+    bins = _shear_tomographic_bins(cls)
+    if not bins:
+        raise ValueError("no ('SHE', 'SHE', i, j) entries found in cls")
+
+    nl = None  # Not used by the adapter, but required by the interface.
+    ks = None  # Not used by the adapter, but required by the interface.
+    adapter = _CloeClsAdapter(cls, len(bins))
+    tomo_cosebis = AngularTwoPoint.get_cosebis(adapter, ells, nl, ks, w_ell, ns)
+    return _wrap_cosebis_output(tomo_cosebis, ns)
