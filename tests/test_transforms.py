@@ -124,12 +124,23 @@ def test_cl2cosebis_with_cloe_adapter_and_internal_kernel_build(monkeypatch):
     w_ell = fake_get_w_ell(captured["thetagrid"], int(np.max(ns)), ells, 3)
     assert set(cosebis) == set(cls)
     for key in cls:
-        cl = cls[key][0, 0]
-        expected = np.array(
+        cl_ee = cls[key][0, 0]
+        cl_bb = cls[key][1, 1]
+        expected_ee = np.array(
             [
-                integrate.simpson(ells * cl * w_ell[int(n)], x=ells) / (2 * np.pi)
+                integrate.simpson(ells * cl_ee * w_ell[int(n)], x=ells) / (2 * np.pi)
                 for n in ns
             ]
         )
-        assert np.allclose(cosebis[key].array, expected)
+        expected_bb = np.array(
+            [
+                integrate.simpson(ells * cl_bb * w_ell[int(n)], x=ells) / (2 * np.pi)
+                for n in ns
+            ]
+        )
+        assert cosebis[key].array.shape == (2, 2, ns.size)
+        assert np.allclose(cosebis[key].array[0, 0], expected_ee)
+        assert np.allclose(cosebis[key].array[1, 1], expected_bb)
+        assert np.allclose(cosebis[key].array[0, 1], 0.0)
+        assert np.allclose(cosebis[key].array[1, 0], 0.0)
         assert np.array_equal(cosebis[key].ell, ns)

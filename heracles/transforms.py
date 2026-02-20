@@ -343,32 +343,11 @@ def corr2cl(wds):
 def _shear_tomographic_bins(cls):
     bins = set()
     for key in cls:
-        if len(key) >= 4 and key[0] == "SHE" and key[1] == "SHE":
+        s1, s2 = cls[key].spin
+        if s1 != 0 and s2 != 0:
             bins.add(key[2])
             bins.add(key[3])
     return sorted(bins)
-
-
-def _wrap_cosebis_output(tomo_cosebis, ns):
-    from .result import Result
-
-    out = {}
-    for key, value in tomo_cosebis.items():
-        if isinstance(value, Result):
-            out[key] = value
-            continue
-
-        array = np.asarray(getattr(value, "array", value), dtype=np.float64)
-        mode = np.asarray(getattr(value, "mode", ns))
-        out[key] = Result(
-            array=array,
-            ell=mode,
-            lower=mode,
-            upper=mode + 1,
-            axis=-1,
-            spin=(0, 0),
-        )
-    return out
 
 
 class _CloeTracerProxy:
@@ -408,11 +387,16 @@ def cl2cosebis(
 
     Returns:
         Dictionary of COSEBIs stored as Heracles ``Result`` objects.
+        For each tomographic pair, array shape is ``(2, 2, n_cosebis)``,
+        with EE on ``[0, 0]`` and BB on ``[1, 1]``.
     """
-    ns = np.arange(1, int(n_cosebis) + 1, dtype=int)
+    n_cosebis = int(n_cosebis)
+    if n_cosebis < 1:
+        raise ValueError("n_cosebis must be >= 1")
+    ns = np.arange(1, n_cosebis + 1, dtype=int)
 
-    _key = list(cls.keys())[0]
-    ells = cls[_key].ell
+    _key = next(key for key in cls if cls[key].spin[0] != 0 and cls[key].spin[1] != 0)
+    ells = np.asarray(cls[_key].ell, dtype=np.float64)
     theta_min = np.pi / np.max(ells)
     theta_max = np.pi / np.min(ells)
     n_theta = max(64, ells.size)
@@ -436,5 +420,34 @@ def cl2cosebis(
     nl = None  # Not used by the adapter, but required by the interface.
     ks = None  # Not used by the adapter, but required by the interface.
     adapter = _CloeClsAdapter(cls, len(bins))
-    tomo_cosebis = AngularTwoPoint.get_cosebis(adapter, ells, nl, ks, w_ell, ns)
-    return _wrap_cosebis_output(tomo_cosebis, ns)
+    cosebis_ee = AngularTwoPoint.get_cosebis(adapter, ells, nl, ks, w_ell, ns)
+
+    # Fool Cloe into giving us BB COSEBIs by replacing EE with BB in the input cls.
+    #  We can then repackage the output to match the original cls keys.
+    bb_cls = {}
+    for key, result in cls.items():
+        s1, s2 = result.spin
+        if s1 != 0 and s2 != 0:
+            arr = np.zeros_like(result.array)
+            arr[0, 0] = result.array[1, 1]
+            bb_cls[key] = replace(result, array=arr)
+        else:
+            bb_cls[key] = result
+    adapter_bb = _CloeClsAdapter(bb_cls, len(bins))
+    cosebis_bb = AngularTwoPoint.get_cosebis(adapter_bb, ells, nl, ks, w_ell, ns)
+
+    # Repackage the outputs to match the original cls keys.
+    cosebis = {}
+    for key, result in cls.items():
+        s1, s2 = result.spin
+        if s1 != 0 and s2 != 0:
+            if key not in cosebis_ee or key not in cosebis_bb:
+                raise KeyError(f"Missing COSEBIs output for key {key}")
+            arr = np.zeros((2, 2, ns.size), dtype=np.float64)
+            arr[0, 0] = np.asarray(cosebis_ee[key].array, dtype=np.float64)
+            arr[1, 1] = np.asarray(cosebis_bb[key].array, dtype=np.float64)
+            cosebis[key] = replace(result, array=arr, ell=ns, lower=ns, upper=ns + 1)
+        else:
+            cosebis[key] = result
+
+    return cosebis
