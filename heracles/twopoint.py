@@ -404,7 +404,7 @@ def mixing_matrices(
 
 def invert_mixing_matrix(
     M,
-    rtol: float = 1e-5,
+    rcond: float = 1e-5,
     progress: Progress | None = None,
 ):
     """
@@ -412,7 +412,7 @@ def invert_mixing_matrix(
 
     Args:
         M: Mixing matrix (mapping of keys -> Result objects)
-        rtol: relative tolerance for pseudo-inverse
+        rcond: relative tolerance for pseudo-inverse
         progress: optional progress reporter
 
     Returns:
@@ -432,14 +432,21 @@ def invert_mixing_matrix(
         s1, s2 = value.spin
         *_, _n, _m = _M.shape
 
+        if isinstance(rcond, Mapping):
+            if key not in rcond:
+                raise KeyError(f"Missing rcond value for wm key: {key}")
+            _rcond = rcond[key]
+        else:
+            _rcond = rcond
+
         with progress.task(f"invert {key}"):
             if (s1 != 0) and (s2 != 0):
                 # Cl^EE+Cl^BB and Cl^EE-Cl^BB transformation
                 # makes the mixing matrix block-diagonal
                 M_p = _M[0] + _M[1]
                 M_m = _M[0] - _M[1]
-                inv_M_p = np.linalg.pinv(M_p, rcond=rtol)
-                inv_M_m = np.linalg.pinv(M_m, rcond=rtol)
+                inv_M_p = np.linalg.pinv(M_p, rcond=_rcond)
+                inv_M_m = np.linalg.pinv(M_m, rcond=_rcond)
                 _inv_m = np.vstack(
                     (
                         np.hstack(((inv_M_p + inv_M_m) / 2, (inv_M_p - inv_M_m) / 2)),
@@ -448,10 +455,10 @@ def invert_mixing_matrix(
                 )
                 _inv_M_EEEE = _inv_m[:_m, :_n]
                 _inv_M_EEBB = _inv_m[_m:, :_n]
-                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=rtol)
+                _inv_M_EBEB = np.linalg.pinv(_M[2], rcond=_rcond)
                 _inv_M = np.array([_inv_M_EEEE, _inv_M_EEBB, _inv_M_EBEB])
             else:
-                _inv_M = np.linalg.pinv(_M, rcond=rtol)
+                _inv_M = np.linalg.pinv(_M, rcond=_rcond)
 
             inv_M[key] = replace(M[key], array=_inv_M)
     return inv_M
