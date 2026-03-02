@@ -368,7 +368,7 @@ def test_inverting_mixing_matrices():
         ("WHT", "WHT", 0, 0): Result(cl, spin=(0, 0), axis=(0,)),
     }
     mms = mixing_matrices(fields, cls2, l1max=10, l2max=20)
-    inv_mms = invert_mixing_matrix(mms)
+    inv_mms = invert_mixing_matrix(mms, rcond=1e-2)
 
     # test for correct shape
     for key in mms.keys():
@@ -387,7 +387,14 @@ def test_inverting_mixing_matrices():
         _m = np.ones_like(mms[key].array)
         mms[key] = Result(_m, spin=mms[key].spin, axis=mms[key].axis, ell=mms[key].ell)
 
-    inv_mms = invert_mixing_matrix(mms)
+    inv_mms = invert_mixing_matrix(
+        mms,
+        rcond={
+            ("POS", "POS", 0, 0): 1e-2,
+            ("POS", "SHE", 0, 0): 1e-3,
+            ("SHE", "SHE", 0, 0): 1e-4,
+        },
+    )
     assert inv_mms.keys() == mms.keys()
     for key in mms:
         inv_mm = inv_mms[key].array
