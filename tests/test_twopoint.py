@@ -411,3 +411,48 @@ def test_inverting_mixing_matrices():
         _mixed_cls = np.sum(mixed_cls[key].array)
         print(key, _mixed_cls)
         np.testing.assert_allclose(_mixed_cls, (n + 1) * 1.0)
+
+
+def test_invert_mixing_matrix_accepts_per_key_rcond():
+    from heracles.twopoint import Result, invert_mixing_matrix
+
+    key_spin0 = ("POS", "POS", 0, 0)
+    key_spin2 = ("SHE", "SHE", 0, 0)
+
+    mms = {
+        key_spin0: Result(np.eye(2), spin=(0, 0), axis=(0,)),
+        key_spin2: Result(
+            np.array([np.eye(2), np.zeros((2, 2)), np.eye(2)]),
+            spin=(2, 2),
+            axis=(1,),
+        ),
+    }
+    rcond = {
+        key_spin0: 1e-2,
+        key_spin2: 1e-4,
+    }
+
+    orig_pinv = np.linalg.pinv
+    pinv_calls = []
+
+    def spy_pinv(a, rcond):
+        pinv_calls.append(rcond)
+        return orig_pinv(a, rcond=rcond)
+
+    with patch("numpy.linalg.pinv", side_effect=spy_pinv):
+        inv_mms = invert_mixing_matrix(mms, rcond=rcond)
+
+    assert inv_mms.keys() == mms.keys()
+    assert pinv_calls == [1e-2, 1e-4, 1e-4, 1e-4]
+
+
+def test_invert_mixing_matrix_errors_if_rcond_mapping_missing_key():
+    from heracles.twopoint import Result, invert_mixing_matrix
+
+    key = ("POS", "POS", 0, 0)
+    mms = {
+        key: Result(np.eye(2), spin=(0, 0), axis=(0,)),
+    }
+
+    with pytest.raises(KeyError, match="Missing rcond value"):
+        invert_mixing_matrix(mms, rcond={})

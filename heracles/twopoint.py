@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from datetime import timedelta
 from itertools import combinations_with_replacement, product
 from typing import TYPE_CHECKING, Any
@@ -39,7 +40,7 @@ except ImportError:
     from dataclasses import replace
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import MutableMapping
 
     from numpy.typing import ArrayLike, NDArray
 
