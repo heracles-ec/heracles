@@ -476,8 +476,6 @@ def apply_mixing_matrix(d, M):
     """
     corr_d = {}
     for key in d.keys():
-        if lmax is None:
-            *_, lmax = d[key].shape
         dtype = d[key].array.dtype
         s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
