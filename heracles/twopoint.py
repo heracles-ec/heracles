@@ -31,7 +31,7 @@ import numpy as np
 
 from .core import TocDict, toc_match, update_metadata
 from .progress import NoProgress, Progress
-from .result import Result, binned
+from .result import Result, binned, get_result_array
 
 try:
     from copy import replace
@@ -461,7 +461,25 @@ def invert_mixing_matrix(
             else:
                 _inv_M = np.linalg.pinv(_M, rcond=_rcond)
 
-            inv_M[key] = replace(M[key], array=_inv_M)
+            if _n != _m:
+                # A pseudo-inverse swaps output/input ell dimensions. Build
+                # angular arrays from the inverse output size (row dimension).
+                axis = value.axis[0]
+                out_size = _inv_M.shape[axis]
+                ell = np.arange(out_size)
+                lower = np.arange(out_size)
+                upper = np.arange(1, out_size + 1)
+                weight = np.ones(out_size)
+                inv_M[key] = replace(
+                    M[key],
+                    array=_inv_M,
+                    ell=ell,
+                    lower=lower,
+                    upper=upper,
+                    weight=weight,
+                )
+            else:
+                inv_M[key] = replace(M[key], array=_inv_M)
     return inv_M
 
 
@@ -480,6 +498,11 @@ def apply_mixing_matrix(d, M):
         s1, s2 = d[key].spin
         _d = np.atleast_2d(d[key].array)
         _M = M[key].array
+        # Output angular metadata follows the matrix output ell axis.
+        _ell = get_result_array(M[key], "ell")[0]
+        _lower = get_result_array(M[key], "lower")[0]
+        _upper = get_result_array(M[key], "upper")[0]
+        _weight = get_result_array(M[key], "weight")[0]
         if (s1 != 0) and (s2 != 0):
             _corr_d_EE = _M[0] @ _d[0, 0] + _M[1] @ _d[1, 1]
             _corr_d_BB = _M[1] @ _d[0, 0] + _M[0] @ _d[1, 1]
@@ -492,5 +515,12 @@ def apply_mixing_matrix(d, M):
                 _corr_d.append(_M @ cl)
             _corr_d = np.squeeze(_corr_d)
         _corr_d = np.array(list(_corr_d), dtype=dtype)
-        corr_d[key] = replace(d[key], array=_corr_d)
+        corr_d[key] = replace(
+            d[key],
+            array=_corr_d,
+            ell=_ell,
+            lower=_lower,
+            upper=_upper,
+            weight=_weight,
+        )
     return corr_d
