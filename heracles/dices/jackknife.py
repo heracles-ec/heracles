@@ -163,7 +163,8 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
         fskyjk = len(cond) / len(mask)
         if ratio:
             fskysjk[key] = fskyjk / fsky
-        fskysjk[key] = fskyjk
+        else:
+            fskysjk[key] = fskyjk
     return fskysjk
 
 
