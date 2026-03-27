@@ -57,13 +57,48 @@ def jackknife_cls(
     mls0 = get_cls(vis_maps, jk_maps, fields)
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
-    for regions in combinations(range(1, njk + 1), nd):
-        _cls = get_cls(data_maps, jk_maps, fields, *regions)
-        _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
-        # Bias correction
-        _cls = correct_bias(_cls, jk_maps, fields, *regions)
-        # Mask correction
+
+    if nd == 0:
+        regions = ()
+        _cls = get_cls(data_maps, jk_maps, fields)
+        _cls_mm = get_cls(vis_maps, jk_maps, fields)
+        _cls = correct_bias(_cls, jk_maps, fields)
         if mask_correction == "Full":
+            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
+            _cls = _naturalspice(_cls, alphas, fields)
+        elif mask_correction == "Fast":
+            _cls = correct_footprint_reduction(_cls, jk_maps, fields, unmixed=unmixed)
+        else:
+            raise ValueError("mask_correction must be 'Fast' or 'Full'")
+        cls[regions] = _cls
+        return cls
+
+    # Exploit linearity of the SHT: alm_full = sum(alm_k).
+    # Compute alms for each region once; delete-k alms are obtained by
+    # subtraction (alm_minus_k = alm_full - alm_k), avoiding N*(N-1)/2
+    # extra transforms for the delete-2 case.
+    data_alms_regions = {}
+    vis_alms_regions = {}
+    for k in range(1, njk + 1):
+        print(f" - Computing ALMs for region {k}", end="\r", flush=True)
+        data_alms_regions[k] = transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+
+    data_alms_full = _sum_region_alms(data_alms_regions)
+    vis_alms_full = _sum_region_alms(vis_alms_regions)
+
+    for regions in combinations(range(1, njk + 1), nd):
+        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
+        alms_jk = _subtract_alms(
+            data_alms_full, [data_alms_regions[k] for k in regions]
+        )
+        _cls = angular_power_spectra(alms_jk)
+        _cls = correct_bias(_cls, jk_maps, fields, *regions)
+        if mask_correction == "Full":
+            vis_alms_jk = _subtract_alms(
+                vis_alms_full, [vis_alms_regions[k] for k in regions]
+            )
+            _cls_mm = angular_power_spectra(vis_alms_jk)
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
             _cls = _naturalspice(_cls, alphas, fields)
         elif mask_correction == "Fast":
@@ -74,6 +109,59 @@ def jackknife_cls(
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
         cls[regions] = _cls
     return cls
+
+
+def _get_region_maps(maps, jkmaps, jk):
+    """
+    Returns maps with only the pixels belonging to jackknife region *jk* active.
+    All other pixels are set to zero.
+    """
+    _maps = deepcopy(maps)
+    for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
+        _map = _maps[key_data]
+        _jkmap = jkmaps[key_mask]
+        if _jkmap is None:
+            continue
+        _mask = (_jkmap == float(jk)).astype(int)
+        _map *= _mask
+    return _maps
+
+
+def _sum_region_alms(alms_regions):
+    """
+    Returns the full-sky alms as the sum of all region alms.
+
+    The metadata (including bias) is taken from the first region's alms.
+    The mapper copies the full-footprint bias to every region alm unchanged,
+    so the summed alms correctly carry that same bias value.
+    """
+    alms_list = list(alms_regions.values())
+    first = alms_list[0]
+    result = {}
+    for key in first:
+        arr = first[key].copy()
+        for alms_k in alms_list[1:]:
+            arr += alms_k[key]
+        result[key] = arr
+    return result
+
+
+def _subtract_alms(alms_full, alms_list):
+    """
+    Returns alms for the full sky minus the listed region alms.
+
+    The metadata (including bias) is preserved from *alms_full* via in-place
+    subtraction.  Because the mapper stores the full-footprint bias on every
+    regional alm, the resulting alms carry the same bias as the deleted-region
+    alms produced by the original map-based approach.
+    """
+    result = {}
+    for key in alms_full:
+        arr = alms_full[key].copy()
+        for alms_k in alms_list:
+            arr -= alms_k[key]
+        result[key] = arr
+    return result
 
 
 def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
