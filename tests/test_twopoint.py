@@ -418,3 +418,85 @@ def test_inverting_mixing_matrices():
         _mixed_cls = np.sum(mixed_cls[key].array)
         print(key, _mixed_cls)
         np.testing.assert_allclose(_mixed_cls, (n + 1) * 1.0)
+
+
+def test_nonsquare_mixing_matrix_metadata_binning_and_io(tmp_path):
+    import heracles
+
+    from heracles.twopoint import Result, apply_mixing_matrix, invert_mixing_matrix
+
+    key = ("POS", "POS", 0, 0)
+
+    in_ell = np.arange(8)
+    out_ell = np.array([2.0, 4.0, 6.0, 8.0, 10.0])
+    out_lower = np.array([1.5, 3.5, 5.5, 7.5, 9.5])
+    out_upper = np.array([2.5, 4.5, 6.5, 8.5, 10.5])
+
+    cls_in = {
+        key: Result(
+            np.linspace(1.0, 8.0, in_ell.size),
+            spin=(0, 0),
+            axis=(0,),
+            ell=in_ell,
+        )
+    }
+
+    mm = {
+        key: Result(
+            np.arange(out_ell.size * in_ell.size, dtype=float).reshape(
+                out_ell.size, in_ell.size
+            ),
+            spin=(0, 0),
+            axis=(0,),
+            ell=out_ell,
+            lower=out_lower,
+            upper=out_upper,
+        )
+    }
+
+    mixed = apply_mixing_matrix(cls_in, mm)
+    np.testing.assert_array_equal(mixed[key].ell, out_ell)
+    np.testing.assert_array_equal(mixed[key].lower, out_lower)
+    np.testing.assert_array_equal(mixed[key].upper, out_upper)
+
+    bins = np.array([2.0, 5.0, 11.0])
+    mixed_binned = heracles.binned(mixed, bins)
+    assert mixed_binned[key].shape == (2,)
+    np.testing.assert_array_equal(mixed_binned[key].lower, bins[:-1])
+    np.testing.assert_array_equal(mixed_binned[key].upper, bins[1:])
+
+    mixed_path = tmp_path / "mixed_nonsquare.fits"
+    heracles.write(mixed_path, mixed_binned)
+    mixed_read = heracles.read(mixed_path)
+    np.testing.assert_array_equal(mixed_read[key], mixed_binned[key])
+    np.testing.assert_array_equal(mixed_read[key].ell, mixed_binned[key].ell)
+
+    inv_mm = invert_mixing_matrix(mm, rcond=1e-12)
+    assert inv_mm[key].shape == (in_ell.size, out_ell.size)
+    np.testing.assert_array_equal(inv_mm[key].ell, np.arange(in_ell.size))
+    np.testing.assert_array_equal(inv_mm[key].lower, np.arange(in_ell.size))
+    np.testing.assert_array_equal(inv_mm[key].upper, np.arange(1, in_ell.size + 1))
+
+    cls_out = {
+        key: Result(
+            np.linspace(1.0, out_ell.size, out_ell.size),
+            spin=(0, 0),
+            axis=(0,),
+            ell=out_ell,
+        )
+    }
+
+    unmixed = apply_mixing_matrix(cls_out, inv_mm)
+    np.testing.assert_array_equal(unmixed[key].ell, np.arange(in_ell.size))
+    np.testing.assert_array_equal(unmixed[key].lower, np.arange(in_ell.size))
+    np.testing.assert_array_equal(unmixed[key].upper, np.arange(1, in_ell.size + 1))
+
+    inv_bins = np.array([0.0, 4.0, 8.0])
+    unmixed_binned = heracles.binned(unmixed, inv_bins)
+    assert unmixed_binned[key].shape == (2,)
+
+    unmixed_path = tmp_path / "unmixed_nonsquare.fits"
+    heracles.write(unmixed_path, unmixed_binned)
+    unmixed_read = heracles.read(unmixed_path)
+    np.testing.assert_array_equal(unmixed_read[key], unmixed_binned[key])
+    np.testing.assert_array_equal(unmixed_read[key].ell, unmixed_binned[key].ell)
