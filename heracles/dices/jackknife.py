@@ -163,7 +163,8 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
         fskyjk = len(cond) / len(mask)
         if ratio:
             fskysjk[key] = fskyjk / fsky
-        fskysjk[key] = fskyjk
+        else:
+            fskysjk[key] = fskyjk
     return fskysjk
 
 
@@ -244,7 +245,7 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False)
         m_b = f_b.mask
         fsky_a = fskyjk[(m_a, i)]
         fsky_b = fskyjk[(m_b, j)]
-        _cl = np.sqrt(fsky_a * fsky_b) * cls[key].array
+        _cl = cls[key].array / np.sqrt(fsky_a * fsky_b)
         _cls[key] = replace(cls[key], array=_cl)
     return _cls
 
