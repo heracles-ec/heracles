@@ -43,7 +43,7 @@ def jackknife_cls(
     inputs:
         data_maps (dict): Dictionary of data maps
         vis_maps (dict): Dictionary of visibility maps
-        jkmaps (dict): Dictionary of mask maps
+        jk_maps (dict): Dictionary of mask maps
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
@@ -58,30 +58,13 @@ def jackknife_cls(
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
 
-    if nd == 0:
-        regions = ()
-        _cls = get_cls(data_maps, jk_maps, fields)
-        _cls_mm = get_cls(vis_maps, jk_maps, fields)
-        _cls = correct_bias(_cls, jk_maps, fields)
-        if mask_correction == "Full":
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
-            _cls = _naturalspice(_cls, alphas, fields)
-        elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(_cls, jk_maps, fields, unmixed=unmixed)
-        else:
-            raise ValueError("mask_correction must be 'Fast' or 'Full'")
-        cls[regions] = _cls
-        return cls
-
-    # Exploit linearity of the SHT: alm_full = sum(alm_k).
-    # Compute alms for each region once; delete-k alms are obtained by
-    # subtraction (alm_minus_k = alm_full - alm_k), avoiding N*(N-1)/2
-    # extra transforms for the delete-2 case.
     data_alms_regions = {}
     vis_alms_regions = {}
     for k in range(1, njk + 1):
         print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_regions[k] = transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        data_alms_regions[k] = transform(
+            fields, _get_region_maps(data_maps, jk_maps, k)
+        )
         vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
 
     data_alms_full = _sum_region_alms(data_alms_regions)
