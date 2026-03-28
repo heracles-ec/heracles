@@ -15,43 +15,48 @@ def test_jkmap(jk_maps, njk):
         assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
 
 
-def test_jackknife_maps(data_maps, jk_maps, njk):
-    # multiply maps by jk footprint
-    vmap = np.copy(jk_maps[("VIS", 1)])
-    vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
-    for key in list(data_maps.keys()):
-        data_maps[key] *= vmap
-    # test null case
-    _data_maps = dices.jackknife.jackknife_maps(data_maps, jk_maps)
-    for key in list(_data_maps.keys()):
-        np.testing.assert_allclose(_data_maps[key], data_maps[key])
-    # test delete1 case
-    __data_maps = np.array(
-        [
-            dices.jackknife.jackknife_maps(data_maps, jk_maps, jk=i, jk2=i)[("POS", 1)]
-            for i in range(1, njk + 1)
-        ]
-    )
-    __data_map = np.sum(__data_maps, axis=0) / (njk - 1)
-    np.testing.assert_allclose(__data_map, data_maps[("POS", 1)])
-    ___data_map = np.prod(__data_maps, axis=0)
-    np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
+def _remove_regions(maps, jk_maps, regions):
+    """Reference: explicitly zero out the given regions in each map."""
+    from copy import deepcopy
 
-    # Copy data map and add systematic map which should not be jackknifed
-    data_maps_nojk = data_maps.copy()
-    data_maps_nojk[("SYS", 1)] = np.arange(1, 11, dtype=float)
+    _maps = deepcopy(maps)
+    for key_data, key_mask in zip(maps.keys(), jk_maps.keys()):
+        _jkmap = jk_maps[key_mask]
+        if _jkmap is None:
+            continue
+        mask = (_jkmap > 0).astype(int)
+        for r in regions:
+            mask[_jkmap == float(r)] = 0
+        _maps[key_data] *= mask
+    return _maps
 
-    # Copy Jackknife maps and add None map, output jackknifed maps
-    jk_maps_nojk = jk_maps.copy()
-    jk_maps_nojk[("SYS", 1)] = None
-    out_maps = dices.jackknife.jackknife_maps(data_maps_nojk, jk_maps_nojk, jk=1)
 
-    # Assert that the SYS map is unchanged
-    np.testing.assert_allclose(out_maps[("SYS", 1)], data_maps_nojk[("SYS", 1)])
+def test_region_alm_cls(fields, data_maps, jk_maps, njk):
+    """ALM-subtraction and map-masking must give identical Cls."""
+    from itertools import combinations
 
-    # Check that a sample key WAS jackknifed
-    sample_key = ("POS", 1)
-    assert not np.allclose(out_maps[sample_key], data_maps_nojk[sample_key])
+    from heracles import angular_power_spectra, transform
+    from heracles.dices.jackknife import _get_region_maps, _sum_alms_except
+
+    alms_regions = {
+        k: transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        for k in range(1, njk + 1)
+    }
+
+    for nd in (0, 1, 2):
+        for regions in combinations(range(1, njk + 1), nd):
+            cls_new = angular_power_spectra(_sum_alms_except(alms_regions, regions))
+            cls_ref = angular_power_spectra(
+                transform(fields, _remove_regions(data_maps, jk_maps, regions))
+            )
+            for key in cls_ref:
+                np.testing.assert_allclose(
+                    cls_new[key].array,
+                    cls_ref[key].array,
+                    rtol=1e-7,
+                    atol=1e-10,
+                    err_msg=f"nd={nd}, regions={regions}, key={key}",
+                )
 
 
 def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
