@@ -15,6 +15,49 @@ def test_jkmap(jk_maps, njk):
         assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
 
 
+def _remove_regions(maps, jk_maps, regions):
+    """Reference: explicitly zero out the given regions in each map."""
+    from copy import deepcopy
+
+    _maps = deepcopy(maps)
+    for key_data, key_mask in zip(maps.keys(), jk_maps.keys()):
+        _jkmap = jk_maps[key_mask]
+        if _jkmap is None:
+            continue
+        mask = (_jkmap > 0).astype(int)
+        for r in regions:
+            mask[_jkmap == float(r)] = 0
+        _maps[key_data] *= mask
+    return _maps
+
+
+def test_region_alm_cls(fields, data_maps, jk_maps, njk):
+    """ALM-subtraction and map-masking must give identical Cls."""
+    from itertools import combinations
+
+    from heracles import angular_power_spectra, transform
+    from heracles.dices.jackknife import _get_region_maps, _sum_alms_except
+
+    alms_regions = {
+        k: transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        for k in range(1, njk + 1)
+    }
+
+    for nd in (0, 1, 2):
+        for regions in combinations(range(1, njk + 1), nd):
+            cls_new = angular_power_spectra(_sum_alms_except(alms_regions, regions))
+            cls_ref = angular_power_spectra(
+                transform(fields, _remove_regions(data_maps, jk_maps, regions))
+            )
+            for key in cls_ref:
+                np.testing.assert_allclose(
+                    cls_new[key].array,
+                    cls_ref[key].array,
+                    rtol=1e-7,
+                    atol=1e-10,
+                    err_msg=f"nd={nd}, regions={regions}, key={key}",
+                )
+
 
 def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
     _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
