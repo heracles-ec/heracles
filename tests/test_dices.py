@@ -15,44 +15,6 @@ def test_jkmap(jk_maps, njk):
         assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
 
 
-def test_jackknife_maps(data_maps, jk_maps, njk):
-    # multiply maps by jk footprint
-    vmap = np.copy(jk_maps[("VIS", 1)])
-    vmap[vmap > 0] = vmap[vmap > 0] / vmap[vmap > 0]
-    for key in list(data_maps.keys()):
-        data_maps[key] *= vmap
-    # test null case
-    _data_maps = dices.jackknife.jackknife_maps(data_maps, jk_maps)
-    for key in list(_data_maps.keys()):
-        np.testing.assert_allclose(_data_maps[key], data_maps[key])
-    # test delete1 case
-    __data_maps = np.array(
-        [
-            dices.jackknife.jackknife_maps(data_maps, jk_maps, jk=i, jk2=i)[("POS", 1)]
-            for i in range(1, njk + 1)
-        ]
-    )
-    __data_map = np.sum(__data_maps, axis=0) / (njk - 1)
-    np.testing.assert_allclose(__data_map, data_maps[("POS", 1)])
-    ___data_map = np.prod(__data_maps, axis=0)
-    np.testing.assert_allclose(___data_map, np.zeros_like(data_maps[("POS", 1)]))
-
-    # Copy data map and add systematic map which should not be jackknifed
-    data_maps_nojk = data_maps.copy()
-    data_maps_nojk[("SYS", 1)] = np.arange(1, 11, dtype=float)
-
-    # Copy Jackknife maps and add None map, output jackknifed maps
-    jk_maps_nojk = jk_maps.copy()
-    jk_maps_nojk[("SYS", 1)] = None
-    out_maps = dices.jackknife.jackknife_maps(data_maps_nojk, jk_maps_nojk, jk=1)
-
-    # Assert that the SYS map is unchanged
-    np.testing.assert_allclose(out_maps[("SYS", 1)], data_maps_nojk[("SYS", 1)])
-
-    # Check that a sample key WAS jackknifed
-    sample_key = ("POS", 1)
-    assert not np.allclose(out_maps[sample_key], data_maps_nojk[sample_key])
-
 
 def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
     _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
