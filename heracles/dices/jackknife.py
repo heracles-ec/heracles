@@ -67,20 +67,13 @@ def jackknife_cls(
         )
         vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
 
-    data_alms_full = _sum_region_alms(data_alms_regions)
-    vis_alms_full = _sum_region_alms(vis_alms_regions)
-
     for regions in combinations(range(1, njk + 1), nd):
         print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        alms_jk = _subtract_alms(
-            data_alms_full, [data_alms_regions[k] for k in regions]
-        )
+        alms_jk = _sum_alms_except(data_alms_regions, regions)
         _cls = angular_power_spectra(alms_jk)
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         if mask_correction == "Full":
-            vis_alms_jk = _subtract_alms(
-                vis_alms_full, [vis_alms_regions[k] for k in regions]
-            )
+            vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
             _cls_mm = angular_power_spectra(vis_alms_jk)
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
             _cls = _naturalspice(_cls, alphas, fields)
@@ -110,39 +103,22 @@ def _get_region_maps(maps, jkmaps, jk):
     return _maps
 
 
-def _sum_region_alms(alms_regions):
+def _sum_alms_except(alms_regions, exclude=()):
     """
-    Returns the full-sky alms as the sum of all region alms.
+    Returns the sum of all region alms except those whose key is in *exclude*.
 
-    The metadata (including bias) is taken from the first region's alms.
-    The mapper copies the full-footprint bias to every region alm unchanged,
-    so the summed alms correctly carry that same bias value.
+    Metadata (including bias) is taken from the first included region's alms,
+    consistent with the mapper copying the full-footprint bias to every region.
+    Passing an empty *exclude* gives the full-sky alms; passing the deleted
+    region keys gives the delete-k or delete-k1k2 alms directly.
     """
-    alms_list = list(alms_regions.values())
-    first = alms_list[0]
+    included = [alms for k, alms in alms_regions.items() if k not in exclude]
+    first = included[0]
     result = {}
     for key in first:
         arr = first[key].copy()
-        for alms_k in alms_list[1:]:
+        for alms_k in included[1:]:
             arr += alms_k[key]
-        result[key] = arr
-    return result
-
-
-def _subtract_alms(alms_full, alms_list):
-    """
-    Returns alms for the full sky minus the listed region alms.
-
-    The metadata (including bias) is preserved from *alms_full* via in-place
-    subtraction.  Because the mapper stores the full-footprint bias on every
-    regional alm, the resulting alms carry the same bias as the deleted-region
-    alms produced by the original map-based approach.
-    """
-    result = {}
-    for key in alms_full:
-        arr = alms_full[key].copy()
-        for alms_k in alms_list:
-            arr -= alms_k[key]
         result[key] = arr
     return result
 
