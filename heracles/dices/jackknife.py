@@ -24,7 +24,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import get_context
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
-from ..progress import Progress, NoProgress
+from ..progress import NoProgress
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
@@ -121,9 +121,7 @@ def jackknife_cls(
     cls = {}
     current = total - n_regions
     with ProcessPoolExecutor(mp_context=get_context("spawn")) as executor:
-        futures = {
-            executor.submit(_jackknife_cls, args): args[0] for args in cls_args
-        }
+        futures = {executor.submit(_jackknife_cls, args): args[0] for args in cls_args}
         for future in as_completed(futures):
             regions, _cls = future.result()
             cls[regions] = _cls
