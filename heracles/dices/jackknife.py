@@ -21,8 +21,10 @@ import itertools
 from copy import deepcopy
 from itertools import combinations
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import get_context
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
+from ..progress import Progress, NoProgress
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
@@ -41,21 +43,14 @@ def _jackknife_cls(args):
     Worker function for one combination of deleted jackknife regions.
     Must be a module-level function so it can be pickled by ProcessPoolExecutor.
     """
-    (
-        regions,
-        data_alms_regions,
-        vis_alms_regions,
-        mls0,
-        jk_maps,
-        fields,
-        mask_correction,
-        unmixed,
-    ) = args
-    alms_jk = _sum_alms_except(data_alms_regions, regions)
+    regions, data_maps, vis_maps, jk_maps, fields, mls0, mask_correction, unmixed = args
+    alms_jk = transform(fields, _mask_excluded_regions(data_maps, jk_maps, regions))
     _cls = angular_power_spectra(alms_jk)
     _cls = correct_bias(_cls, jk_maps, fields, *regions)
     if mask_correction == "Full":
-        vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
+        vis_alms_jk = transform(
+            fields, _mask_excluded_regions(vis_maps, jk_maps, regions)
+        )
         _cls_mm = angular_power_spectra(vis_alms_jk)
         alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
         _wcls = cl2corr(_cls)
@@ -78,7 +73,7 @@ def jackknife_cls(
     mask_correction="Fast",
     unmixed=False,
     nd=1,
-    n_jobs=None,
+    progress=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -89,71 +84,71 @@ def jackknife_cls(
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
-        n_jobs (int or None): Number of worker processes. None uses all available CPUs;
-            1 runs sequentially without spawning subprocesses.
+        progress (Progress): Progress reporter
     returns:
         cls (dict): Dictionary of data Cls
     """
     if nd < 0 or nd > 2:
         raise ValueError("number of deletions must be 0, 1, or 2")
-    cls = {}
+
+    if progress is None:
+        progress = NoProgress()
+
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
-
-    data_alms_regions = {}
-    vis_alms_regions = {}
-    for k in range(1, njk + 1):
-        print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_regions[k] = transform(
-            fields, _get_region_maps(data_maps, jk_maps, k)
-        )
-        vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
-
-    mls0 = angular_power_spectra(_sum_alms_except(vis_alms_regions, ()))
-
     all_regions = list(combinations(range(1, njk + 1), nd))
     n_regions = len(all_regions)
-    args_list = [
-        (
-            regions,
-            data_alms_regions,
-            vis_alms_regions,
-            mls0,
-            jk_maps,
-            fields,
-            mask_correction,
-            unmixed,
-        )
+
+    # mls0 is only needed for the "Full" mask correction
+    if mask_correction == "Full":
+        total = 1 + n_regions
+        progress.update(0, total)
+        with progress.task("full-sky vis CLs"):
+            mls0 = angular_power_spectra(
+                transform(fields, _mask_excluded_regions(vis_maps, jk_maps, ()))
+            )
+        progress.update(1, total)
+    else:
+        total = n_regions
+        progress.update(0, total)
+        mls0 = None
+
+    cls_args = [
+        (regions, data_maps, vis_maps, jk_maps, fields, mls0, mask_correction, unmixed)
         for regions in all_regions
     ]
 
-    if n_jobs == 1:
-        for i, args in enumerate(args_list):
-            regions = args[0]
-            print(
-                f" - Computing Cls for regions {regions} ({i + 1}/{n_regions})",
-                end="\r",
-                flush=True,
-            )
-            _, _cls = _jackknife_cls(args)
+    cls = {}
+    current = total - n_regions
+    with ProcessPoolExecutor(mp_context=get_context("spawn")) as executor:
+        futures = {
+            executor.submit(_jackknife_cls, args): args[0] for args in cls_args
+        }
+        for future in as_completed(futures):
+            regions, _cls = future.result()
             cls[regions] = _cls
-    else:
-        max_workers = n_jobs if (n_jobs is not None and n_jobs > 0) else None
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_jackknife_cls, args): args[0] for args in args_list
-            }
-            for i, future in enumerate(as_completed(futures)):
-                regions = futures[future]
-                print(
-                    f" - Done regions {regions} ({i + 1}/{n_regions})",
-                    end="\r",
-                    flush=True,
-                )
-                _, _cls = future.result()
-                cls[regions] = _cls
+            current += 1
+            progress.update(current, total)
 
     return cls
+
+
+def _mask_excluded_regions(maps, jkmaps, regions):
+    """
+    Returns maps restricted to the survey footprint with the specified
+    jackknife regions masked out (zeroed).
+    """
+    _maps = deepcopy(maps)
+    for key_data, key_mask in zip(_maps.keys(), jkmaps.keys()):
+        _map = _maps[key_data]
+        _jkmap = jkmaps[key_mask]
+        if _jkmap is None:
+            continue
+        mask = (_jkmap > 0).astype(int)
+        for r in regions:
+            mask[_jkmap == float(r)] = 0
+        _map *= mask
+    return _maps
 
 
 def _get_region_maps(maps, jkmaps, jk):
