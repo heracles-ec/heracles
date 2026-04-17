@@ -20,13 +20,14 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice, logistic
-from ..transforms import _cl2corr
+from ..transforms import _cl2corr, cl2corr, corr2cl
 
 try:
     from copy import replace
@@ -35,8 +36,31 @@ except ImportError:
     from dataclasses import replace
 
 
+def _jackknife_cls(args):
+    """
+    Worker function for one combination of deleted jackknife regions.
+    Must be a module-level function so it can be pickled by ProcessPoolExecutor.
+    """
+    regions, data_alms_regions, vis_alms_regions, mls0, jk_maps, fields, mask_correction, unmixed = args
+    alms_jk = _sum_alms_except(data_alms_regions, regions)
+    _cls = angular_power_spectra(alms_jk)
+    _cls = correct_bias(_cls, jk_maps, fields, *regions)
+    if mask_correction == "Full":
+        vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
+        _cls_mm = angular_power_spectra(vis_alms_jk)
+        alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
+        _wcls = cl2corr(_cls)
+        _wcls = _naturalspice(_wcls, alphas, fields)
+        _cls = corr2cl(_wcls)
+    elif mask_correction == "Fast":
+        _cls = correct_footprint_reduction(_cls, jk_maps, fields, *regions, unmixed=unmixed)
+    else:
+        raise ValueError("mask_correction must be 'Fast' or 'Full'")
+    return regions, _cls
+
+
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1, n_jobs=None
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -47,7 +71,8 @@ def jackknife_cls(
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
-        mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
+        n_jobs (int or None): Number of worker processes. None uses all available CPUs;
+            1 runs sequentially without spawning subprocesses.
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -68,23 +93,29 @@ def jackknife_cls(
 
     mls0 = angular_power_spectra(_sum_alms_except(vis_alms_regions, ()))
 
-    for regions in combinations(range(1, njk + 1), nd):
-        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        alms_jk = _sum_alms_except(data_alms_regions, regions)
-        _cls = angular_power_spectra(alms_jk)
-        _cls = correct_bias(_cls, jk_maps, fields, *regions)
-        if mask_correction == "Full":
-            vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
-            _cls_mm = angular_power_spectra(vis_alms_jk)
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
-            _cls = _naturalspice(_cls, alphas, fields)
-        elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(
-                _cls, jk_maps, fields, *regions, unmixed=unmixed
-            )
-        else:
-            raise ValueError("mask_correction must be 'Fast' or 'Full'")
-        cls[regions] = _cls
+    all_regions = list(combinations(range(1, njk + 1), nd))
+    n_regions = len(all_regions)
+    args_list = [
+        (regions, data_alms_regions, vis_alms_regions, mls0, jk_maps, fields, mask_correction, unmixed)
+        for regions in all_regions
+    ]
+
+    if n_jobs == 1:
+        for i, args in enumerate(args_list):
+            regions = args[0]
+            print(f" - Computing Cls for regions {regions} ({i + 1}/{n_regions})", end="\r", flush=True)
+            _, _cls = _jackknife_cls(args)
+            cls[regions] = _cls
+    else:
+        max_workers = n_jobs if (n_jobs is not None and n_jobs > 0) else None
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_jackknife_cls, args): args[0] for args in args_list}
+            for i, future in enumerate(as_completed(futures)):
+                regions = futures[future]
+                print(f" - Done regions {regions} ({i + 1}/{n_regions})", end="\r", flush=True)
+                _, _cls = future.result()
+                cls[regions] = _cls
+
     return cls
 
 
