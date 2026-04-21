@@ -43,7 +43,7 @@ def jackknife_cls(
     inputs:
         data_maps (dict): Dictionary of data maps
         vis_maps (dict): Dictionary of visibility maps
-        jk_maps (dict): Dictionary of mask maps
+        jkmaps (dict): Dictionary of mask maps
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
@@ -54,28 +54,16 @@ def jackknife_cls(
     if nd < 0 or nd > 2:
         raise ValueError("number of deletions must be 0, 1, or 2")
     cls = {}
+    mls0 = get_cls(vis_maps, jk_maps, fields)
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
-
-    data_alms_regions = {}
-    vis_alms_regions = {}
-    for k in range(1, njk + 1):
-        print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_regions[k] = transform(
-            fields, _get_region_maps(data_maps, jk_maps, k)
-        )
-        vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
-
-    mls0 = angular_power_spectra(_sum_alms_except(vis_alms_regions, ()))
-
     for regions in combinations(range(1, njk + 1), nd):
-        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        alms_jk = _sum_alms_except(data_alms_regions, regions)
-        _cls = angular_power_spectra(alms_jk)
+        _cls = get_cls(data_maps, jk_maps, fields, *regions)
+        _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
+        # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
+        # Mask correction
         if mask_correction == "Full":
-            vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
-            _cls_mm = angular_power_spectra(vis_alms_jk)
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
             _wcls = cl2corr(_cls)
             _wcls = _naturalspice(_wcls, alphas, fields)
@@ -90,40 +78,55 @@ def jackknife_cls(
     return cls
 
 
-def _get_region_maps(maps, jkmaps, jk):
+def get_cls(maps, jkmaps, fields, jk=0, jk2=0):
     """
-    Returns maps with only the pixels belonging to jackknife region *jk* active.
-    All other pixels are set to zero.
+    Internal method to compute the Cls of removing 2 Jackknife.
+    inputs:
+        maps (dict): Dictionary of data maps
+        jkmaps (dict): Dictionary of mask maps
+        fields (dict): Dictionary of fields
+        jk (int): Jackknife region to remove
+        jk2 (int): Jackknife region to remove
+    returns:
+        cls (dict): Dictionary of data Cls
+    """
+    print(f" - Computing Cls for regions ({jk},{jk2})", end="\r", flush=True)
+    # remove the region from the maps
+    _maps = jackknife_maps(maps, jkmaps, jk=jk, jk2=jk2)
+    # compute alms
+    alms = transform(fields, _maps)
+    # compute cls
+    cls = angular_power_spectra(alms)
+    return cls
+
+
+def jackknife_maps(maps, jkmaps, jk=0, jk2=0):
+    """
+    Internal method to remove a region from the maps.
+    inputs:
+        maps (dict): Dictionary of data maps
+        jkmaps (dict): Dictionary of mask maps
+        jk (int): Jackknife region to remove
+        jk2 (int): Jackknife region to remove
+    returns:
+        maps (dict): Dictionary of data maps
     """
     _maps = deepcopy(maps)
     for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
         _map = _maps[key_data]
         _jkmap = jkmaps[key_mask]
+
         if _jkmap is None:
             continue
-        _mask = (_jkmap == float(jk)).astype(int)
+
+        _mask = np.copy(_jkmap)
+        _mask = (_mask > 0).astype(int)
+        # Remove jk 2 regions
+        cond = np.where((_jkmap == float(jk)) | (_jkmap == float(jk2)))[0]
+        _mask[cond] = 0.0
+        # Apply mask
         _map *= _mask
     return _maps
-
-
-def _sum_alms_except(alms_regions, exclude=()):
-    """
-    Returns the sum of all region alms except those whose key is in *exclude*.
-
-    Metadata (including bias) is taken from the first included region's alms,
-    consistent with the mapper copying the full-footprint bias to every region.
-    Passing an empty *exclude* gives the full-sky alms; passing the deleted
-    region keys gives the delete-k or delete-k1k2 alms directly.
-    """
-    included = [alms for k, alms in alms_regions.items() if k not in exclude]
-    first = included[0]
-    result = {}
-    for key in first:
-        arr = first[key].copy()
-        for alms_k in included[1:]:
-            arr += alms_k[key]
-        result[key] = arr
-    return result
 
 
 def bias(cls):
