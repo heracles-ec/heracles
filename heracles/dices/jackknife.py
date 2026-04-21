@@ -20,6 +20,7 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
+from pathlib import Path
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array
@@ -27,6 +28,8 @@ from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice, logistic
 from ..transforms import _cl2corr, cl2corr, corr2cl
+from .. import read, write
+from ..result import binned
 
 try:
     from copy import replace
@@ -36,7 +39,7 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1, dir=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -48,6 +51,7 @@ def jackknife_cls(
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
         mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
+        dir (str): Directory to save the results
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -57,17 +61,36 @@ def jackknife_cls(
     mls0 = get_cls(vis_maps, jk_maps, fields)
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
+
+    cache_dir = Path(dir) if dir is not None else None
+    if cache_dir is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
     for regions in combinations(range(1, njk + 1), nd):
+        if cache_dir is not None:
+            cache_file = cache_dir / f"cls_regions_{'_'.join(map(str, regions))}.fits"
+            if cache_file.exists():
+                print(f" - Loading Cls for regions {regions} from cache", end="\r", flush=True)
+                cls[regions] = read(cache_file)
+                continue
+
+        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
         _cls = get_cls(data_maps, jk_maps, fields, *regions)
         _cls_mm = get_cls(vis_maps, jk_maps, fields, *regions)
         # Bias correction
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         # Mask correction
         if mask_correction == "Full":
+            first_cls = list(_cls.values())[0]
+            first_cls_mm = list(_cls_mm.values())[0]
+            lmax = first_cls.shape[first_cls.axis[0]]
+            lmax_mask = first_cls_mm.shape[first_cls_mm.axis[0]]
             alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
+            _cls = binned(_cls, np.arange(0, lmax_mask + 1))
             _wcls = cl2corr(_cls)
             _wcls = _naturalspice(_wcls, alphas, fields)
             _cls = corr2cl(_wcls)
+            _cls = binned(_cls, np.arange(0, lmax + 1))
         elif mask_correction == "Fast":
             _cls = correct_footprint_reduction(
                 _cls, jk_maps, fields, *regions, unmixed=unmixed
@@ -75,6 +98,8 @@ def jackknife_cls(
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
         cls[regions] = _cls
+        if cache_dir is not None:
+            write(cache_file, _cls)
     return cls
 
 
