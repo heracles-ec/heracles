@@ -39,7 +39,14 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1, dir=None,
+    data_maps,
+    vis_maps,
+    jk_maps,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    nd=1,
+    dir=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -70,7 +77,11 @@ def jackknife_cls(
         if cache_dir is not None:
             cache_file = cache_dir / f"cls_regions_{'_'.join(map(str, regions))}.fits"
             if cache_file.exists():
-                print(f" - Loading Cls for regions {regions} from cache", end="\r", flush=True)
+                print(
+                    f" - Loading Cls for regions {regions} from cache",
+                    end="\r",
+                    flush=True,
+                )
                 cls[regions] = read(cache_file)
                 continue
 
