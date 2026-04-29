@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from collections.abc import Mapping
 from .result import binned
 from .transforms import cl2corr, corr2cl
 from .utils import get_cl
@@ -56,7 +55,7 @@ def naturalspice(d, m, fields, theta_max=None):
     if theta_max is not None:
         for m_key in list(wm.keys()):
             _wm = wm[m_key].array
-            i_theta_max =  np.abs(theta - theta_max).argmin()
+            i_theta_max = np.abs(theta - theta_max).argmin()
             wm_at_theta_max = _wm[i_theta_max]
             _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(abs(wm_at_theta_max)))
             wm[m_key] = replace(wm[m_key], array=_wm)
