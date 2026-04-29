@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from collections.abc import Mapping
 from .result import binned
 from .transforms import cl2corr, corr2cl
 from .utils import get_cl
+from .transforms import _cached_gauss_legendre
 
 try:
     from copy import replace
@@ -29,14 +29,14 @@ except ImportError:
     from dataclasses import replace
 
 
-def naturalspice(d, m, fields, rcond=0.01):
+def naturalspice(d, m, fields, theta_max=None):
     """
     Natural unmixing of the data Cl.
     Args:
         d: Data Cl
         m: mask Cl
         fields: list of fields
-        patch_hole: If True, apply the patch hole correction
+        theta_max: maximum angle to use for the unmixing, in degrees. If None, use all angles.
     Returns:
         corr_d: Corrected Cl
     """
@@ -44,23 +44,21 @@ def naturalspice(d, m, fields, rcond=0.01):
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
     lmax_mask = first_wm.shape[first_wm.axis[0]]
+    xvals, _ = _cached_gauss_legendre(lmax_mask)
+    theta = np.arccos(xvals) * 180 / np.pi
 
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
     wd = cl2corr(d)
     wm = cl2corr(m)
-    for m_key in list(wm.keys()):
-        if isinstance(rcond, Mapping):
-            if m_key not in rcond:
-                raise KeyError(f"Missing rcond value for wm key: {m_key}")
-            _rcond = rcond[m_key]
-        else:
-            _rcond = rcond
-        _wm = wm[m_key].array
-        _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(_rcond * np.max(_wm)))
-        wm[m_key] = replace(wm[m_key], array=_wm)
-
+    if theta_max is not None:
+        for m_key in list(wm.keys()):
+            _wm = wm[m_key].array
+            i_theta_max = np.abs(theta - theta_max).argmin()
+            wm_at_theta_max = _wm[i_theta_max]
+            _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(abs(wm_at_theta_max)))
+            wm[m_key] = replace(wm[m_key], array=_wm)
     corr_wds = _naturalspice(wd, wm, fields)
 
     # trnasform back to Cl
@@ -99,5 +97,5 @@ def _naturalspice(wd, wm, fields):
     return corr_wds
 
 
-def logistic(x, x0=-5, k=50):
+def logistic(x, x0=-2, k=50):
     return 1.0 + np.exp(-k * (x - x0))

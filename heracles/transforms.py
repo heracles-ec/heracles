@@ -7,6 +7,8 @@ except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
+from .result import get_result_array
+
 gauss_legendre = None
 _gauss_legendre_cache = {}
 
@@ -203,6 +205,9 @@ def cl2corr(cls):
         s1, s2 = cl.spin
         # Grab metadata
         dtype = cl.array.dtype
+        # Determine lmax from ell field or shape along ell axis
+        lmax = len(get_result_array(cl, "ell")[0]) - 1
+        xvals, _ = _cached_gauss_legendre(lmax + 1)
         # Initialize wd
         wd = np.zeros_like(cl)
         if (s1 != 0) and (s2 != 0):
@@ -259,6 +264,7 @@ def cl2corr(cls):
         wd = np.array(list(wd), dtype=dtype)
         wds[key] = replace(
             cls[key],
+            ell=xvals,
             array=wd,
         )
     return wds
@@ -278,6 +284,9 @@ def corr2cl(wds):
         s1, s2 = wd.spin
         # Grab metadata
         dtype = wd.array.dtype
+        # Derive lmax from xvals stored in the correlation's ell field
+        xvals = get_result_array(wd, "ell")[0]
+        lmax = len(xvals) - 1
         # initialize cl
         cl = np.zeros_like(wd)
         if (s1 != 0) and (s2 != 0):
@@ -335,6 +344,7 @@ def corr2cl(wds):
         cl = np.array(list(cl), dtype=dtype)
         cls[key] = replace(
             wds[key],
+            ell=np.arange(lmax + 1),
             array=cl,
         )
     return cls
