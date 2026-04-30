@@ -91,7 +91,7 @@ def jackknife_cls(
     mls0 = angular_power_spectra(vis_alms_full)
     for regions in combinations(range(1, njk + 1), nd):
         regions_tag = "_".join(map(str, regions))
-        cls_path = os.path.join(dir, f"cls_{regions_tag}.fits")
+        cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
         if os.path.exists(cls_path):
             print(f" - Loading Cls for regions {regions}", end="\r", flush=True)
             cls[regions] = read(cls_path)
