@@ -22,11 +22,11 @@ from copy import deepcopy
 from itertools import combinations
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
-from ..result import Result, get_result_array
+from ..result import Result, get_result_array, binned
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _naturalspice, logistic
-from ..transforms import _cl2corr, cl2corr, corr2cl
+from ..unmixing import _naturalspice
+from ..transforms import cl2corr, corr2cl
 
 try:
     from copy import replace
@@ -76,12 +76,11 @@ def jackknife_cls(
         if mask_correction == "Full":
             vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
             _cls_mm = angular_power_spectra(vis_alms_jk)
-            alphas = get_mask_correlation_ratio(_cls_mm, mls0, unmixed=unmixed)
-            _wcls = cl2corr(_cls)
-            _wcls = _naturalspice(_wcls, alphas, fields)
-            _cls = corr2cl(_wcls)
+            _cls = correct_footprint_naturalspice(
+                _cls, _cls_mm, mls0, fields, unmixed=unmixed
+            )
         elif mask_correction == "Fast":
-            _cls = correct_footprint_reduction(
+            _cls = correct_footprint_fsky(
                 _cls, jk_maps, fields, *regions, unmixed=unmixed
             )
         else:
@@ -220,7 +219,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
+def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -249,33 +248,42 @@ def correct_footprint_reduction(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False)
     return _cls
 
 
-def get_mask_correlation_ratio(Mljk, Mls0, unmixed=False):
+def _mask_correlation_ratio(mljk, mls0, unmixed=False):
+    alphas = {}
+    wmls0 = cl2corr(mls0)
+    wmljk = cl2corr(mljk)
+    for key in list(wmljk.keys()):
+        _wmljk = wmljk[key].array
+        _wmls0 = wmls0[key].array
+        alpha = _wmljk
+        if not unmixed:
+            alpha = alpha / _wmls0
+        alphas[key] = replace(mls0[key], array=alpha)
+    return alphas
+
+
+def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
     """
-    Computes the ratio of the correlation
-    functions of the masks Cls.
-    input:
-        Mljk (np.array): mask of delete1 Cls
-        Mls0 (np.array): mask Cls
+    Corrects the Cls for footprint reduction using the full NaMaster/naturalspice approach.
+    inputs:
+        cls (dict): Dictionary of data Cls
+        cls_mm (dict): Dictionary of jackknife mask Cls
+        mls0 (dict): Dictionary of full mask Cls
+        fields (dict): Dictionary of fields
         unmixed (bool): unmix the Cls
     returns:
-        alpha (Float64): Mask correction factor
+        cls (dict): Corrected Cls
     """
-    alphas = {}
-    for key in list(Mljk.keys()):
-        mljk = Mljk[key]
-        mls0 = Mls0[key]
-        # Transform to real space
-        wmljk = _cl2corr(mljk)
-        wmljk = wmljk.T[0]
-        wmljk *= logistic(np.log10(abs(wmljk)))
-        # Compute alpha
-        alpha = wmljk
-        if not unmixed:
-            wmls0 = _cl2corr(mls0)
-            wmls0 = wmls0.T[0]
-            alpha /= wmls0
-        alphas[key] = replace(Mls0[key], array=alpha)
-    return alphas
+    alphas = _mask_correlation_ratio(cls_mm, mls0, unmixed=unmixed)
+    first_cls = list(cls.values())[0]
+    first_mls = list(mls0.values())[0]
+    lmax = first_cls.shape[first_cls.axis[0]]
+    lmax_mask = first_mls.shape[first_mls.axis[0]]
+    cls = binned(cls, np.arange(0, lmax_mask + 1))
+    wcls = cl2corr(cls)
+    wcls = _naturalspice(wcls, alphas, fields)
+    cls = corr2cl(wcls)
+    return binned(cls, np.arange(0, lmax + 1))
 
 
 def jackknife_covariance(dict, nd=1):
