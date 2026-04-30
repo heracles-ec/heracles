@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
+import os
 import numpy as np
 import itertools
 from copy import deepcopy
@@ -27,6 +28,7 @@ from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
+from ..io import write_alms, read_alms
 
 try:
     from copy import replace
@@ -36,7 +38,7 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
+    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1, dir="./dices",
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -47,7 +49,7 @@ def jackknife_cls(
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
-        mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
+        dir (str): Directory for caching intermediate ALMs.
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -56,25 +58,38 @@ def jackknife_cls(
     cls = {}
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
+    os.makedirs(dir, exist_ok=True)
 
-    data_alms_regions = {}
-    vis_alms_regions = {}
+    data_alms_full = None
+    vis_alms_full = None
+
+    # Compute Alms
     for k in range(1, njk + 1):
         print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_regions[k] = transform(
-            fields, _get_region_maps(data_maps, jk_maps, k)
-        )
-        vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+        data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+        write_alms(os.path.join(dir, f"data_alms_{k}.fits"), data_alms_k, clobber=True)
+        write_alms(os.path.join(dir, f"vis_alms_{k}.fits"), vis_alms_k, clobber=True)
+        if data_alms_full is None:
+            data_alms_full = {key: arr.copy() for key, arr in data_alms_k.items()}
+            vis_alms_full = {key: arr.copy() for key, arr in vis_alms_k.items()}
+        else:
+            for key in data_alms_full:
+                data_alms_full[key] += data_alms_k[key]
+            for key in vis_alms_full:
+                vis_alms_full[key] += vis_alms_k[key]
 
-    mls0 = angular_power_spectra(_sum_alms_except(vis_alms_regions, ()))
-
+    # Compute Cls
+    mls0 = angular_power_spectra(vis_alms_full)
     for regions in combinations(range(1, njk + 1), nd):
         print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        alms_jk = _sum_alms_except(data_alms_regions, regions)
+        data_region_alms = [read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions]
+        alms_jk = _subtract_alms(data_alms_full, data_region_alms)
         _cls = angular_power_spectra(alms_jk)
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         if mask_correction == "Full":
-            vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
+            vis_region_alms = [read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions]
+            vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
             _cls_mm = angular_power_spectra(vis_alms_jk)
             _cls = correct_footprint_naturalspice(
                 _cls, _cls_mm, mls0, fields, unmixed=unmixed
@@ -121,6 +136,17 @@ def _sum_alms_except(alms_regions, exclude=()):
         arr = first[key].copy()
         for alms_k in included[1:]:
             arr += alms_k[key]
+        result[key] = arr
+    return result
+
+
+def _subtract_alms(full_alms, region_alms_list):
+    """Returns full_alms minus the sum of each entry in region_alms_list."""
+    result = {}
+    for key in full_alms:
+        arr = full_alms[key].copy()
+        for region_alms in region_alms_list:
+            arr -= region_alms[key]
         result[key] = arr
     return result
 
