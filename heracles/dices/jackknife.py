@@ -28,7 +28,7 @@ from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
-from ..io import write_alms, read_alms
+from ..io import write_alms, read_alms, write, read
 
 try:
     from copy import replace
@@ -38,7 +38,14 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1, dir="./dices",
+    data_maps,
+    vis_maps,
+    jk_maps,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    nd=1,
+    dir="./dices",
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -60,35 +67,46 @@ def jackknife_cls(
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
     os.makedirs(dir, exist_ok=True)
 
-    data_alms_full = None
-    vis_alms_full = None
-
     # Compute Alms
-    for k in range(1, njk + 1):
-        print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
-        vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
-        write_alms(os.path.join(dir, f"data_alms_{k}.fits"), data_alms_k, clobber=True)
-        write_alms(os.path.join(dir, f"vis_alms_{k}.fits"), vis_alms_k, clobber=True)
-        if data_alms_full is None:
-            data_alms_full = {key: arr.copy() for key, arr in data_alms_k.items()}
-            vis_alms_full = {key: arr.copy() for key, arr in vis_alms_k.items()}
+    for k in range(0, njk + 1):
+        data_path = os.path.join(dir, f"data_alms_{k}.fits")
+        vis_path = os.path.join(dir, f"vis_alms_{k}.fits")
+        if os.path.exists(data_path) and os.path.exists(vis_path):
+            print(f" - Loading ALMs for region {k}", end="\r", flush=True)
         else:
-            for key in data_alms_full:
-                data_alms_full[key] += data_alms_k[key]
-            for key in vis_alms_full:
-                vis_alms_full[key] += vis_alms_k[key]
+            print(f" - Computing ALMs for region {k}", end="\r", flush=True)
+            if k == 0:
+                data_alms_k = transform(fields, data_maps)
+                vis_alms_k = transform(fields, vis_maps)
+            else:
+                data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
+                vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+            write_alms(data_path, data_alms_k, clobber=True)
+            write_alms(vis_path, vis_alms_k, clobber=True)
+
+    data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
+    vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
 
     # Compute Cls
     mls0 = angular_power_spectra(vis_alms_full)
     for regions in combinations(range(1, njk + 1), nd):
+        regions_tag = "_".join(map(str, regions))
+        cls_path = os.path.join(dir, f"cls_{regions_tag}.fits")
+        if os.path.exists(cls_path):
+            print(f" - Loading Cls for regions {regions}", end="\r", flush=True)
+            cls[regions] = read(cls_path)
+            continue
         print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        data_region_alms = [read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions]
+        data_region_alms = [
+            read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions
+        ]
         alms_jk = _subtract_alms(data_alms_full, data_region_alms)
         _cls = angular_power_spectra(alms_jk)
         _cls = correct_bias(_cls, jk_maps, fields, *regions)
         if mask_correction == "Full":
-            vis_region_alms = [read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions]
+            vis_region_alms = [
+                read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions
+            ]
             vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
             _cls_mm = angular_power_spectra(vis_alms_jk)
             _cls = correct_footprint_naturalspice(
@@ -100,6 +118,7 @@ def jackknife_cls(
             )
         else:
             raise ValueError("mask_correction must be 'Fast' or 'Full'")
+        write(cls_path, _cls, clobber=True)
         cls[regions] = _cls
     return cls
 
