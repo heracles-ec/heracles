@@ -26,7 +26,7 @@ from ..result import Result, get_result_array, binned
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
-from ..transforms import _cl2corr, cl2corr, corr2cl
+from ..transforms import cl2corr, corr2cl
 
 try:
     from copy import replace
@@ -76,7 +76,9 @@ def jackknife_cls(
         if mask_correction == "Full":
             vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
             _cls_mm = angular_power_spectra(vis_alms_jk)
-            _cls = correct_footprint_naturalspice(_cls, _cls_mm, mls0, fields, unmixed=unmixed)
+            _cls = correct_footprint_naturalspice(
+                _cls, _cls_mm, mls0, fields, unmixed=unmixed
+            )
         elif mask_correction == "Fast":
             _cls = correct_footprint_fsky(
                 _cls, jk_maps, fields, *regions, unmixed=unmixed
