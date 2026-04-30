@@ -29,6 +29,10 @@ except ImportError:
     from dataclasses import replace
 
 
+def logistic(x, x0=-2, k=50):
+    return 1.0 + np.exp(-k * (x - x0))
+
+
 def naturalspice(d, m, fields, theta_max=None):
     """
     Natural unmixing of the data Cl.
@@ -44,22 +48,13 @@ def naturalspice(d, m, fields, theta_max=None):
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
     lmax_mask = first_wm.shape[first_wm.axis[0]]
-    xvals, _ = _cached_gauss_legendre(lmax_mask)
-    theta = np.arccos(xvals) * 180 / np.pi
 
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
     wd = cl2corr(d)
     wm = cl2corr(m)
-    if theta_max is not None:
-        for m_key in list(wm.keys()):
-            _wm = wm[m_key].array
-            i_theta_max = np.abs(theta - theta_max).argmin()
-            wm_at_theta_max = _wm[i_theta_max]
-            _wm = _wm * logistic(np.log10(abs(_wm)), x0=np.log10(abs(wm_at_theta_max)))
-            wm[m_key] = replace(wm[m_key], array=_wm)
-    corr_wds = _naturalspice(wd, wm, fields)
+    corr_wds = _naturalspice(wd, wm, fields, theta_max=theta_max)
 
     # trnasform back to Cl
     corr_d = corr2cl(corr_wds)
@@ -69,14 +64,14 @@ def naturalspice(d, m, fields, theta_max=None):
     return corr_d
 
 
-def _naturalspice(wd, wm, fields):
+def _naturalspice(wd, wm, fields, theta_max=None):
     """
     Natural unmixing of the data correlation function.
     Args:
         wd: data correlation function
         wm: mask correlation function
         fields: list of fields
-        patch_hole: If True, apply the patch hole correction
+        theta_max: maximum angle in degrees for the logistic cutoff. If None, uses default x0=-2.
     Returns:
         corr_d: Corrected Cl
     """
@@ -85,17 +80,22 @@ def _naturalspice(wd, wm, fields):
         if field.mask is not None:
             masks[key] = field.mask
 
+    if theta_max is not None:
+        first_wm = list(wm.values())[0]
+        lmax_mask = first_wm.shape[first_wm.axis[0]]
+        xvals, _ = _cached_gauss_legendre(lmax_mask)
+        theta = np.arccos(xvals) * 180 / np.pi
+        i_theta_max = np.abs(theta - theta_max).argmin()
+
     corr_wds = {}
     for key in wd.keys():
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        _wm = get_cl(m_key, wm)
-        _wd = wd[key]
-        # divide by the mask correlation function
-        corr_wds[key] = replace(wd[key], array=(_wd.array / _wm.array))
+        _wm = get_cl(m_key, wm).array
+        _wd = wd[key].array
+        if theta_max is not None:
+            x0 = np.log10(abs(_wm[i_theta_max]))
+            _wm *= logistic(np.log10(abs(_wm)), x0=x0)
+        corr_wds[key] = replace(wd[key], array=(_wd / _wm))
 
     return corr_wds
-
-
-def logistic(x, x0=-2, k=50):
-    return 1.0 + np.exp(-k * (x - x0))

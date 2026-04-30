@@ -107,15 +107,16 @@ def test_get_delete2_fsky(jk_maps, njk):
 
 
 def test_full_mask_correction(cls0, mls0, fields):
-    alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=False)
-    wcls0 = heracles.transforms.cl2corr(cls0)
-    _wcls = heracles.unmixing._naturalspice(wcls0, alphas, fields)
-    _cls = heracles.transforms.corr2cl(_wcls)
+    from heracles.dices.jackknife import _mask_correlation_ratio
+
+    # When mljk == mls0, correct_footprint_naturalspice should recover the original cls
+    _cls = dices.correct_footprint_naturalspice(cls0, mls0, mls0, fields, unmixed=False)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
 
+    alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
     __cls = heracles.unmixing.naturalspice(cls0, cls_alphas, fields, theta_max=180)
     for key in list(cls0.keys()):
@@ -123,7 +124,7 @@ def test_full_mask_correction(cls0, mls0, fields):
         _cl = __cls[key].array
         assert np.isclose(cl[2:], 2 * _cl[2:]).all()
 
-    _alphas = dices.get_mask_correlation_ratio(mls0, mls0, unmixed=True)
+    _alphas = _mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
         wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
         alpha = alphas[key].array
@@ -132,7 +133,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
 
 def test_fast_mask_correction(cls0, fields, jk_maps):
-    _cls0 = dices.correct_footprint_reduction(cls0, jk_maps, fields, 0, 0)
+    _cls0 = dices.correct_footprint_fsky(cls0, jk_maps, fields, 0, 0)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls0[key].array
