@@ -535,6 +535,6 @@ def _debias_covariance(cov_jk, Q):
     """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array / 2
+        c = cov_jk[key].array - Q[key].array
         debiased_cov[key] = replace(cov_jk[key], array=c)
     return debiased_cov
