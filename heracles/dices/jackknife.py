@@ -21,6 +21,8 @@ import numpy as np
 import itertools
 from copy import deepcopy
 from itertools import combinations
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import get_context
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
 from ..result import Result, get_result_array, binned
@@ -37,6 +39,43 @@ except ImportError:
     from dataclasses import replace
 
 
+def _compute_cls_for_regions(args):
+    """
+    Worker function for one combination of deleted jackknife regions.
+    Reads ALMs from the cache directory so no large arrays need to be pickled.
+    """
+    regions, dir, fields, jk_maps, mls0, mask_correction, unmixed = args
+    regions_tag = "_".join(map(str, regions))
+    cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
+
+    if os.path.exists(cls_path):
+        return regions, read(cls_path)
+
+    data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
+    data_region_alms = [
+        read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions
+    ]
+    alms_jk = _subtract_alms(data_alms_full, data_region_alms)
+    _cls = angular_power_spectra(alms_jk)
+    _cls = correct_bias(_cls, jk_maps, fields, *regions)
+
+    if mask_correction == "Full":
+        vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
+        vis_region_alms = [
+            read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions
+        ]
+        vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
+        _cls_mm = angular_power_spectra(vis_alms_jk)
+        _cls = correct_footprint_naturalspice(_cls, _cls_mm, mls0, fields, unmixed=unmixed)
+    elif mask_correction == "Fast":
+        _cls = correct_footprint_fsky(_cls, jk_maps, fields, *regions, unmixed=unmixed)
+    else:
+        raise ValueError("mask_correction must be 'Fast' or 'Full'")
+
+    write(cls_path, _cls, clobber=True)
+    return regions, _cls
+
+
 def jackknife_cls(
     data_maps,
     vis_maps,
@@ -46,6 +85,7 @@ def jackknife_cls(
     unmixed=False,
     nd=1,
     dir="./dices",
+    parallel=False,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -57,6 +97,7 @@ def jackknife_cls(
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
         dir (str): Directory for caching intermediate ALMs.
+        parallel (bool): If True, compute Cls in parallel using all available cores minus one.
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -89,37 +130,30 @@ def jackknife_cls(
 
     # Compute Cls
     mls0 = angular_power_spectra(vis_alms_full)
-    for regions in combinations(range(1, njk + 1), nd):
-        regions_tag = "_".join(map(str, regions))
-        cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
-        if os.path.exists(cls_path):
-            print(f" - Loading Cls for regions {regions}", end="\r", flush=True)
-            cls[regions] = read(cls_path)
-            continue
-        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        data_region_alms = [
-            read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions
-        ]
-        alms_jk = _subtract_alms(data_alms_full, data_region_alms)
-        _cls = angular_power_spectra(alms_jk)
-        _cls = correct_bias(_cls, jk_maps, fields, *regions)
-        if mask_correction == "Full":
-            vis_region_alms = [
-                read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions
-            ]
-            vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
-            _cls_mm = angular_power_spectra(vis_alms_jk)
-            _cls = correct_footprint_naturalspice(
-                _cls, _cls_mm, mls0, fields, unmixed=unmixed
-            )
-        elif mask_correction == "Fast":
-            _cls = correct_footprint_fsky(
-                _cls, jk_maps, fields, *regions, unmixed=unmixed
-            )
-        else:
-            raise ValueError("mask_correction must be 'Fast' or 'Full'")
-        write(cls_path, _cls, clobber=True)
-        cls[regions] = _cls
+
+    all_regions = list(combinations(range(1, njk + 1), nd))
+    args_list = [
+        (regions, dir, fields, jk_maps, mls0, mask_correction, unmixed)
+        for regions in all_regions
+    ]
+
+    if not parallel:
+        for args in args_list:
+            regions, _cls = _compute_cls_for_regions(args)
+            cls[regions] = _cls
+    else:
+        nworkers = max(1, (os.cpu_count() or 1) - 1)
+        with ProcessPoolExecutor(
+            max_workers=nworkers, mp_context=get_context("spawn")
+        ) as executor:
+            futures = {
+                executor.submit(_compute_cls_for_regions, args): args[0]
+                for args in args_list
+            }
+            for future in as_completed(futures):
+                regions, _cls = future.result()
+                cls[regions] = _cls
+
     return cls
 
 
