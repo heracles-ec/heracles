@@ -66,7 +66,9 @@ def _compute_cls_for_regions(args):
         ]
         vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
         _cls_mm = angular_power_spectra(vis_alms_jk)
-        _cls = correct_footprint_naturalspice(_cls, _cls_mm, mls0, fields, unmixed=unmixed)
+        _cls = correct_footprint_naturalspice(
+            _cls, _cls_mm, mls0, fields, unmixed=unmixed
+        )
     elif mask_correction == "Fast":
         _cls = correct_footprint_fsky(_cls, jk_maps, fields, *regions, unmixed=unmixed)
     else:
