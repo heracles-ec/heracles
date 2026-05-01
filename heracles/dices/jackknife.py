@@ -31,6 +31,7 @@ from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
 from ..io import write_alms, read_alms, write, read
+from ..progress import Progress, NoProgress
 
 try:
     from copy import replace
@@ -88,6 +89,7 @@ def jackknife_cls(
     nd=1,
     dir="./dices",
     parallel=False,
+    progress=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -100,32 +102,37 @@ def jackknife_cls(
         nd (int): Number of Jackknife regions
         dir (str): Directory for caching intermediate ALMs.
         parallel (bool): If True, compute Cls in parallel using all available cores minus one.
+        progress (Progress): Progress reporter.
     returns:
         cls (dict): Dictionary of data Cls
     """
     if nd < 0 or nd > 2:
         raise ValueError("number of deletions must be 0, 1, or 2")
+
+    if progress is None:
+        progress = NoProgress()
+
     cls = {}
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
     os.makedirs(dir, exist_ok=True)
 
-    # Compute Alms
+    # Compute ALMs
+    progress.update(0, njk + 1)
     for k in range(0, njk + 1):
         data_path = os.path.join(dir, f"data_alms_{k}.fits")
         vis_path = os.path.join(dir, f"vis_alms_{k}.fits")
-        if os.path.exists(data_path) and os.path.exists(vis_path):
-            print(f" - Loading ALMs for region {k}", end="\r", flush=True)
-        else:
-            print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-            if k == 0:
-                data_alms_k = transform(fields, data_maps)
-                vis_alms_k = transform(fields, vis_maps)
-            else:
-                data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
-                vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
-            write_alms(data_path, data_alms_k, clobber=True)
-            write_alms(vis_path, vis_alms_k, clobber=True)
+        with progress.task(f"ALMs {k}"):
+            if not (os.path.exists(data_path) and os.path.exists(vis_path)):
+                if k == 0:
+                    data_alms_k = transform(fields, data_maps)
+                    vis_alms_k = transform(fields, vis_maps)
+                else:
+                    data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
+                    vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+                write_alms(data_path, data_alms_k, clobber=True)
+                write_alms(vis_path, vis_alms_k, clobber=True)
+        progress.update(k + 1, njk + 1)
 
     data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
     vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
@@ -139,10 +146,14 @@ def jackknife_cls(
         for regions in all_regions
     ]
 
+    n_regions = len(all_regions)
+    progress.update(0, n_regions)
     if not parallel:
-        for args in args_list:
-            regions, _cls = _compute_cls_for_regions(args)
+        for i, args in enumerate(args_list):
+            with progress.task(f"Cls regions {args[0]}"):
+                regions, _cls = _compute_cls_for_regions(args)
             cls[regions] = _cls
+            progress.update(i + 1, n_regions)
     else:
         nworkers = max(1, (os.cpu_count() or 1) - 1)
         with ProcessPoolExecutor(
@@ -152,9 +163,10 @@ def jackknife_cls(
                 executor.submit(_compute_cls_for_regions, args): args[0]
                 for args in args_list
             }
-            for future in as_completed(futures):
+            for i, future in enumerate(as_completed(futures)):
                 regions, _cls = future.result()
                 cls[regions] = _cls
+                progress.update(i + 1, n_regions)
 
     return cls
 
@@ -509,6 +521,6 @@ def _debias_covariance(cov_jk, Q):
     """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array
+        c = cov_jk[key].array - Q[key].array/2
         debiased_cov[key] = replace(cov_jk[key], array=c)
     return debiased_cov
