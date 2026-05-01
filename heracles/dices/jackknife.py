@@ -31,7 +31,7 @@ from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
 from ..io import write_alms, read_alms, write, read
-from ..progress import Progress, NoProgress
+from ..progress import NoProgress
 
 try:
     from copy import replace
@@ -53,19 +53,19 @@ def _compute_cls_for_regions(args):
         return regions, read(cls_path)
 
     data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
-    data_region_alms = [
-        read_alms(os.path.join(dir, f"data_alms_{r}.fits")) for r in regions
-    ]
-    alms_jk = _subtract_alms(data_alms_full, data_region_alms)
+    alms_jk = _subtract_alms(
+        data_alms_full,
+        _accumulate_alms(os.path.join(dir, f"data_alms_{r}.fits") for r in regions),
+    )
     _cls = angular_power_spectra(alms_jk)
     _cls = correct_bias(_cls, jk_maps, fields, *regions)
 
     if mask_correction == "Full":
         vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
-        vis_region_alms = [
-            read_alms(os.path.join(dir, f"vis_alms_{r}.fits")) for r in regions
-        ]
-        vis_alms_jk = _subtract_alms(vis_alms_full, vis_region_alms)
+        vis_alms_jk = _subtract_alms(
+            vis_alms_full,
+            _accumulate_alms(os.path.join(dir, f"vis_alms_{r}.fits") for r in regions),
+        )
         _cls_mm = angular_power_spectra(vis_alms_jk)
         _cls = correct_footprint_naturalspice(
             _cls, _cls_mm, mls0, fields, unmixed=unmixed
@@ -128,16 +128,18 @@ def jackknife_cls(
                     data_alms_k = transform(fields, data_maps)
                     vis_alms_k = transform(fields, vis_maps)
                 else:
-                    data_alms_k = transform(fields, _get_region_maps(data_maps, jk_maps, k))
-                    vis_alms_k = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+                    data_alms_k = transform(
+                        fields, _get_region_maps(data_maps, jk_maps, k)
+                    )
+                    vis_alms_k = transform(
+                        fields, _get_region_maps(vis_maps, jk_maps, k)
+                    )
                 write_alms(data_path, data_alms_k, clobber=True)
                 write_alms(vis_path, vis_alms_k, clobber=True)
         progress.update(k + 1, njk + 1)
 
-    data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
-    vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
-
     # Compute Cls
+    vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
     mls0 = angular_power_spectra(vis_alms_full)
 
     all_regions = list(combinations(range(1, njk + 1), nd))
@@ -207,14 +209,26 @@ def _sum_alms_except(alms_regions, exclude=()):
     return result
 
 
-def _subtract_alms(full_alms, region_alms_list):
-    """Returns full_alms minus the sum of each entry in region_alms_list."""
+def _accumulate_alms(paths):
+    """Reads ALMs from each path and returns their sum, loading one file at a time."""
+    result = None
+    for path in paths:
+        alms = read_alms(path)
+        if result is None:
+            result = {key: arr.copy() for key, arr in alms.items()}
+        else:
+            for key in result:
+                result[key] += alms[key]
+    return result
+
+
+def _subtract_alms(full_alms, region_sum):
+    """Returns full_alms minus region_sum, or a copy of full_alms if region_sum is None."""
     result = {}
     for key in full_alms:
-        arr = full_alms[key].copy()
-        for region_alms in region_alms_list:
-            arr -= region_alms[key]
-        result[key] = arr
+        result[key] = full_alms[key].copy()
+        if region_sum is not None:
+            result[key] -= region_sum[key]
     return result
 
 
@@ -521,6 +535,6 @@ def _debias_covariance(cov_jk, Q):
     """
     debiased_cov = {}
     for key in list(cov_jk.keys()):
-        c = cov_jk[key].array - Q[key].array/2
+        c = cov_jk[key].array - Q[key].array / 2
         debiased_cov[key] = replace(cov_jk[key], array=c)
     return debiased_cov
