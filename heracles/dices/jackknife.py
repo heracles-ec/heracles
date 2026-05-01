@@ -45,9 +45,9 @@ def _compute_cls_for_regions(args):
     Worker function for one combination of deleted jackknife regions.
     Reads ALMs from the cache directory so no large arrays need to be pickled.
     """
-    regions, dir, fields, jk_maps, mls0, mask_correction, unmixed = args
+    regions, dir, fields, jk_maps, mls0, mask_correction = args
     regions_tag = "_".join(map(str, regions))
-    cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
+    cls_path = os.path.join(dir, f"cls_{regions_tag}.fits")
 
     if os.path.exists(cls_path):
         return regions, read(cls_path)
@@ -68,10 +68,10 @@ def _compute_cls_for_regions(args):
         )
         _cls_mm = angular_power_spectra(vis_alms_jk)
         _cls = correct_footprint_naturalspice(
-            _cls, _cls_mm, mls0, fields, unmixed=unmixed
+            _cls, _cls_mm, mls0, fields
         )
     elif mask_correction == "Fast":
-        _cls = correct_footprint_fsky(_cls, jk_maps, fields, *regions, unmixed=unmixed)
+        _cls = correct_footprint_fsky(_cls, jk_maps, fields, *regions)
     else:
         raise ValueError("mask_correction must be 'Fast' or 'Full'")
 
@@ -85,7 +85,6 @@ def jackknife_cls(
     jk_maps,
     fields,
     mask_correction="Fast",
-    unmixed=False,
     nd=1,
     dir="./dices",
     parallel=False,
@@ -144,7 +143,7 @@ def jackknife_cls(
 
     all_regions = list(combinations(range(1, njk + 1), nd))
     args_list = [
-        (regions, dir, fields, jk_maps, mls0, mask_correction, unmixed)
+        (regions, dir, fields, jk_maps, mls0, mask_correction)
         for regions in all_regions
     ]
 
@@ -247,7 +246,7 @@ def bias(cls):
     return bias
 
 
-def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
+def jackknife_fsky(jkmaps, jk=0, jk2=0):
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
@@ -266,10 +265,7 @@ def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
         fsky = sum(mask) / len(mask)
         cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
         fskyjk = len(cond) / len(mask)
-        if ratio:
-            fskysjk[key] = fskyjk / fsky
-        else:
-            fskysjk[key] = fskyjk
+        fskysjk[key] = fskyjk / fsky
     return fskysjk
 
 
@@ -326,7 +322,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
+def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -335,12 +331,10 @@ def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
         fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
-        unmixed (bool): unmix the Cls
     returns:
         cls_cf (dict): Corrected Cls
     """
-    ratio = not unmixed
-    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2, ratio=ratio)
+    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
     _cls = {}
     for key in cls.keys():
         a, b, i, j = key
@@ -355,21 +349,19 @@ def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
     return _cls
 
 
-def _mask_correlation_ratio(mljk, mls0, unmixed=False):
+def _mask_correlation_ratio(mljk, mls0):
     alphas = {}
     wmls0 = cl2corr(mls0)
     wmljk = cl2corr(mljk)
     for key in list(wmljk.keys()):
         _wmljk = wmljk[key].array
         _wmls0 = wmls0[key].array
-        alpha = _wmljk
-        if not unmixed:
-            alpha = alpha / _wmls0
+        alpha = _wmljk / _wmls0
         alphas[key] = replace(mls0[key], array=alpha)
     return alphas
 
 
-def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
+def correct_footprint_naturalspice(cls, cls_mm, mls0, fields):
     """
     Corrects the Cls for footprint reduction using the full NaMaster/naturalspice approach.
     inputs:
@@ -377,11 +369,10 @@ def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
         cls_mm (dict): Dictionary of jackknife mask Cls
         mls0 (dict): Dictionary of full mask Cls
         fields (dict): Dictionary of fields
-        unmixed (bool): unmix the Cls
     returns:
         cls (dict): Corrected Cls
     """
-    alphas = _mask_correlation_ratio(cls_mm, mls0, unmixed=unmixed)
+    alphas = _mask_correlation_ratio(cls_mm, mls0)
     first_cls = list(cls.values())[0]
     first_mls = list(mls0.values())[0]
     lmax = first_cls.shape[first_cls.axis[0]]
