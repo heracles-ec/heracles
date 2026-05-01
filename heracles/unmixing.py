@@ -88,7 +88,7 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         i_theta_max = np.abs(theta - theta_max).argmin()
         x0 = np.log10(abs(first_wm[i_theta_max]))
     else:
-        x0 = -2
+        x0 = -5
 
     corr_wds = {}
     for key in wd.keys():
