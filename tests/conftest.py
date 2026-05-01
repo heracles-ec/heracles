@@ -161,17 +161,31 @@ def mls0(fields, vis_maps):
 
 
 @pytest.fixture(scope="session")
-def cls1(fields, data_maps, vis_maps, jk_maps):
+def cls1(fields, data_maps, vis_maps, jk_maps, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
-    return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=1)
+    return jackknife_cls(
+        data_maps,
+        vis_maps,
+        jk_maps,
+        fields,
+        nd=1,
+        dir=str(tmp_path_factory.mktemp("cls1")),
+    )
 
 
 @pytest.fixture(scope="session")
-def cls2(fields, data_maps, vis_maps, jk_maps):
+def cls2(fields, data_maps, vis_maps, jk_maps, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
-    return jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=2)
+    return jackknife_cls(
+        data_maps,
+        vis_maps,
+        jk_maps,
+        fields,
+        nd=2,
+        dir=str(tmp_path_factory.mktemp("cls2")),
+    )
 
 
 @pytest.fixture(scope="session")

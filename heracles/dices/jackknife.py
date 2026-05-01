@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
+import os
 import numpy as np
 import itertools
 from copy import deepcopy
@@ -27,6 +28,8 @@ from ..mapping import transform
 from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
+from ..io import write_alms, read_alms, write, read
+from ..progress import NoProgress
 
 try:
     from copy import replace
@@ -36,7 +39,15 @@ except ImportError:
 
 
 def jackknife_cls(
-    data_maps, vis_maps, jk_maps, fields, mask_correction="Fast", unmixed=False, nd=1
+    data_maps,
+    vis_maps,
+    jk_maps,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    nd=1,
+    dir="./dices",
+    progress=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -47,45 +58,89 @@ def jackknife_cls(
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
-        mode (str): Type of statistic to compute ("Cls" or "PseudoCls")
+        dir (str): Directory for caching intermediate ALMs.
+        progress (Progress): Progress reporter.
     returns:
         cls (dict): Dictionary of data Cls
     """
     if nd < 0 or nd > 2:
         raise ValueError("number of deletions must be 0, 1, or 2")
+
+    if progress is None:
+        progress = NoProgress()
+
     cls = {}
     jkmap = jk_maps[list(jk_maps.keys())[0]]
     njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
+    os.makedirs(dir, exist_ok=True)
 
-    data_alms_regions = {}
-    vis_alms_regions = {}
-    for k in range(1, njk + 1):
-        print(f" - Computing ALMs for region {k}", end="\r", flush=True)
-        data_alms_regions[k] = transform(
-            fields, _get_region_maps(data_maps, jk_maps, k)
-        )
-        vis_alms_regions[k] = transform(fields, _get_region_maps(vis_maps, jk_maps, k))
+    all_regions = list(combinations(range(1, njk + 1), nd))
+    total = (njk + 1) + len(all_regions)
+    current = 0
+    progress.update(current, total)
 
-    mls0 = angular_power_spectra(_sum_alms_except(vis_alms_regions, ()))
+    # Compute ALMs
+    for k in range(0, njk + 1):
+        data_path = os.path.join(dir, f"data_alms_{k}.fits")
+        vis_path = os.path.join(dir, f"vis_alms_{k}.fits")
+        with progress.task(f"ALMs {k}"):
+            if not (os.path.exists(data_path) and os.path.exists(vis_path)):
+                if k == 0:
+                    data_alms_k = transform(fields, data_maps)
+                    vis_alms_k = transform(fields, vis_maps)
+                else:
+                    data_alms_k = transform(
+                        fields, _get_region_maps(data_maps, jk_maps, k)
+                    )
+                    vis_alms_k = transform(
+                        fields, _get_region_maps(vis_maps, jk_maps, k)
+                    )
+                write_alms(data_path, data_alms_k, clobber=True)
+                write_alms(vis_path, vis_alms_k, clobber=True)
+        current += 1
+        progress.update(current, total)
 
-    for regions in combinations(range(1, njk + 1), nd):
-        print(f" - Computing Cls for regions {regions}", end="\r", flush=True)
-        alms_jk = _sum_alms_except(data_alms_regions, regions)
-        _cls = angular_power_spectra(alms_jk)
-        _cls = correct_bias(_cls, jk_maps, fields, *regions)
-        if mask_correction == "Full":
-            vis_alms_jk = _sum_alms_except(vis_alms_regions, regions)
-            _cls_mm = angular_power_spectra(vis_alms_jk)
-            _cls = correct_footprint_naturalspice(
-                _cls, _cls_mm, mls0, fields, unmixed=unmixed
-            )
-        elif mask_correction == "Fast":
-            _cls = correct_footprint_fsky(
-                _cls, jk_maps, fields, *regions, unmixed=unmixed
-            )
-        else:
-            raise ValueError("mask_correction must be 'Fast' or 'Full'")
-        cls[regions] = _cls
+    data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
+    vis_alms_full = read_alms(os.path.join(dir, "vis_alms_0.fits"))
+    mls0 = angular_power_spectra(vis_alms_full)
+
+    # Compute Cls
+    for regions in all_regions:
+        regions_tag = "_".join(map(str, regions))
+        cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
+        with progress.task(f"Cls {regions}"):
+            if os.path.exists(cls_path):
+                cls[regions] = read(cls_path)
+            else:
+                alms_jk = _subtract_alms(
+                    data_alms_full,
+                    _accumulate_alms(
+                        os.path.join(dir, f"data_alms_{r}.fits") for r in regions
+                    ),
+                )
+                _cls = angular_power_spectra(alms_jk)
+                _cls = correct_bias(_cls, jk_maps, fields, *regions)
+                if mask_correction == "Full":
+                    vis_alms_jk = _subtract_alms(
+                        vis_alms_full,
+                        _accumulate_alms(
+                            os.path.join(dir, f"vis_alms_{r}.fits") for r in regions
+                        ),
+                    )
+                    _cls_mm = angular_power_spectra(vis_alms_jk)
+                    _cls = correct_footprint_naturalspice(
+                        _cls, _cls_mm, mls0, fields, unmixed=unmixed
+                    )
+                elif mask_correction == "Fast":
+                    _cls = correct_footprint_fsky(
+                        _cls, jk_maps, fields, *regions, unmixed=unmixed
+                    )
+                else:
+                    raise ValueError("mask_correction must be 'Fast' or 'Full'")
+                write(cls_path, _cls, clobber=True)
+                cls[regions] = _cls
+        current += 1
+        progress.update(current, total)
     return cls
 
 
@@ -122,6 +177,29 @@ def _sum_alms_except(alms_regions, exclude=()):
         for alms_k in included[1:]:
             arr += alms_k[key]
         result[key] = arr
+    return result
+
+
+def _accumulate_alms(paths):
+    """Reads ALMs from each path and returns their sum, loading one file at a time."""
+    result = None
+    for path in paths:
+        alms = read_alms(path)
+        if result is None:
+            result = {key: arr.copy() for key, arr in alms.items()}
+        else:
+            for key in result:
+                result[key] += alms[key]
+    return result
+
+
+def _subtract_alms(full_alms, region_sum):
+    """Returns full_alms minus region_sum, or a copy of full_alms if region_sum is None."""
+    result = {}
+    for key in full_alms:
+        result[key] = full_alms[key].copy()
+        if region_sum is not None:
+            result[key] -= region_sum[key]
     return result
 
 

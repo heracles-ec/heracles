@@ -86,6 +86,9 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         xvals, _ = _cached_gauss_legendre(lmax_mask)
         theta = np.arccos(xvals) * 180 / np.pi
         i_theta_max = np.abs(theta - theta_max).argmin()
+        x0 = np.log10(abs(first_wm[i_theta_max]))
+    else:
+        x0 = -5
 
     corr_wds = {}
     for key in wd.keys():
@@ -93,9 +96,7 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         m_key = (masks[a], masks[b], i, j)
         _wm = get_cl(m_key, wm).array
         _wd = wd[key].array
-        if theta_max is not None:
-            x0 = np.log10(abs(_wm[i_theta_max]))
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0)
+        _wm *= logistic(np.log10(abs(_wm)), x0=x0)
         corr_wds[key] = replace(wd[key], array=(_wd / _wm))
 
     return corr_wds

@@ -59,8 +59,10 @@ def test_region_alm_cls(fields, data_maps, jk_maps, njk):
                 )
 
 
-def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps):
-    _cls0 = dices.jackknife_cls(data_maps, vis_maps, jk_maps, fields, nd=0)[()]
+def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps, tmp_path):
+    _cls0 = dices.jackknife_cls(
+        data_maps, vis_maps, jk_maps, fields, nd=0, dir=str(tmp_path)
+    )[()]
     for key in list(_cls0.keys()):
         _cl = _cls0[key]
         *_, nells = _cl.shape
