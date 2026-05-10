@@ -62,6 +62,11 @@ class Mapper(Protocol):
         Add values to data.
         """
 
+    def set_for_map(self, m: NDArray[Any], spin: int) -> NDArray[Any]:
+        """
+        Reads external data into the mapper's format.
+        """
+
     def transform(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         The spherical harmonic transform for this mapper.
