@@ -4,7 +4,15 @@ try:
     from scipy.special import lpn as legendrep
 except ImportError:
     # scipy > 1.15
-    from scipy.special import legendre_p_all as legendrep
+    from scipy.special import legendre_p_all
+
+    def legendrep(n, z):
+        """
+        Legendre function of the first kind. Compatibility function for
+        ``scipy.special.lpn()``.
+        """
+        return legendre_p_all(n, z, diff_n=1)
+
 
 try:
     from copy import replace
