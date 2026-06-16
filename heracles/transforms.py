@@ -1,5 +1,10 @@
-from scipy.special import lpn as legendrep
 import numpy as np
+
+try:
+    from scipy.special import lpn as legendrep
+except ImportError:
+    # scipy > 1.15
+    from scipy.special import legendre_p_all as legendrep
 
 try:
     from copy import replace
