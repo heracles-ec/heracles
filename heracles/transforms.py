@@ -1,18 +1,5 @@
 import numpy as np
-
-try:
-    from scipy.special import lpn as legendrep
-except ImportError:
-    # scipy > 1.15
-    from scipy.special import legendre_p_all
-
-    def legendrep(n, z):
-        """
-        Legendre function of the first kind. Compatibility function for
-        ``scipy.special.lpn()``.
-        """
-        return legendre_p_all(n, z, diff_n=1)
-
+from scipy.special import legendre_p_all
 
 try:
     from copy import replace
@@ -57,7 +44,7 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
     :return: :math:`(P,P'),(d_{11},d_{-1,1}), (d_{20}, d_{22}, d_{2,-2})` as requested, where P starts
              at :math:`\ell=0`, but spin functions start at :math:`\ell=\ell_{\rm min}`
     """
-    allP, alldP = legendrep(lmax, x)
+    allP, alldP = legendre_p_all(lmax, x, diff_n=1)
     # Polarization functions all start at L=2
     fac1 = 1 - x
     fac2 = 1 + x
