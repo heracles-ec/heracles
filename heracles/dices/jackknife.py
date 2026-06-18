@@ -41,7 +41,7 @@ except ImportError:
 def jackknife_cls(
     data_maps,
     vis_maps,
-    jk_maps,
+    jk_map,
     fields,
     mask_correction="Fast",
     unmixed=False,
@@ -54,7 +54,7 @@ def jackknife_cls(
     inputs:
         data_maps (dict): Dictionary of data maps
         vis_maps (dict): Dictionary of visibility maps
-        jk_maps (dict): Dictionary of mask maps
+        jk_map (array): Jackknife mask map
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
@@ -70,8 +70,7 @@ def jackknife_cls(
         progress = NoProgress()
 
     cls = {}
-    jkmap = jk_maps[list(jk_maps.keys())[0]]
-    njk = len(np.unique(jkmap)[np.unique(jkmap) != 0])
+    njk = len(np.unique(jk_map)[np.unique(jk_map) != 0])
     os.makedirs(dir, exist_ok=True)
 
     all_regions = list(combinations(range(1, njk + 1), nd))
@@ -90,10 +89,10 @@ def jackknife_cls(
                     vis_alms_k = transform(fields, vis_maps)
                 else:
                     data_alms_k = transform(
-                        fields, _get_region_maps(data_maps, jk_maps, k)
+                        fields, _get_region_maps(data_maps, jk_map, k)
                     )
                     vis_alms_k = transform(
-                        fields, _get_region_maps(vis_maps, jk_maps, k)
+                        fields, _get_region_maps(vis_maps, jk_map, k)
                     )
                 write_alms(data_path, data_alms_k, clobber=True)
                 write_alms(vis_path, vis_alms_k, clobber=True)
@@ -119,7 +118,7 @@ def jackknife_cls(
                     ),
                 )
                 _cls = angular_power_spectra(alms_jk)
-                _cls = correct_bias(_cls, jk_maps, fields, *regions)
+                _cls = correct_bias(_cls, jk_map, fields, *regions)
                 if mask_correction == "Full":
                     vis_alms_jk = _subtract_alms(
                         vis_alms_full,
@@ -133,7 +132,7 @@ def jackknife_cls(
                     )
                 elif mask_correction == "Fast":
                     _cls = correct_footprint_fsky(
-                        _cls, jk_maps, fields, *regions, unmixed=unmixed
+                        _cls, jk_map, *regions, unmixed=unmixed
                     )
                 else:
                     raise ValueError("mask_correction must be 'Fast' or 'Full'")
@@ -144,18 +143,15 @@ def jackknife_cls(
     return cls
 
 
-def _get_region_maps(maps, jkmaps, jk):
+def _get_region_maps(maps, jk_map, jk):
     """
     Returns maps with only the pixels belonging to jackknife region *jk* active.
     All other pixels are set to zero.
     """
     _maps = deepcopy(maps)
-    for key_data, key_mask in zip(maps.keys(), jkmaps.keys()):
+    for key_data in maps.keys():
         _map = _maps[key_data]
-        _jkmap = jkmaps[key_mask]
-        if _jkmap is None:
-            continue
-        _mask = (_jkmap == float(jk)).astype(int)
+        _mask = (jk_map == float(jk)).astype(int)
         _map *= _mask
     return _maps
 
@@ -218,30 +214,25 @@ def bias(cls):
     return bias
 
 
-def jackknife_fsky(jkmaps, jk=0, jk2=0, ratio=True):
+def jackknife_fsky(jk_map, jk=0, jk2=0, ratio=True):
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
-        jkmaps (dict): Dictionary of Jackknife maps
+        jk_map (array): Jackknife mask map
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
         ratio (bool): Return the ratio of fskyjk to fsky
     returns:
         fskyjk2 (np.array): Fraction of the sky after deleting two regions.
     """
-    fskysjk = {}
-    for key in jkmaps.keys():
-        jkmap = jkmaps[key]
-        mask = np.copy(jkmap)
-        mask = (mask > 0).astype(int)
-        fsky = sum(mask) / len(mask)
-        cond = np.where((mask == 1.0) & (jkmap != jk) & (jkmap != jk2))[0]
-        fskyjk = len(cond) / len(mask)
-        if ratio:
-            fskysjk[key] = fskyjk / fsky
-        else:
-            fskysjk[key] = fskyjk
-    return fskysjk
+    mask = np.copy(jk_map)
+    mask = (mask > 0).astype(int)
+    fsky = sum(mask) / len(mask)
+    cond = np.where((mask == 1.0) & (jk_map != jk) & (jk_map != jk2))[0]
+    fskyjk = len(cond) / len(mask)
+    if ratio:
+        fskyjk = fskyjk / fsky
+    return fskyjk
 
 
 def jackknife_bias(bias, fsky, fields):
@@ -258,23 +249,19 @@ def jackknife_bias(bias, fsky, fields):
     for key in list(bias.keys()):
         f1, f2, b1, b2 = key
         b = bias[key]
-        if (f1, b1) == (f2, b2):
-            field = fields[f1]
-            m_f = field.mask
-            fskyjk = fsky[(m_f, b1)]
-        else:
-            fskyjk = 0.0
-        b_jk = b * fskyjk
+        if (f1, b1) != (f2, b2):
+            fsky = 0.0
+        b_jk = b * fsky
         bias_jk[key] = b_jk
     return bias
 
 
-def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
+def correct_bias(cls, jk_map, fields, jk=0, jk2=0):
     """
     Corrects the bias of the Cls due to taking out a region.
     inputs:
         cls (dict): Dictionary of Cls
-        jkmaps (dict): Dictionary of Jackknife maps
+        jk_map (array): Jackknife mask map
         fields (dict): Dictionary of fields
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
@@ -284,7 +271,7 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     """
     # Bias correction
     b = bias(cls)
-    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2)
+    fskyjk = jackknife_fsky(jk_map, jk=jk, jk2=jk2)
     b_jk = jackknife_bias(b, fskyjk, fields)
     # Correct Cls
     cls = add_to_Cls(cls, b)
@@ -297,13 +284,12 @@ def correct_bias(cls, jkmaps, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
+def correct_footprint_fsky(cls, jk_map, jk=0, jk2=0, unmixed=False):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
         cls (dict): Dictionary of Cls
-        jkmaps (dict): Dictionary of Jackknife maps
-        fields (dict): Dictionary of fields
+        jk_map (array): Jackknife mask map
         jk (int): Jackknife region to remove
         jk2 (int): Jackknife region to remove
         unmixed (bool): unmix the Cls
@@ -311,17 +297,10 @@ def correct_footprint_fsky(cls, jkmaps, fields, jk=0, jk2=0, unmixed=False):
         cls_cf (dict): Corrected Cls
     """
     ratio = not unmixed
-    fskyjk = jackknife_fsky(jkmaps, jk=jk, jk2=jk2, ratio=ratio)
+    fskyjk = jackknife_fsky(jk_map, jk=jk, jk2=jk2, ratio=ratio)
     _cls = {}
     for key in cls.keys():
-        a, b, i, j = key
-        f_a = fields[a]
-        f_b = fields[b]
-        m_a = f_a.mask
-        m_b = f_b.mask
-        fsky_a = fskyjk[(m_a, i)]
-        fsky_b = fskyjk[(m_b, j)]
-        _cl = cls[key].array / np.sqrt(fsky_a * fsky_b)
+        _cl = cls[key].array / fskyjk
         _cls[key] = replace(cls[key], array=_cl)
     return _cls
 

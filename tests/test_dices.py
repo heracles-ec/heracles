@@ -10,28 +10,24 @@ except ImportError:
     from dataclasses import replace
 
 
-def test_jkmap(jk_maps, njk):
-    for key in list(jk_maps.keys()):
-        assert np.all(np.unique(jk_maps[key]) == np.arange(1, njk + 1))
+def test_jkmap(jk_map, njk):
+    assert np.all(np.unique(jk_map) == np.arange(1, njk + 1))
 
 
-def _remove_regions(maps, jk_maps, regions):
+def _remove_regions(maps, jk_map, regions):
     """Reference: explicitly zero out the given regions in each map."""
     from copy import deepcopy
 
     _maps = deepcopy(maps)
-    for key_data, key_mask in zip(maps.keys(), jk_maps.keys()):
-        _jkmap = jk_maps[key_mask]
-        if _jkmap is None:
-            continue
-        mask = (_jkmap > 0).astype(int)
+    for key_data in maps.keys():
+        mask = (jk_map > 0).astype(int)
         for r in regions:
-            mask[_jkmap == float(r)] = 0
+            mask[jk_map == float(r)] = 0
         _maps[key_data] *= mask
     return _maps
 
 
-def test_region_alm_cls(fields, data_maps, jk_maps, njk):
+def test_region_alm_cls(fields, data_maps, jk_map, njk):
     """ALM-subtraction and map-masking must give identical Cls."""
     from itertools import combinations
 
@@ -39,7 +35,7 @@ def test_region_alm_cls(fields, data_maps, jk_maps, njk):
     from heracles.dices.jackknife import _get_region_maps, _sum_alms_except
 
     alms_regions = {
-        k: transform(fields, _get_region_maps(data_maps, jk_maps, k))
+        k: transform(fields, _get_region_maps(data_maps, jk_map, k))
         for k in range(1, njk + 1)
     }
 
@@ -47,7 +43,7 @@ def test_region_alm_cls(fields, data_maps, jk_maps, njk):
         for regions in combinations(range(1, njk + 1), nd):
             cls_new = angular_power_spectra(_sum_alms_except(alms_regions, regions))
             cls_ref = angular_power_spectra(
-                transform(fields, _remove_regions(data_maps, jk_maps, regions))
+                transform(fields, _remove_regions(data_maps, jk_map, regions))
             )
             for key in cls_ref:
                 np.testing.assert_allclose(
@@ -59,9 +55,9 @@ def test_region_alm_cls(fields, data_maps, jk_maps, njk):
                 )
 
 
-def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_maps, tmp_path):
+def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_map, tmp_path):
     _cls0 = dices.jackknife_cls(
-        data_maps, vis_maps, jk_maps, fields, nd=0, dir=str(tmp_path)
+        data_maps, vis_maps, jk_map, fields, nd=0, dir=str(tmp_path)
     )[()]
     for key in list(_cls0.keys()):
         _cl = _cls0[key]
@@ -79,33 +75,25 @@ def test_bias(cls0):
         assert key in list(b.keys())
 
 
-def test_get_delete1_fsky(jk_maps, njk):
+def test_get_delete1_fsky(jk_map, njk):
     for jk in range(1, njk + 1):
-        alphas = dices.jackknife_fsky(jk_maps, jk, jk, ratio=True)
-        for key in list(alphas.keys()):
-            _alpha = 1 - 1 / njk
-            alpha = alphas[key]
-            assert alpha == pytest.approx(_alpha, rel=1e-1)
-        alphas = dices.jackknife_fsky(jk_maps, jk, jk, ratio=False)
-        for key in list(alphas.keys()):
-            _alpha = (njk - 1) / njk
-            alpha = alphas[key]
-            assert alpha == pytest.approx(_alpha, rel=1e-1)
+        alpha = dices.jackknife_fsky(jk_map, jk, jk, ratio=True)
+        _alpha = 1 - 1 / njk
+        assert alpha == pytest.approx(_alpha, rel=1e-1)
+        alpha = dices.jackknife_fsky(jk_map, jk, jk, ratio=False)
+        _alpha = (njk - 1) / njk
+        assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
-def test_get_delete2_fsky(jk_maps, njk):
+def test_get_delete2_fsky(jk_map, njk):
     for jk in range(1, njk + 1):
         for jk2 in range(jk + 1, njk + 1):
-            alphas = dices.jackknife_fsky(jk_maps, jk, jk2)
-            for key in list(alphas.keys()):
-                _alpha = 1 - 2 / njk
-                alpha = alphas[key]
-                assert alpha == pytest.approx(_alpha, rel=1e-1)
-            alphas = dices.jackknife_fsky(jk_maps, jk, jk2, ratio=False)
-            for key in list(alphas.keys()):
-                _alpha = (njk - 2) / njk
-                alpha = alphas[key]
-                assert alpha == pytest.approx(_alpha, rel=1e-1)
+            alpha = dices.jackknife_fsky(jk_map, jk, jk2)
+            _alpha = 1 - 2 / njk
+            assert alpha == pytest.approx(_alpha, rel=1e-1)
+            alpha = dices.jackknife_fsky(jk_map, jk, jk2, ratio=False)
+            _alpha = (njk - 2) / njk
+            assert alpha == pytest.approx(_alpha, rel=1e-1)
 
 
 def test_full_mask_correction(cls0, mls0, fields):
@@ -134,8 +122,8 @@ def test_full_mask_correction(cls0, mls0, fields):
         assert np.isclose(alpha, _alpha).all()
 
 
-def test_fast_mask_correction(cls0, fields, jk_maps):
-    _cls0 = dices.correct_footprint_fsky(cls0, jk_maps, fields, 0, 0)
+def test_fast_mask_correction(cls0, fields, jk_map):
+    _cls0 = dices.correct_footprint_fsky(cls0, jk_map, fields, 0, 0)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls0[key].array
