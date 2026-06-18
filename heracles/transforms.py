@@ -1,5 +1,18 @@
 import numpy as np
-from scipy.special import legendre_p_all
+
+try:
+    from scipy.special import legendre_p_all
+except ImportError:
+    # old scipy
+    from scipy.special import lpn
+
+    def legendre_p_all(n, z, *, diff_n=0):
+        """
+        All Legendre polynomials of the first kind up to the specified degree n.
+        """
+        assert diff_n == 1, "only diff_n=1 is supported"
+        return lpn(n, z)
+
 
 try:
     from copy import replace
