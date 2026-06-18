@@ -249,11 +249,9 @@ def jackknife_bias(bias, fsky, fields):
     for key in list(bias.keys()):
         f1, f2, b1, b2 = key
         b = bias[key]
-        if (f1, b1) != (f2, b2):
-            fsky = 0.0
         b_jk = b * fsky
         bias_jk[key] = b_jk
-    return bias
+    return bias_jk
 
 
 def correct_bias(cls, jk_map, fields, jk=0, jk2=0):

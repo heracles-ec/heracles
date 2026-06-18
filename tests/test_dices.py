@@ -122,8 +122,8 @@ def test_full_mask_correction(cls0, mls0, fields):
         assert np.isclose(alpha, _alpha).all()
 
 
-def test_fast_mask_correction(cls0, fields, jk_map):
-    _cls0 = dices.correct_footprint_fsky(cls0, jk_map, fields, 0, 0)
+def test_fast_mask_correction(cls0, jk_map):
+    _cls0 = dices.correct_footprint_fsky(cls0, jk_map, 0, 0)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls0[key].array
