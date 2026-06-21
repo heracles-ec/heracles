@@ -38,6 +38,214 @@ except ImportError:
     from dataclasses import replace
 
 
+def compute_jk_cls(
+    data_maps,
+    vis_maps,
+    jk_map,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    nd=1,
+    dir="./dices",
+    progress=None,
+):
+    """Compute jackknife Cls (nd = 1 or 2)."""
+
+    if progress is None:
+        progress = NoProgress()
+
+    # calc save alms if don't exist
+    compute_jk_alms(
+        data_maps,
+        vis_maps,
+        jk_map,
+        fields,
+        dir=dir,
+        progress=progress,
+    )
+
+    # calculate cls from saved alms
+    return compute_jk_cls_from_alms(
+        jk_map,
+        fields,
+        mask_correction=mask_correction,
+        unmixed=unmixed,
+        nd=nd,
+        dir=dir,
+        progress=progress,
+    )
+
+def compute_jk_alms(
+    data_maps,
+    vis_maps,
+    jk_map,
+    fields,
+    dir="./dices",
+    progress=None,
+):
+    """Compute and cache ALMs for full map and each JK region."""
+
+    if progress is None:
+        progress = NoProgress()
+
+    os.makedirs(dir, exist_ok=True)
+
+    njk = len(np.unique(jk_map)[np.unique(jk_map) != 0])
+
+    total = njk + 1
+    current = 0
+    progress.update(current, total)
+
+    for k in range(0, njk + 1):
+        with progress.task(f"ALMs {k}"):
+            _compute_single_jk_alm(
+                k,
+                data_maps,
+                vis_maps,
+                jk_map,
+                fields,
+                dir,
+            )
+
+        current += 1
+        progress.update(current, total)
+
+
+def _compute_single_jk_alm(
+    k,
+    data_maps,
+    vis_maps,
+    jk_map,
+    fields,
+    dir="./dices",
+):
+    data_path = os.path.join(dir, f"data_alms_{k}.fits")
+    vis_path  = os.path.join(dir, f"vis_alms_{k}.fits")
+
+    # Skip if already cached
+    if os.path.exists(data_path) and os.path.exists(vis_path):
+        return k, False  # nothing done
+
+    if k == 0:
+        data_alms_k = transform(fields, data_maps)
+        vis_alms_k  = transform(fields, vis_maps)
+    else:
+        data_alms_k = transform(
+            fields, _get_region_maps(data_maps, jk_map, k)
+        )
+        vis_alms_k = transform(
+            fields, _get_region_maps(vis_maps, jk_map, k)
+        )
+
+    write_alms(data_path, data_alms_k, clobber=True)
+    write_alms(vis_path,  vis_alms_k,  clobber=True)
+
+    return k, True  # processed
+
+
+def compute_jk_cls_from_alms(
+    jk_map,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    nd=1,
+    dir="./dices",
+    progress=None,
+):
+    """Serial driver — loops over all region combinations."""
+    
+    if nd == 0:
+        data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
+        cls0 = angular_power_spectra(data_alms_full)
+        return {(): cls0}
+
+    if nd < 1 or nd > 2:
+        raise ValueError("number of deletions must be 1 or 2")
+
+    if progress is None:
+        progress = NoProgress()
+
+    cls = {}
+
+    njk = len(np.unique(jk_map)[np.unique(jk_map) != 0])
+    all_regions = list(combinations(range(1, njk + 1), nd))
+
+    total = len(all_regions)
+    current = 0
+    progress.update(current, total)
+
+    for regions in all_regions:
+        with progress.task(f"Cls {regions}"):
+
+            cls[regions] = _compute_single_jk_cls(
+                regions,
+                jk_map,
+                fields,
+                mask_correction,
+                unmixed,
+                dir,
+            )
+
+        current += 1
+        progress.update(current, total)
+
+    return cls
+
+def _compute_single_jk_cls(
+    regions,
+    jk_map,
+    fields,
+    mask_correction="Fast",
+    unmixed=False,
+    dir="./dices",
+):
+    """Compute Cls for a single jackknife region combination."""
+
+    regions_tag = "_".join(map(str, regions))
+    cls_path = os.path.join(dir, f"cls_{regions_tag}_unmixed_{unmixed}.fits")
+
+    if os.path.exists(cls_path):
+        return read(cls_path)
+
+    data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
+    vis_alms_full  = read_alms(os.path.join(dir, "vis_alms_0.fits"))
+    mls0 = angular_power_spectra(vis_alms_full)
+
+    alms_jk = _subtract_alms(
+        data_alms_full,
+        _accumulate_alms(
+            os.path.join(dir, f"data_alms_{r}.fits") for r in regions
+        ),
+    )
+
+    _cls = angular_power_spectra(alms_jk)
+    _cls = correct_bias(_cls, jk_map, fields, *regions)
+
+    if mask_correction == "Full":
+        vis_alms_jk = _subtract_alms(
+            vis_alms_full,
+            _accumulate_alms(
+                os.path.join(dir, f"vis_alms_{r}.fits") for r in regions
+            ),
+        )
+        _cls_mm = angular_power_spectra(vis_alms_jk)
+        _cls = correct_footprint_naturalspice(
+            _cls, _cls_mm, mls0, fields, unmixed=unmixed
+        )
+
+    elif mask_correction == "Fast":
+        _cls = correct_footprint_fsky(
+            _cls, jk_map, *regions, unmixed=unmixed
+        )
+
+    else:
+        raise ValueError("mask_correction must be 'Fast' or 'Full'")
+
+    write(cls_path, _cls, clobber=True)
+
+    return _cls
+
+
 def jackknife_cls(
     data_maps,
     vis_maps,
