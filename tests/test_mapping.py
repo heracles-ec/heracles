@@ -50,6 +50,37 @@ def test_map_catalogs_match():
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
+def test_add_metadata_to_external_map():
+    import heracles.healpy
+    import numpy as np
+
+    nside = 16
+    lmax = 10
+    mapper = heracles.healpy.HealpixMapper(nside, lmax)
+
+    # spin = 0 case
+    m = np.ones(12 * nside**2)
+    m = mapper.update_metadata(m, spin=0)
+
+    assert m.dtype.metadata is not None
+    assert m.dtype.metadata["spin"] == 0
+    assert m.dtype.metadata["geometry"] == "healpix"
+    assert m.dtype.metadata["kernel"] == "healpix"
+    assert m.dtype.metadata["deconv"] is True
+    assert m.dtype.metadata["nside"] == nside
+    assert m.dtype.metadata["lmax"] == lmax
+
+    m2 = np.ones((2, 12 * nside**2))
+    m2 = mapper.update_metadata(m2, spin=2)
+    assert m2.dtype.metadata is not None
+    assert m2.dtype.metadata["spin"] == 2
+    assert m2.dtype.metadata["geometry"] == "healpix"
+    assert m2.dtype.metadata["kernel"] == "healpix"
+    assert m2.dtype.metadata["deconv"] is True
+    assert m2.dtype.metadata["nside"] == nside
+    assert m2.dtype.metadata["lmax"] == lmax
+
+
 def test_transform(rng):
     from heracles.mapping import transform
 

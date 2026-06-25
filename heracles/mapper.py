@@ -67,6 +67,11 @@ class Mapper(Protocol):
         The spherical harmonic transform for this mapper.
         """
 
+    def update_metadata(self, m: NDArray[Any], spin: int) -> NDArray[Any]:
+        """
+        Update metadata of external data to this mapper's format.
+        """
+
     def resample(self, data: NDArray[Any]) -> NDArray[Any]:
         """
         Change resolution of data, which must be in this mapper's format.
