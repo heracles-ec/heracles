@@ -143,7 +143,7 @@ def jk_map(nside, njk):
 def cls0(fields, data_maps, mapper):
     from heracles import transform, angular_power_spectra
 
-    alms = transform(fields, data_maps, mapper=mapper)
+    alms = transform(mapper, fields, data_maps)
     # compute cls
     cls = angular_power_spectra(alms)
     return cls
@@ -153,7 +153,7 @@ def cls0(fields, data_maps, mapper):
 def mls0(fields, vis_maps, mapper):
     from heracles import transform, angular_power_spectra
 
-    return angular_power_spectra(transform(fields, vis_maps, mapper=mapper))
+    return angular_power_spectra(transform(mapper, fields, vis_maps))
 
 
 @pytest.fixture(scope="session")
@@ -164,8 +164,8 @@ def cls1(fields, data_maps, vis_maps, jk_map, mapper, tmp_path_factory):
         data_maps,
         vis_maps,
         jk_map,
-        fields,
         mapper,
+        fields,
         nd=1,
         dir=str(tmp_path_factory.mktemp("cls1")),
     )
@@ -179,8 +179,8 @@ def cls2(fields, data_maps, vis_maps, jk_map, mapper, tmp_path_factory):
         data_maps,
         vis_maps,
         jk_map,
-        fields,
         mapper,
+        fields,
         nd=2,
         dir=str(tmp_path_factory.mktemp("cls2")),
     )

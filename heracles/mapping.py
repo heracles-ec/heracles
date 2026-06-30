@@ -41,12 +41,11 @@ if TYPE_CHECKING:
 
 async def _map_field(
     key: tuple[Any, ...],
+    mapper: Mapper,
     field: Field,
     catalog: Catalog,
     progress: Progress,
     task_done: Callable[[], None],
-    *,
-    mapper: Mapper,
 ) -> NDArray:
     """
     Coroutine to map an individual field.
@@ -62,10 +61,10 @@ async def _map_field(
 
 
 def map_catalogs(
+    mapper: Mapper,
     fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
-    mapper: Mapper,
     parallel: bool = False,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     include: Sequence[tuple[Any, Any]] | None = None,
@@ -111,7 +110,7 @@ def map_catalogs(
             if toc_match(key, include, exclude):
                 keys.append(key)
                 coros.append(
-                    _map_field(key, field, catalog, progress, _task_done, mapper=mapper)
+                    _map_field(key, mapper, field, catalog, progress, _task_done)
                 )
 
         # run all coroutines concurrently
@@ -134,10 +133,10 @@ def map_catalogs(
 
 
 def transform(
+    mapper: Mapper,
     fields: Mapping[Any, Field],
     data: Mapping[tuple[Any, Any], NDArray],
     *,
-    mapper: Mapper,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     progress: Progress | None = None,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:

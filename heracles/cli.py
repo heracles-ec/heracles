@@ -497,9 +497,9 @@ def map_all_selections(
             group_fields = {name: fields[name] for name in names}
             result.update(
                 map_catalogs(
+                    mapper,
                     group_fields,
                     {key: catalog},
-                    mapper=mapper,
                     parallel=True,  # process everything at this level in one go
                     progress=progress,
                 )
@@ -612,9 +612,9 @@ def alms(
             group_fields = {name: fields[name] for name in names}
             group_maps = {k: v for k, v in maps.items() if k[0] in names}
             transform(
+                mapper,
                 group_fields,
                 group_maps,
-                mapper=mapper,
                 progress=progress,
                 out=out,
             )

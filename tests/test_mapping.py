@@ -25,7 +25,7 @@ def test_map_catalogs(parallel):
 
     mapper = unittest.mock.Mock()
 
-    maps = map_catalogs(fields, catalogs, mapper=mapper, parallel=parallel)
+    maps = map_catalogs(mapper, fields, catalogs, parallel=parallel)
 
     for k in fields:
         for i in catalogs:
@@ -46,11 +46,11 @@ def test_map_catalogs_match():
     catalogs = {"x": MockCatalog(), "y": MockCatalog()}
     mapper = unittest.mock.Mock()
 
-    maps = map_catalogs(fields, catalogs, mapper=mapper, include=[(..., "y")])
+    maps = map_catalogs(mapper, fields, catalogs, include=[(..., "y")])
 
     assert set(maps.keys()) == {("a", "y"), ("b", "y"), ("c", "y")}
 
-    maps = map_catalogs(fields, catalogs, mapper=mapper, exclude=[("a", ...)])
+    maps = map_catalogs(mapper, fields, catalogs, exclude=[("a", ...)])
 
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
@@ -65,7 +65,7 @@ def test_transform(rng):
     fields = {"X": x, "Y": y}
     maps = {("X", 0): unittest.mock.Mock(), ("Y", 1): unittest.mock.Mock()}
 
-    alms = transform(fields, maps, mapper=mapper)
+    alms = transform(mapper, fields, maps)
 
     assert len(alms) == 2
     assert alms.keys() == {("X", 0), ("Y", 1)}
