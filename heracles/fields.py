@@ -264,7 +264,7 @@ class Positions(Field, spin=0):
                 lon, lat = page.get(*col)
                 w = page.get(wcol) if wcol is not None else np.ones(page.size)
 
-                mapper.map_values(lon, lat, pos, w)
+                mapper.map_values(lon, lat, pos, w, spin=self.spin)
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
@@ -354,7 +354,7 @@ class ScalarField(Field, spin=0):
                 w = page.get(wcol) if wcol is not None else np.ones(page.size)
                 v = v * w
 
-                mapper.map_values(lon, lat, val, v)
+                mapper.map_values(lon, lat, val, v, spin=self.spin)
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
@@ -431,7 +431,7 @@ class ComplexField(Field, spin=0):
                 w = page.get(wcol) if wcol is not None else np.ones(page.size)
                 re, im = w * re, w * im
 
-                mapper.map_values(lon, lat, val, np.r_[[re, im]])
+                mapper.map_values(lon, lat, val, np.r_[[re, im]], spin=self.spin)
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal
@@ -537,7 +537,7 @@ class Weights(Field, spin=0):
                 lon, lat = page.get(*col)
                 w = page.get(wcol) if wcol is not None else np.ones(page.size)
 
-                mapper.map_values(lon, lat, wht, w)
+                mapper.map_values(lon, lat, wht, w, spin=self.spin)
 
                 ngal += page.size
                 wmean += (w - wmean).sum() / ngal

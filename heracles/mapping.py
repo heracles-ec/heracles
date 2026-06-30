@@ -158,8 +158,8 @@ def transform(
             except KeyError:
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg) from None
-
-            out[k, i] = field.mapper_or_error.transform(m)
+            s = field.spin
+            out[k, i] = field.mapper_or_error.transform(m, spin=s)
 
     # return the toc dict of alms
     return out
