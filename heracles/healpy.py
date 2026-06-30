@@ -158,13 +158,12 @@ class HealpixMapper:
         # sum values in each pixel
         _map(ipix, data, values)
 
-    def transform(self, data: NDArray[Any]) -> NDArray[Any]:
+    def transform(self, data: NDArray[Any], spin: int = 0) -> NDArray[Any]:
         """
         Spherical harmonic transform of HEALPix maps.
         """
 
         md: Mapping[str, Any] = data.dtype.metadata or {}
-        spin = md.get("spin", 0)
         pw: NDArray[Any] | None = None
 
         if spin == 0:

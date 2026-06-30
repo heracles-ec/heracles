@@ -139,6 +139,7 @@ class DiscreteMapper:
     def transform(
         self,
         data: ArrayLike,
+        spin: int = 0,
     ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
         """
         Does nothing, since inputs are alms already.
