@@ -85,13 +85,11 @@ class Field(metaclass=ABCMeta):
 
     def __init__(
         self,
-        mapper: Mapper | None,
         *columns: str,
         mask: str | None = None,
     ) -> None:
         """Initialise the field."""
         super().__init__()
-        self.__mapper = mapper
         self.__columns = self._init_columns(*columns) if columns else None
         self.__mask = mask
 
@@ -115,20 +113,6 @@ class Field(metaclass=ABCMeta):
             msg += f", received {len(columns)}"
             raise ValueError(msg)
         return columns + (None,) * (nmax - len(columns))
-
-    @property
-    def mapper(self) -> Mapper | None:
-        """Return the mapper used by this field."""
-        return self.__mapper
-
-    @property
-    def mapper_or_error(self) -> Mapper:
-        """Return the mapper used by this field, or raise a :class:`ValueError`
-        if not set."""
-        if self.__mapper is None:
-            msg = "no mapper for field"
-            raise ValueError(msg)
-        return self.__mapper
 
     @property
     def columns(self) -> Columns | None:
@@ -164,6 +148,7 @@ class Field(metaclass=ABCMeta):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Implementation for mapping a catalogue."""
@@ -206,14 +191,13 @@ class Positions(Field, spin=0):
 
     def __init__(
         self,
-        mapper: Mapper | None,
         *columns: str,
         overdensity: bool = True,
         nbar: float | None = None,
         mask: str | None = None,
     ) -> None:
         """Create a position field."""
-        super().__init__(mapper, *columns, mask=mask)
+        super().__init__(*columns, mask=mask)
         self.__overdensity = overdensity
         self.__nbar = nbar
 
@@ -236,6 +220,7 @@ class Positions(Field, spin=0):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Map the given catalogue."""
@@ -244,9 +229,6 @@ class Positions(Field, spin=0):
         if self.__overdensity and catalog.visibility is None:
             msg = "cannot compute density contrast: no visibility in catalog"
             raise ValueError(msg)
-
-        # get mapper
-        mapper = self.mapper_or_error
 
         # get catalogue column definition
         *col, wcol = self.columns_or_error
@@ -327,12 +309,10 @@ class ScalarField(Field, spin=0):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Map real values from catalogue to HEALPix map."""
-
-        # get mapper
-        mapper = self.mapper_or_error
 
         # get the column definition of the catalogue
         *col, wcol = self.columns_or_error
@@ -404,12 +384,10 @@ class ComplexField(Field, spin=0):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Map complex values from catalogue to HEALPix map."""
-
-        # get mapper
-        mapper = self.mapper_or_error
 
         # get the column definition of the catalogue
         *col, wcol = self.columns_or_error
@@ -473,12 +451,10 @@ class Visibility(Field, spin=0):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Create a visibility map from the given catalogue."""
-
-        # get mapper
-        mapper = self.mapper_or_error
 
         # make sure that catalogue has a visibility
         visibility = catalog.visibility
@@ -511,12 +487,10 @@ class Weights(Field, spin=0):
         self,
         catalog: Catalog,
         *,
+        mapper: Mapper,
         progress: Progress | None = None,
     ) -> ArrayLike:
         """Map catalogue weights."""
-
-        # get mapper
-        mapper = self.mapper_or_error
 
         # get the columns for this field
         *col, wcol = self.columns_or_error

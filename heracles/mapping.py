@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
     from heracles.catalog import Catalog
     from heracles.fields import Field
+    from heracles.mapper import Mapper
 
 
 async def _map_field(
@@ -44,6 +45,8 @@ async def _map_field(
     catalog: Catalog,
     progress: Progress,
     task_done: Callable[[], None],
+    *,
+    mapper: Mapper,
 ) -> NDArray:
     """
     Coroutine to map an individual field.
@@ -51,7 +54,7 @@ async def _map_field(
 
     label = "(" + ", ".join(map(str, key)) + ")"
     with progress.task(label) as task:
-        result = await field(catalog, progress=task)
+        result = await field(catalog, progress=task, mapper=mapper)
 
     task_done()
 
@@ -62,6 +65,7 @@ def map_catalogs(
     fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
+    mapper: Mapper,
     parallel: bool = False,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     include: Sequence[tuple[Any, Any]] | None = None,
@@ -106,7 +110,9 @@ def map_catalogs(
         for key, field, catalog in items:
             if toc_match(key, include, exclude):
                 keys.append(key)
-                coros.append(_map_field(key, field, catalog, progress, _task_done))
+                coros.append(
+                    _map_field(key, field, catalog, progress, _task_done, mapper=mapper)
+                )
 
         # run all coroutines concurrently
         try:
@@ -131,6 +137,7 @@ def transform(
     fields: Mapping[Any, Field],
     data: Mapping[tuple[Any, Any], NDArray],
     *,
+    mapper: Mapper,
     out: MutableMapping[tuple[Any, Any], NDArray] | None = None,
     progress: Progress | None = None,
 ) -> MutableMapping[tuple[Any, Any], NDArray]:
@@ -159,7 +166,7 @@ def transform(
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg) from None
             s = field.spin
-            out[k, i] = field.mapper_or_error.transform(m, spin=s)
+            out[k, i] = mapper.transform(m, spin=s)
 
     # return the toc dict of alms
     return out

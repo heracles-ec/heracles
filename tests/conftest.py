@@ -104,25 +104,27 @@ def vis_maps(nside):
 
 
 @pytest.fixture(scope="session")
-def fields(nside):
+def mapper(nside):
+    from heracles.healpy import HealpixMapper
+
+    lmax = nside // 4
+    return HealpixMapper(nside=nside, lmax=lmax)
+
+
+@pytest.fixture(scope="session")
+def fields():
     """
     Internal method to initialize fields.
-    inputs:
-        nside (int): Healpix nside
-        lmax (int): Maximum multipole
     returns:
         fields (dict): Dictionary of fields
     """
-    from heracles.healpy import HealpixMapper
     from heracles.fields import Positions, Shears, Visibility, Weights
 
-    lmax = nside // 4
-    mapper = HealpixMapper(nside=nside, lmax=lmax)
     fields = {
-        "POS": Positions(mapper, mask="VIS"),
-        "SHE": Shears(mapper, mask="WHT"),
-        "VIS": Visibility(mapper),
-        "WHT": Weights(mapper),
+        "POS": Positions(mask="VIS"),
+        "SHE": Shears(mask="WHT"),
+        "VIS": Visibility(),
+        "WHT": Weights(),
     }
     return fields
 
@@ -138,24 +140,24 @@ def jk_map(nside, njk):
 
 
 @pytest.fixture(scope="session")
-def cls0(fields, data_maps):
+def cls0(fields, data_maps, mapper):
     from heracles import transform, angular_power_spectra
 
-    alms = transform(fields, data_maps)
+    alms = transform(fields, data_maps, mapper=mapper)
     # compute cls
     cls = angular_power_spectra(alms)
     return cls
 
 
 @pytest.fixture(scope="session")
-def mls0(fields, vis_maps):
+def mls0(fields, vis_maps, mapper):
     from heracles import transform, angular_power_spectra
 
-    return angular_power_spectra(transform(fields, vis_maps))
+    return angular_power_spectra(transform(fields, vis_maps, mapper=mapper))
 
 
 @pytest.fixture(scope="session")
-def cls1(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
+def cls1(fields, data_maps, vis_maps, jk_map, mapper, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(
@@ -163,13 +165,14 @@ def cls1(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
         vis_maps,
         jk_map,
         fields,
+        mapper,
         nd=1,
         dir=str(tmp_path_factory.mktemp("cls1")),
     )
 
 
 @pytest.fixture(scope="session")
-def cls2(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
+def cls2(fields, data_maps, vis_maps, jk_map, mapper, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(
@@ -177,6 +180,7 @@ def cls2(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
         vis_maps,
         jk_map,
         fields,
+        mapper,
         nd=2,
         dir=str(tmp_path_factory.mktemp("cls2")),
     )

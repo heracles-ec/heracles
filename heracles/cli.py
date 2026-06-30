@@ -159,8 +159,8 @@ class ConfigParser(configparser.ConfigParser):
         return {s.rpartition(":")[-1].strip(): s for s in sections}
 
 
-def mapper_from_config(config, section):
-    """Construct a mapper instance from config."""
+def _mapper_config_key(config, section):
+    """Read a hashable mapper config key from a field's config section."""
 
     choices = {
         "none": "none",
@@ -168,23 +168,61 @@ def mapper_from_config(config, section):
         "discrete": "discrete",
     }
 
-    mapper = config.getchoice(section, "mapper", choices)
+    kind = config.getchoice(section, "mapper", choices)
 
-    if mapper == "healpix":
-        from .healpy import HealpixMapper
-
+    if kind == "healpix":
         nside = config.getint(section, "nside")
         lmax = config.getint(section, "lmax", fallback=None)
         deconvolve = config.getboolean(section, "deconvolve", fallback=None)
-        return HealpixMapper(nside, lmax, deconvolve=deconvolve)
+        return ("healpix", nside, lmax, deconvolve)
 
-    if mapper == "discrete":
-        from .ducc import DiscreteMapper
-
+    if kind == "discrete":
         lmax = config.getint(section, "lmax", fallback=None)
-        return DiscreteMapper(lmax)
+        return ("discrete", lmax)
 
     return None
+
+
+def _build_mapper(key):
+    """Construct a mapper instance from a mapper config key."""
+
+    if key[0] == "healpix":
+        from .healpy import HealpixMapper
+
+        _, nside, lmax, deconvolve = key
+        return HealpixMapper(nside, lmax, deconvolve=deconvolve)
+
+    from .ducc import DiscreteMapper
+
+    _, lmax = key
+    return DiscreteMapper(lmax)
+
+
+def mapper_from_config(config, section):
+    """Construct a mapper instance from config."""
+
+    key = _mapper_config_key(config, section)
+    if key is None:
+        return None
+    return _build_mapper(key)
+
+
+def group_fields_by_mapper(fields, config):
+    """Group field names by identical mapper config.
+
+    Yields ``(mapper, names)`` pairs, where *mapper* is a single
+    :class:`~heracles.mapper.Mapper` instance shared by all field names in
+    *names* (fields configured with ``mapper = none`` are skipped).
+    """
+    sections = config.subsections("fields")
+    groups: dict[tuple, list[str]] = {}
+    for name in fields:
+        key = _mapper_config_key(config, sections[name])
+        if key is None:
+            continue
+        groups.setdefault(key, []).append(name)
+    for key, names in groups.items():
+        yield _build_mapper(key), names
 
 
 def field_from_config(config, section):
@@ -205,10 +243,9 @@ def field_from_config(config, section):
             raise RuntimeError(msg) from None
     else:
         cls = _type
-    mapper = mapper_from_config(config, section)
     columns = config.getlist(section, "columns", fallback=())
     mask = config.get(section, "mask", fallback=None)
-    return cls(mapper, *columns, mask=mask)
+    return cls(*columns, mask=mask)
 
 
 def fields_from_config(config):
@@ -434,12 +471,17 @@ def map_all_selections(
 ) -> Iterator:
     """Iteratively map the catalogues defined in config."""
 
+    from .core import TocDict
     from .mapping import map_catalogs
 
     # load catalogues to process
     catalogs = catalogs_from_config(config)
 
     logger.info("fields %s", ", ".join(map(repr, fields)))
+
+    # group fields by their configured mapper, since map_catalogs() maps a
+    # single mapper per call
+    groups = list(group_fields_by_mapper(fields, config))
 
     # process each catalogue separately into maps
     for key, catalog in catalogs.items():
@@ -449,13 +491,20 @@ def map_all_selections(
             f"selection {key}",
         )
 
-        # maps for single catalogue
-        yield map_catalogs(
-            fields,
-            {key: catalog},
-            parallel=True,  # process everything at this level in one go
-            progress=progress,
-        )
+        # maps for single catalogue, merged across mapper groups
+        result = TocDict()
+        for mapper, names in groups:
+            group_fields = {name: fields[name] for name in names}
+            result.update(
+                map_catalogs(
+                    group_fields,
+                    {key: catalog},
+                    mapper=mapper,
+                    parallel=True,  # process everything at this level in one go
+                    progress=progress,
+                )
+            )
+        yield result
 
 
 def load_all_maps(paths: Paths, logger: logging.Logger) -> Iterator:
@@ -537,8 +586,12 @@ def alms(
     if healpix_datapath is not None:
         HealpixMapper.DATAPATH = healpix_datapath
 
-    # construct fields to get mappers for transform
+    # construct fields for mapping
     fields = fields_from_config(config)
+
+    # group fields by their configured mapper, since transform() transforms
+    # a single mapper per call
+    groups = list(group_fields_by_mapper(fields, config))
 
     # process either catalogues or maps
     # everything is loaded via iterators to keep memory use low
@@ -555,12 +608,16 @@ def alms(
     # iterate over maps and transform each
     for maps in itermaps:
         logger.info("transforming %d maps", len(maps))
-        transform(
-            fields,
-            maps,
-            progress=progress,
-            out=out,
-        )
+        for mapper, names in groups:
+            group_fields = {name: fields[name] for name in names}
+            group_maps = {k: v for k, v in maps.items() if k[0] in names}
+            transform(
+                group_fields,
+                group_maps,
+                mapper=mapper,
+                progress=progress,
+                out=out,
+            )
         del maps
 
 

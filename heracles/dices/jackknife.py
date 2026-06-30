@@ -43,6 +43,7 @@ def jackknife_cls(
     vis_maps,
     jk_map,
     fields,
+    mapper,
     mask_correction="Fast",
     unmixed=False,
     nd=1,
@@ -56,6 +57,7 @@ def jackknife_cls(
         vis_maps (dict): Dictionary of visibility maps
         jk_map (array): Jackknife mask map
         fields (dict): Dictionary of fields
+        mapper (Mapper): Mapper used to transform maps to alms
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
         dir (str): Directory for caching intermediate ALMs.
@@ -85,14 +87,14 @@ def jackknife_cls(
         with progress.task(f"ALMs {k}"):
             if not (os.path.exists(data_path) and os.path.exists(vis_path)):
                 if k == 0:
-                    data_alms_k = transform(fields, data_maps)
-                    vis_alms_k = transform(fields, vis_maps)
+                    data_alms_k = transform(fields, data_maps, mapper=mapper)
+                    vis_alms_k = transform(fields, vis_maps, mapper=mapper)
                 else:
                     data_alms_k = transform(
-                        fields, _get_region_maps(data_maps, jk_map, k)
+                        fields, _get_region_maps(data_maps, jk_map, k), mapper=mapper
                     )
                     vis_alms_k = transform(
-                        fields, _get_region_maps(vis_maps, jk_map, k)
+                        fields, _get_region_maps(vis_maps, jk_map, k), mapper=mapper
                     )
                 write_alms(data_path, data_alms_k, clobber=True)
                 write_alms(vis_path, vis_alms_k, clobber=True)
