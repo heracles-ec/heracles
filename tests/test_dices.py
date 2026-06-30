@@ -35,9 +35,7 @@ def test_region_alm_cls(fields, data_maps, jk_map, njk, mapper):
     from heracles.dices.jackknife import _get_region_maps, _sum_alms_except
 
     alms_regions = {
-        k: transform(
-            fields, _get_region_maps(data_maps, jk_map, k), mapper=mapper
-        )
+        k: transform(fields, _get_region_maps(data_maps, jk_map, k), mapper=mapper)
         for k in range(1, njk + 1)
     }
 
