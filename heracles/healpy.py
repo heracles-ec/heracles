@@ -147,6 +147,7 @@ class HealpixMapper:
         lat: NDArray[Any],
         data: NDArray[Any],
         values: NDArray[Any],
+        spin: int = 0,
     ) -> None:
         """
         Add values to HEALPix maps.

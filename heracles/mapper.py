@@ -57,6 +57,7 @@ class Mapper(Protocol):
         lat: NDArray[Any],
         data: NDArray[Any],
         values: NDArray[Any],
+        spin: int = 0,
     ) -> None:
         """
         Add values to data.
