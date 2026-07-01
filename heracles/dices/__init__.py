@@ -23,6 +23,8 @@ Main module of the *DICES* package.
 __all__ = [
     # jackknife
     "jackknife_cls",
+    "_compute_single_jk_cls",
+    "_compute_single_jk_alm",
     "jackknife_fsky",
     "jackknife_bias",
     "correct_bias",
@@ -43,6 +45,8 @@ __all__ = [
 
 from .jackknife import (
     jackknife_cls,
+    _compute_single_jk_cls,
+    _compute_single_jk_alm,
     jackknife_fsky,
     jackknife_bias,
     correct_bias,
