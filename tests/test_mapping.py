@@ -50,14 +50,25 @@ def test_map_catalogs_match():
     assert set(maps.keys()) == {("b", "x"), ("b", "y"), ("c", "x"), ("c", "y")}
 
 
+def _mock_map(spin=None):
+    import numpy as np
+
+    from heracles.core import update_metadata
+
+    m = np.zeros(1)
+    if spin is not None:
+        update_metadata(m, spin=spin)
+    return m
+
+
 def test_transform(rng):
     from heracles.mapping import transform
 
-    x = unittest.mock.Mock()
-    y = unittest.mock.Mock()
+    x = unittest.mock.Mock(spin=0)
+    y = unittest.mock.Mock(spin=2)
 
     fields = {"X": x, "Y": y}
-    maps = {("X", 0): unittest.mock.Mock(), ("Y", 1): unittest.mock.Mock()}
+    maps = {("X", 0): _mock_map(spin=0), ("Y", 1): _mock_map(spin=2)}
 
     alms = transform(fields, maps)
 
@@ -65,3 +76,27 @@ def test_transform(rng):
     assert alms.keys() == {("X", 0), ("Y", 1)}
     assert alms["X", 0] is x.mapper_or_error.transform.return_value
     assert alms["Y", 1] is y.mapper_or_error.transform.return_value
+
+
+def test_transform_fills_missing_spin():
+    from heracles.mapping import transform
+
+    x = unittest.mock.Mock(spin=2)
+    fields = {"X": x}
+    m = _mock_map(spin=None)
+    maps = {("X", 0): m}
+
+    transform(fields, maps)
+
+    assert m.dtype.metadata["spin"] == 2
+
+
+def test_transform_spin_mismatch():
+    from heracles.mapping import transform
+
+    x = unittest.mock.Mock(spin=2)
+    fields = {"X": x}
+    maps = {("X", 0): _mock_map(spin=0)}
+
+    with pytest.raises(ValueError, match="spin mismatch"):
+        transform(fields, maps)
