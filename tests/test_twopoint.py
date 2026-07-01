@@ -182,7 +182,7 @@ def test_angular_power_spectra_bias(lmax):
 
     # cross-spectrum: no bias key
     alms_cross = {("F", 0): a, ("F", 1): a.copy()}
-    cls_cross = angular_power_spectra({("F", 0): a}, {("F", 1): a.copy()}, debias=False)
+    cls_cross = angular_power_spectra(alms_cross, debias=False)
     assert "bias" not in (cls_cross["F", "F", 0, 1].dtype.metadata or {})
 
     # external map (no ingredients): no bias key
