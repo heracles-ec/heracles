@@ -128,13 +128,19 @@ def fields(nside):
 
 
 @pytest.fixture(scope="session")
-def jk_map(nside, njk):
+def jk_maps(nside, njk):
     npix = 12 * nside**2
     jkmap = np.ones(npix)
     segment = npix // njk
     for i in range(njk):
         jkmap[i * segment : (i + 1) * segment] = i + 1
-    return jkmap
+    return {
+        ("VIS", 1): jkmap,
+        ("WHT", 1): jkmap,
+        ("VIS", 2): jkmap,
+        ("WHT", 2): jkmap,
+        ("VIS", 3): jkmap,
+    }
 
 
 @pytest.fixture(scope="session")
@@ -155,13 +161,13 @@ def mls0(fields, vis_maps):
 
 
 @pytest.fixture(scope="session")
-def cls1(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
+def cls1(fields, data_maps, vis_maps, jk_maps, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(
         data_maps,
         vis_maps,
-        jk_map,
+        jk_maps,
         fields,
         nd=1,
         dir=str(tmp_path_factory.mktemp("cls1")),
@@ -169,13 +175,13 @@ def cls1(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def cls2(fields, data_maps, vis_maps, jk_map, tmp_path_factory):
+def cls2(fields, data_maps, vis_maps, jk_maps, tmp_path_factory):
     from heracles.dices.jackknife import jackknife_cls
 
     return jackknife_cls(
         data_maps,
         vis_maps,
-        jk_map,
+        jk_maps,
         fields,
         nd=2,
         dir=str(tmp_path_factory.mktemp("cls2")),
