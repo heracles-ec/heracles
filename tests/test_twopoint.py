@@ -160,17 +160,25 @@ def test_angular_power_spectra_bias(lmax):
 
     # spin-0 auto: bias = fsky * musq / dens
     a = np.zeros(size, dtype=complex)
-    a.dtype = np.dtype(a.dtype, metadata={"spin": 0, "fsky": fsky, "musq": musq, "dens": dens})
+    a.dtype = np.dtype(
+        a.dtype, metadata={"spin": 0, "fsky": fsky, "musq": musq, "dens": dens}
+    )
     alms = {("F", 0): a}
     cls = angular_power_spectra(alms, debias=False)
-    assert cls["F", "F", 0, 0].dtype.metadata["bias"] == pytest.approx(fsky * musq / dens)
+    assert cls["F", "F", 0, 0].dtype.metadata["bias"] == pytest.approx(
+        fsky * musq / dens
+    )
 
     # spin-2 auto: bias = 0.5 * fsky * musq / dens
     b = np.zeros((2, size), dtype=complex)
-    b.dtype = np.dtype(b.dtype, metadata={"spin": 2, "fsky": fsky, "musq": musq, "dens": dens})
+    b.dtype = np.dtype(
+        b.dtype, metadata={"spin": 2, "fsky": fsky, "musq": musq, "dens": dens}
+    )
     alms2 = {("G", 0): b}
     cls2 = angular_power_spectra(alms2, debias=False)
-    assert cls2["G", "G", 0, 0].dtype.metadata["bias"] == pytest.approx(0.5 * fsky * musq / dens)
+    assert cls2["G", "G", 0, 0].dtype.metadata["bias"] == pytest.approx(
+        0.5 * fsky * musq / dens
+    )
 
     # cross-spectrum: no bias key
     alms_cross = {("F", 0): a, ("F", 1): a.copy()}

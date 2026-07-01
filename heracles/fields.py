@@ -309,9 +309,7 @@ class Positions(Field, spin=0):
         dens = (nbar / mapper.area) ** 2 / (ngal / (4 * np.pi * fsky)) / w2mean
 
         # set metadata of array
-        update_metadata(
-            pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky
-        )
+        update_metadata(pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the position map
         return pos
@@ -380,9 +378,7 @@ class ScalarField(Field, spin=0):
         dens = ngal / (4 * np.pi * fsky) / deff
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky
-        )
+        update_metadata(val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the value map
         return val
@@ -455,9 +451,7 @@ class ComplexField(Field, spin=0):
         dens = ngal / (4 * np.pi * fsky) / deff
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky
-        )
+        update_metadata(val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the shear map
         return val
@@ -559,9 +553,7 @@ class Weights(Field, spin=0):
         dens = ngal / (4 * np.pi * fsky) / deff
 
         # set metadata of array
-        update_metadata(
-            wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky
-        )
+        update_metadata(wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the weight map
         return wht
