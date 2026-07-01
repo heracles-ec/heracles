@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import coroutines
 
-from heracles.core import TocDict, toc_match
+from heracles.core import TocDict, toc_match, update_metadata
 from heracles.progress import Progress, NoProgress
 
 if TYPE_CHECKING:
@@ -158,8 +158,17 @@ def transform(
             except KeyError:
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg) from None
-
-            out[k, i] = field.mapper_or_error.transform(m)
+            s = field.spin
+            m_spin = (m.dtype.metadata or {}).get("spin")
+            if m_spin is None:
+                update_metadata(m, spin=s)
+            elif m_spin != s:
+                msg = (
+                    f"spin mismatch for field {k!r}: "
+                    f"map has spin {m_spin}, field has spin {s}"
+                )
+                raise ValueError(msg)
+            out[k, i] = field.mapper_or_error.transform(m, spin=s)
 
     # return the toc dict of alms
     return out

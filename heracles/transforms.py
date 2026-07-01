@@ -1,5 +1,18 @@
-from scipy.special import lpn as legendrep
 import numpy as np
+
+try:
+    from scipy.special import legendre_p_all
+except ImportError:
+    # old scipy
+    from scipy.special import lpn
+
+    def legendre_p_all(n, z, *, diff_n=0):
+        """
+        All Legendre polynomials of the first kind up to the specified degree n.
+        """
+        assert diff_n == 1, "only diff_n=1 is supported"
+        return lpn(n, z)
+
 
 try:
     from copy import replace
@@ -44,7 +57,7 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
     :return: :math:`(P,P'),(d_{11},d_{-1,1}), (d_{20}, d_{22}, d_{2,-2})` as requested, where P starts
              at :math:`\ell=0`, but spin functions start at :math:`\ell=\ell_{\rm min}`
     """
-    allP, alldP = legendrep(lmax, x)
+    allP, alldP = legendre_p_all(lmax, x, diff_n=1)
     # Polarization functions all start at L=2
     fac1 = 1 - x
     fac2 = 1 + x
