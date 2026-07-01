@@ -198,7 +198,7 @@ class HealpixMapper:
         if spin != 0:
             alm = alm[1:].copy()
 
-        update_metadata(alm, **md)
+        update_metadata(alm, **md, deconv=self.__deconv)
 
         return alm
 
