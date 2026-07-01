@@ -127,9 +127,9 @@ def test_field_from_config():
         with pytest.raises(RuntimeError, match="Internal error"):
             field_from_config(config, "c")
 
-    mock.assert_called_once_with(None, "COL1", "-COL2", mask="x")
+    mock.assert_called_once_with("COL1", "-COL2", mask="x")
     assert mock.return_value is a
-    other_mock.assert_called_once_with(None, mask=None)
+    other_mock.assert_called_once_with(mask=None)
     assert other_mock.return_value is b
 
 

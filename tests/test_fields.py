@@ -77,8 +77,6 @@ def catalog(page):
 
 
 def test_field_abc():
-    from unittest.mock import Mock
-
     from heracles.fields import Columns, Field
 
     with pytest.raises(TypeError):
@@ -91,7 +89,7 @@ def test_field_abc():
         async def __call__(self):
             pass
 
-    f = SpinLessField(None)
+    f = SpinLessField()
 
     with pytest.raises(ValueError, match="undefined spin weight"):
         f.spin
@@ -102,31 +100,24 @@ def test_field_abc():
         async def __call__(self):
             pass
 
-    f = TestField(None)
+    f = TestField()
 
-    assert f.mapper is None
     assert f.columns is None
     assert f.spin == 0
 
     with pytest.raises(ValueError):
-        f.mapper_or_error
-
-    with pytest.raises(ValueError):
         f.columns_or_error
 
-    mapper = Mock()
-
     with pytest.raises(ValueError, match="accepts 2 to 3 columns"):
-        TestField(mapper, "lon")
+        TestField("lon")
 
-    f = TestField(mapper, "lon", "lat", mask="W")
+    f = TestField("lon", "lat", mask="W")
 
-    assert f.mapper is mapper
     assert f.columns == ("lon", "lat", None)
     assert f.mask == "W"
 
 
-def test_visibility(nside, vmap):
+def test_visibility(nside, mapper, vmap):
     from contextlib import nullcontext
     from unittest.mock import Mock
 
@@ -142,10 +133,10 @@ def test_visibility(nside, vmap):
 
         mapper_out = HealpixMapper(nside_out)
 
-        f = Visibility(mapper_out)
+        f = Visibility()
 
         with pytest.warns(UserWarning) if nside != nside_out else nullcontext():
-            result = coroutines.run(f(catalog))
+            result = coroutines.run(f(catalog, mapper=mapper_out))
 
         assert result is not vmap
 
@@ -164,9 +155,9 @@ def test_visibility(nside, vmap):
     # test missing visibility map
     catalog = Mock()
     catalog.visibility = None
-    f = Visibility(mapper)
+    f = Visibility()
     with pytest.raises(ValueError, match="no visibility"):
-        coroutines.run(f(catalog))
+        coroutines.run(f(catalog, mapper=mapper))
 
 
 def test_positions(mapper, catalog, vmap):
@@ -178,7 +169,7 @@ def test_positions(mapper, catalog, vmap):
 
     # normal mode: compute overdensity maps with metadata
 
-    f = Positions(mapper, "ra", "dec")
+    f = Positions("ra", "dec")
 
     # test some default settings
     assert f.spin == 0
@@ -191,7 +182,7 @@ def test_positions(mapper, catalog, vmap):
     catalog.fsky = 1.0
 
     # create map
-    m = coroutines.run(f(catalog))
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     nbar = 4.0
     assert m.shape == (npix,)
@@ -213,8 +204,8 @@ def test_positions(mapper, catalog, vmap):
 
     # compute number count map
 
-    f = Positions(mapper, "ra", "dec", overdensity=False)
-    m = coroutines.run(f(catalog))
+    f = Positions("ra", "dec", overdensity=False)
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     assert m.shape == (npix,)
     assert m.dtype.metadata == {
@@ -239,8 +230,8 @@ def test_positions(mapper, catalog, vmap):
     catalog.fsky = vmap.mean()
     nbar /= catalog.fsky
 
-    f = Positions(mapper, "ra", "dec")
-    m = coroutines.run(f(catalog))
+    f = Positions("ra", "dec")
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
@@ -260,8 +251,8 @@ def test_positions(mapper, catalog, vmap):
 
     # compute number count map with visibility map
 
-    f = Positions(mapper, "ra", "dec", overdensity=False)
-    m = coroutines.run(f(catalog))
+    f = Positions("ra", "dec", overdensity=False)
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     assert m.shape == (12 * mapper.nside**2,)
     assert m.dtype.metadata == {
@@ -281,9 +272,9 @@ def test_positions(mapper, catalog, vmap):
 
     # compute overdensity maps with given (incorrect) nbar
 
-    f = Positions(mapper, "ra", "dec", nbar=2 * nbar)
+    f = Positions("ra", "dec", nbar=2 * nbar)
     with pytest.warns(UserWarning, match="mean density"):
-        m = coroutines.run(f(catalog))
+        m = coroutines.run(f(catalog, mapper=mapper))
 
     assert m.dtype.metadata["nbar"] == 2 * nbar
     assert m.dtype.metadata["bias"] == pytest.approx(bias / (2 * nbar) ** 2)
@@ -294,8 +285,8 @@ def test_scalar_field(mapper, catalog):
 
     npix = 12 * mapper.nside**2
 
-    f = ScalarField(mapper, "ra", "dec", "g1", "w")
-    m = coroutines.run(f(catalog))
+    f = ScalarField("ra", "dec", "g1", "w")
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     w = next(iter(catalog))["w"]
     v = next(iter(catalog))["g1"]
@@ -335,8 +326,8 @@ def test_complex_field(mapper, catalog):
 
     npix = 12 * mapper.nside**2
 
-    f = Spin2Field(mapper, "ra", "dec", "g1", "g2", "w")
-    m = coroutines.run(f(catalog))
+    f = Spin2Field("ra", "dec", "g1", "g2", "w")
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     w = next(iter(catalog))["w"]
     re = next(iter(catalog))["g1"]
@@ -377,8 +368,8 @@ def test_weights(mapper, catalog):
 
     npix = 12 * mapper.nside**2
 
-    f = Weights(mapper, "ra", "dec", "w")
-    m = coroutines.run(f(catalog))
+    f = Weights("ra", "dec", "w")
+    m = coroutines.run(f(catalog, mapper=mapper))
 
     w = next(iter(catalog))["w"]
     v2 = (w**2).sum()

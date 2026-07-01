@@ -27,7 +27,7 @@ def _remove_regions(maps, jk_map, regions):
     return _maps
 
 
-def test_region_alm_cls(fields, data_maps, jk_map, njk):
+def test_region_alm_cls(fields, data_maps, jk_map, njk, mapper):
     """ALM-subtraction and map-masking must give identical Cls."""
     from itertools import combinations
 
@@ -35,7 +35,7 @@ def test_region_alm_cls(fields, data_maps, jk_map, njk):
     from heracles.dices.jackknife import _get_region_maps, _sum_alms_except
 
     alms_regions = {
-        k: transform(fields, _get_region_maps(data_maps, jk_map, k))
+        k: transform(mapper, fields, _get_region_maps(data_maps, jk_map, k))
         for k in range(1, njk + 1)
     }
 
@@ -43,7 +43,11 @@ def test_region_alm_cls(fields, data_maps, jk_map, njk):
         for regions in combinations(range(1, njk + 1), nd):
             cls_new = angular_power_spectra(_sum_alms_except(alms_regions, regions))
             cls_ref = angular_power_spectra(
-                transform(fields, _remove_regions(data_maps, jk_map, regions))
+                transform(
+                    mapper,
+                    fields,
+                    _remove_regions(data_maps, jk_map, regions),
+                )
             )
             for key in cls_ref:
                 np.testing.assert_allclose(
@@ -55,9 +59,9 @@ def test_region_alm_cls(fields, data_maps, jk_map, njk):
                 )
 
 
-def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_map, tmp_path):
+def test_cls(nside, cls0, fields, data_maps, vis_maps, jk_map, mapper, tmp_path):
     _cls0 = dices.jackknife_cls(
-        data_maps, vis_maps, jk_map, fields, nd=0, dir=str(tmp_path)
+        data_maps, vis_maps, jk_map, mapper, fields, nd=0, dir=str(tmp_path)
     )[()]
     for key in list(_cls0.keys()):
         _cl = _cls0[key]

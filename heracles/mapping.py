@@ -36,10 +36,12 @@ if TYPE_CHECKING:
 
     from heracles.catalog import Catalog
     from heracles.fields import Field
+    from heracles.mapper import Mapper
 
 
 async def _map_field(
     key: tuple[Any, ...],
+    mapper: Mapper,
     field: Field,
     catalog: Catalog,
     progress: Progress,
@@ -51,7 +53,7 @@ async def _map_field(
 
     label = "(" + ", ".join(map(str, key)) + ")"
     with progress.task(label) as task:
-        result = await field(catalog, progress=task)
+        result = await field(catalog, progress=task, mapper=mapper)
 
     task_done()
 
@@ -59,6 +61,7 @@ async def _map_field(
 
 
 def map_catalogs(
+    mapper: Mapper,
     fields: Mapping[Any, Field],
     catalogs: Mapping[Any, Catalog],
     *,
@@ -106,7 +109,9 @@ def map_catalogs(
         for key, field, catalog in items:
             if toc_match(key, include, exclude):
                 keys.append(key)
-                coros.append(_map_field(key, field, catalog, progress, _task_done))
+                coros.append(
+                    _map_field(key, mapper, field, catalog, progress, _task_done)
+                )
 
         # run all coroutines concurrently
         try:
@@ -128,6 +133,7 @@ def map_catalogs(
 
 
 def transform(
+    mapper: Mapper,
     fields: Mapping[Any, Field],
     data: Mapping[tuple[Any, Any], NDArray],
     *,
@@ -159,7 +165,7 @@ def transform(
                 msg = f"unknown field name: {k}"
                 raise ValueError(msg) from None
             s = field.spin
-            out[k, i] = field.mapper_or_error.transform(m, spin=s)
+            out[k, i] = mapper.transform(m, spin=s)
 
     # return the toc dict of alms
     return out

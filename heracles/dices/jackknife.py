@@ -16,6 +16,11 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with DICES. If not, see <https://www.gnu.org/licenses/>.
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import os
 import numpy as np
 import itertools
@@ -29,7 +34,7 @@ from ..twopoint import angular_power_spectra
 from ..unmixing import _naturalspice
 from ..transforms import cl2corr, corr2cl
 from ..io import write_alms, read_alms, write, read
-from ..progress import NoProgress
+from ..progress import NoProgress, Progress
 
 try:
     from copy import replace
@@ -37,17 +42,26 @@ except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from numpy.typing import NDArray
+
+    from heracles.fields import Field
+    from heracles.mapper import Mapper
+
 
 def jackknife_cls(
     data_maps,
     vis_maps,
-    jk_map,
-    fields,
-    mask_correction="Fast",
-    unmixed=False,
-    nd=1,
-    dir="./dices",
-    progress=None,
+    jk_map: NDArray,
+    mapper: Mapper,
+    fields: Mapping[Any, Field],
+    mask_correction: str = "Fast",
+    unmixed: bool = False,
+    nd: int = 1,
+    dir: str = "./dices",
+    progress: Progress | None = None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -55,6 +69,7 @@ def jackknife_cls(
         data_maps (dict): Dictionary of data maps
         vis_maps (dict): Dictionary of visibility maps
         jk_map (array): Jackknife mask map
+        mapper (Mapper): Mapper used to transform maps to alms
         fields (dict): Dictionary of fields
         mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
         nd (int): Number of Jackknife regions
@@ -85,14 +100,18 @@ def jackknife_cls(
         with progress.task(f"ALMs {k}"):
             if not (os.path.exists(data_path) and os.path.exists(vis_path)):
                 if k == 0:
-                    data_alms_k = transform(fields, data_maps)
-                    vis_alms_k = transform(fields, vis_maps)
+                    data_alms_k = transform(mapper, fields, data_maps)
+                    vis_alms_k = transform(mapper, fields, vis_maps)
                 else:
                     data_alms_k = transform(
-                        fields, _get_region_maps(data_maps, jk_map, k)
+                        mapper,
+                        fields,
+                        _get_region_maps(data_maps, jk_map, k),
                     )
                     vis_alms_k = transform(
-                        fields, _get_region_maps(vis_maps, jk_map, k)
+                        mapper,
+                        fields,
+                        _get_region_maps(vis_maps, jk_map, k),
                     )
                 write_alms(data_path, data_alms_k, clobber=True)
                 write_alms(vis_path, vis_alms_k, clobber=True)
@@ -143,7 +162,7 @@ def jackknife_cls(
     return cls
 
 
-def _get_region_maps(maps, jk_map, jk):
+def _get_region_maps(maps, jk_map: NDArray, jk: int):
     """
     Returns maps with only the pixels belonging to jackknife region *jk* active.
     All other pixels are set to zero.
@@ -214,7 +233,12 @@ def bias(cls):
     return bias
 
 
-def jackknife_fsky(jk_map, jk=0, jk2=0, ratio=True):
+def jackknife_fsky(
+    jk_map: NDArray,
+    jk: int = 0,
+    jk2: int = 0,
+    ratio: bool = True,
+) -> float:
     """
     Returns the fraction of the sky after deleting two regions.
     inputs:
@@ -235,12 +259,12 @@ def jackknife_fsky(jk_map, jk=0, jk2=0, ratio=True):
     return fskyjk
 
 
-def jackknife_bias(bias, fsky, fields):
+def jackknife_bias(bias, fsky: float, fields: Mapping[Any, Field]):
     """
     Returns the bias for deleting a Jackknife region.
     inputs:
         bias (dict): Dictionary of biases
-        fsky (dict): Dictionary of relative fskys
+        fsky (float): Relative fsky
         fields (dict): Dictionary of fields
     returns:
         bias_jk (dict): Dictionary of biases
@@ -254,7 +278,13 @@ def jackknife_bias(bias, fsky, fields):
     return bias_jk
 
 
-def correct_bias(cls, jk_map, fields, jk=0, jk2=0):
+def correct_bias(
+    cls,
+    jk_map: NDArray,
+    fields: Mapping[Any, Field],
+    jk: int = 0,
+    jk2: int = 0,
+):
     """
     Corrects the bias of the Cls due to taking out a region.
     inputs:
@@ -282,7 +312,13 @@ def correct_bias(cls, jk_map, fields, jk=0, jk2=0):
     return cls
 
 
-def correct_footprint_fsky(cls, jk_map, jk=0, jk2=0, unmixed=False):
+def correct_footprint_fsky(
+    cls,
+    jk_map: NDArray,
+    jk: int = 0,
+    jk2: int = 0,
+    unmixed: bool = False,
+):
     """
     Corrects the Cls for the footprint reduction due to taking out a region.
     inputs:
@@ -303,7 +339,7 @@ def correct_footprint_fsky(cls, jk_map, jk=0, jk2=0, unmixed=False):
     return _cls
 
 
-def _mask_correlation_ratio(mljk, mls0, unmixed=False):
+def _mask_correlation_ratio(mljk, mls0, unmixed: bool = False):
     alphas = {}
     wmls0 = cl2corr(mls0)
     wmljk = cl2corr(mljk)
@@ -317,7 +353,9 @@ def _mask_correlation_ratio(mljk, mls0, unmixed=False):
     return alphas
 
 
-def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
+def correct_footprint_naturalspice(
+    cls, cls_mm, mls0, fields: Mapping[Any, Field], unmixed: bool = False
+):
     """
     Corrects the Cls for footprint reduction using the full NaMaster/naturalspice approach.
     inputs:
@@ -341,7 +379,7 @@ def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
     return binned(cls, np.arange(0, lmax + 1))
 
 
-def jackknife_covariance(dict, nd=1):
+def jackknife_covariance(dict, nd: int = 1):
     """
     Compute the jackknife covariance matrix from a sequence
     of spectra dictionaries *dict*.
@@ -349,7 +387,7 @@ def jackknife_covariance(dict, nd=1):
     return _jackknife_covariance(dict.values(), nd=nd)
 
 
-def _jackknife_covariance(samples, nd=1):
+def _jackknife_covariance(samples, nd: int = 1):
     """
     Compute the jackknife covariance matrix from a sequence
     of spectra dictionaries *samples*.
@@ -396,7 +434,7 @@ def _jackknife_covariance(samples, nd=1):
     return cov
 
 
-def sample_covariance(samples, samples2=None):
+def sample_covariance(samples: NDArray, samples2: NDArray | None = None) -> NDArray:
     """
     Returns the sample covariance matrix of *samples*, or the sample
     cross-covariance between *samples* and *samples2* if the latter is
