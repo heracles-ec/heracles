@@ -392,7 +392,8 @@ def mixing_matrices(
 
                 # wrap in result array type
                 # second to last axis is the *output* ell axis
-                mm = Result(mm, spin=(spin1, spin2), axis=-2)
+                ell = np.arange(mm.shape[-2])
+                mm = Result(mm, spin=(spin1, spin2), ell=ell, axis=-2)
 
                 if bins is not None:
                     mm = binned(mm, bins, weights)
