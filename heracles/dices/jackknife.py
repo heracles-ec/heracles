@@ -38,7 +38,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def compute_jk_cls(
+def jackknife_cls(
     data_maps,
     vis_maps,
     jk_map,
@@ -49,7 +49,21 @@ def compute_jk_cls(
     dir="./dices",
     progress=None,
 ):
-    """Compute jackknife Cls (nd = 1 or 2)."""
+    """
+    Compute the Cls of removing 1 Jackknife.
+    inputs:
+        data_maps (dict): Dictionary of data maps
+        vis_maps (dict): Dictionary of visibility maps
+        jk_map (array): Jackknife mask map
+        fields (dict): Dictionary of fields
+        mask_correction (str): Type of mask correction to apply ("Fast" or "Full")
+        nd (int): Number of Jackknife regions
+        dir (str): Directory for caching intermediate ALMs.
+        progress (Progress): Progress reporter.
+    returns:
+        cls (dict): Dictionary of data Cls
+    """
+    """Alms calculated and save then cls calculated from saved alms."""
 
     if progress is None:
         progress = NoProgress()
@@ -83,7 +97,7 @@ def compute_jk_alms(
     dir="./dices",
     progress=None,
 ):
-    """Compute and cache ALMs for full map and each JK region."""
+    """Compute and save ALMs each JK region."""
 
     if progress is None:
         progress = NoProgress()
@@ -122,7 +136,6 @@ def _compute_single_jk_alm(
     data_path = os.path.join(dir, f"data_alms_{k}.fits")
     vis_path  = os.path.join(dir, f"vis_alms_{k}.fits")
 
-    # Skip if already cached
     if os.path.exists(data_path) and os.path.exists(vis_path):
         return k, False  # nothing done
 
@@ -151,9 +164,7 @@ def compute_jk_cls_from_alms(
     nd=1,
     dir="./dices",
     progress=None,
-):
-    """Serial driver — loops over all region combinations."""
-    
+):   
     if nd == 0:
         data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
         cls0 = angular_power_spectra(data_alms_full)
@@ -246,7 +257,7 @@ def _compute_single_jk_cls(
     return _cls
 
 
-def jackknife_cls(
+def jackknife_cls_old(
     data_maps,
     vis_maps,
     jk_map,
