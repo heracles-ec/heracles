@@ -151,6 +151,48 @@ def test_angular_power_spectra(mock_alms, lmax):
             assert next(call_iter) == call((a, b, i, j), inc, exc)
 
 
+def test_angular_power_spectra_bias(lmax):
+    from heracles.twopoint import angular_power_spectra
+
+    size = (lmax + 1) * (lmax + 2) // 2
+
+    fsky, musq, dens = 0.5, 1.2, 3.4
+
+    # spin-0 auto: bias = fsky * musq / dens
+    a = np.zeros(size, dtype=complex)
+    a.dtype = np.dtype(
+        a.dtype, metadata={"spin": 0, "fsky": fsky, "musq": musq, "dens": dens}
+    )
+    alms = {("F", 0): a}
+    cls = angular_power_spectra(alms, debias=False)
+    assert cls["F", "F", 0, 0].dtype.metadata["bias"] == pytest.approx(
+        fsky * musq / dens
+    )
+
+    # spin-2 auto: bias = 0.5 * fsky * musq / dens
+    b = np.zeros((2, size), dtype=complex)
+    b.dtype = np.dtype(
+        b.dtype, metadata={"spin": 2, "fsky": fsky, "musq": musq, "dens": dens}
+    )
+    alms2 = {("G", 0): b}
+    cls2 = angular_power_spectra(alms2, debias=False)
+    assert cls2["G", "G", 0, 0].dtype.metadata["bias"] == pytest.approx(
+        0.5 * fsky * musq / dens
+    )
+
+    # cross-spectrum: no bias key
+    alms_cross = {("F", 0): a, ("F", 1): a.copy()}
+    cls_cross = angular_power_spectra(alms_cross, debias=False)
+    assert "bias" not in (cls_cross["F", "F", 0, 1].dtype.metadata or {})
+
+    # external map (no ingredients): no bias key
+    c = np.zeros(size, dtype=complex)
+    c.dtype = np.dtype(c.dtype, metadata={"spin": 0})
+    alms_ext = {("F", 0): c}
+    cls_ext = angular_power_spectra(alms_ext, debias=False)
+    assert "bias" not in (cls_ext["F", "F", 0, 0].dtype.metadata or {})
+
+
 def test_debias_cls():
     from heracles.twopoint import debias_cls
 

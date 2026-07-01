@@ -304,15 +304,12 @@ class Positions(Field, spin=0):
             pos -= vis
             del vis
 
-        # compute bias of positions, including weight variance
+        # compute bias ingredients for positions, including weight variance
         musq = 1.0
         dens = (nbar / mapper.area) ** 2 / (ngal / (4 * np.pi * fsky)) / w2mean
-        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(
-            pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky, bias=bias
-        )
+        update_metadata(pos, catalog, nbar=nbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the position map
         return pos
@@ -375,16 +372,13 @@ class ScalarField(Field, spin=0):
         # normalise the map
         val /= wbar
 
-        # compute bias from variance (per object)
+        # compute bias ingredients from variance (per object)
         musq = var / w2mean
         deff = w2mean / wmean**2
         dens = ngal / (4 * np.pi * fsky) / deff
-        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
-        )
+        update_metadata(val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the value map
         return val
@@ -451,16 +445,13 @@ class ComplexField(Field, spin=0):
         # normalise the map
         val /= wbar
 
-        # bias from measured variance, for E/B decomposition
+        # bias ingredients from measured variance, for E/B decomposition
         musq = var / w2mean
         deff = w2mean / wmean**2
         dens = ngal / (4 * np.pi * fsky) / deff
-        bias = (1 / 2) * fsky * musq / dens
 
         # set metadata of array
-        update_metadata(
-            val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
-        )
+        update_metadata(val, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the shear map
         return val
@@ -556,16 +547,13 @@ class Weights(Field, spin=0):
         # normalise the map
         wht /= wbar
 
-        # bias from weights
+        # bias ingredients from weights
         musq = 1.0
         deff = w2mean / wmean**2
         dens = ngal / (4 * np.pi * fsky) / deff
-        bias = fsky * musq / dens
 
         # set metadata of array
-        update_metadata(
-            wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky, bias=bias
-        )
+        update_metadata(wht, catalog, wbar=wbar, musq=musq, dens=dens, fsky=fsky)
 
         # return the weight map
         return wht

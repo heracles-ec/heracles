@@ -252,18 +252,19 @@ def angular_power_spectra(
             raise ValueError(f"missing spin metadata for {k1} or {k2}")
         # collect metadata
         md = {}
-        bias = None
         for key, value in md1.items():
-            if key == "bias":
-                if k1 == k2 and i1 == i2:
-                    bias = value
-            else:
-                md[f"{key}_1"] = value
+            md[f"{key}_1"] = value
         for key, value in md2.items():
-            if key == "bias":
-                pass
-            else:
-                md[f"{key}_2"] = value
+            md[f"{key}_2"] = value
+        # compute bias for auto-spectra from ingredients stored during field mapping
+        bias = None
+        if k1 == k2 and i1 == i2:
+            _fsky = md1.get("fsky")
+            _musq = md1.get("musq")
+            _dens = md1.get("dens")
+            if _fsky is not None and _musq is not None and _dens is not None:
+                factor = 0.5 if s1 == s2 == 2 else 1.0
+                bias = factor * _fsky * _musq / _dens
         if bias is not None:
             md["bias"] = bias
 
