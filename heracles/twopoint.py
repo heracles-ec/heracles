@@ -362,10 +362,6 @@ def mixing_matrices(
         except KeyError:
             continue
 
-        # deal with structured cl arrays
-        if cl.dtype.names is not None:
-            cl = cl["CL"]
-
         # compute mixing matrices for all fields of this mask combination
         for f1, f2 in product(fields1, fields2):
             # check if this combination has been done already
