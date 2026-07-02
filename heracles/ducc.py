@@ -32,7 +32,6 @@ with external_dependency_explainer:
     import ducc0
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from typing import Any
 
     from numpy.typing import ArrayLike, DTypeLike, NDArray
@@ -96,12 +95,11 @@ class DiscreteMapper:
         lat: NDArray[Any],
         data: NDArray[Any],
         values: NDArray[Any],
+        spin: int = 0,
     ) -> None:
         """
         Add values to alms.
         """
-
-        md: Mapping[str, Any] = data.dtype.metadata or {}
 
         flatten = values.ndim == 1
         if flatten:
@@ -115,8 +113,6 @@ class DiscreteMapper:
         else:
             values = values.astype(np.float64)
             epsilon = 1e-12
-
-        spin = md.get("spin", 0)
 
         loc = np.empty((lon.size, 2), dtype=np.float64)
         loc[:, 0] = np.radians(90.0 - lat)
@@ -139,6 +135,7 @@ class DiscreteMapper:
     def transform(
         self,
         data: ArrayLike,
+        spin: int = 0,
     ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
         """
         Does nothing, since inputs are alms already.

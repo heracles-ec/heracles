@@ -57,12 +57,13 @@ class Mapper(Protocol):
         lat: NDArray[Any],
         data: NDArray[Any],
         values: NDArray[Any],
+        spin: int = 0,
     ) -> None:
         """
         Add values to data.
         """
 
-    def transform(self, data: NDArray[Any]) -> NDArray[Any]:
+    def transform(self, data: NDArray[Any], spin: int = 0) -> NDArray[Any]:
         """
         The spherical harmonic transform for this mapper.
         """

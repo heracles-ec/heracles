@@ -95,7 +95,7 @@ def test_healpix_transform(mock_map2alm, rng):
 
     mock_map2alm.return_value = np.empty(0, dtype=complex)
 
-    alms = mapper.transform(m)
+    alms = mapper.transform(m, spin=0)
 
     assert alms is mock_map2alm.return_value
     assert alms.dtype.metadata["spin"] == 0
@@ -108,7 +108,7 @@ def test_healpix_transform(mock_map2alm, rng):
 
     mock_map2alm.return_value = np.empty((3, 0), dtype=complex)
 
-    alms = mapper.transform(m)
+    alms = mapper.transform(m, spin=2)
 
     assert alms.shape == (2, 0)
     assert alms.dtype.metadata["spin"] == 2
@@ -139,7 +139,7 @@ def test_healpix_deconvolve(mock_map2alm):
 
     mock_map2alm.return_value = np.ones(nlm, dtype=complex)
 
-    alm = mapper.transform(data)
+    alm = mapper.transform(data, spin=0)
 
     assert alm.shape == (nlm,)
     stop = 0
@@ -153,7 +153,7 @@ def test_healpix_deconvolve(mock_map2alm):
 
     mock_map2alm.return_value = np.ones((3, nlm), dtype=complex)
 
-    alm = mapper.transform(data)
+    alm = mapper.transform(data, spin=2)
 
     assert alm.shape == (2, nlm)
     stop = 0

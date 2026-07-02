@@ -252,18 +252,19 @@ def angular_power_spectra(
             raise ValueError(f"missing spin metadata for {k1} or {k2}")
         # collect metadata
         md = {}
-        bias = None
         for key, value in md1.items():
-            if key == "bias":
-                if k1 == k2 and i1 == i2:
-                    bias = value
-            else:
-                md[f"{key}_1"] = value
+            md[f"{key}_1"] = value
         for key, value in md2.items():
-            if key == "bias":
-                pass
-            else:
-                md[f"{key}_2"] = value
+            md[f"{key}_2"] = value
+        # compute bias for auto-spectra from ingredients stored during field mapping
+        bias = None
+        if k1 == k2 and i1 == i2:
+            _fsky = md1.get("fsky")
+            _musq = md1.get("musq")
+            _dens = md1.get("dens")
+            if _fsky is not None and _musq is not None and _dens is not None:
+                factor = 0.5 if s1 == s2 == 2 else 1.0
+                bias = factor * _fsky * _musq / _dens
         if bias is not None:
             md["bias"] = bias
 
@@ -361,10 +362,6 @@ def mixing_matrices(
         except KeyError:
             continue
 
-        # deal with structured cl arrays
-        if cl.dtype.names is not None:
-            cl = cl["CL"]
-
         # compute mixing matrices for all fields of this mask combination
         for f1, f2 in product(fields1, fields2):
             # check if this combination has been done already
@@ -392,7 +389,8 @@ def mixing_matrices(
 
                 # wrap in result array type
                 # second to last axis is the *output* ell axis
-                mm = Result(mm, spin=(spin1, spin2), axis=-2)
+                ell = np.arange(mm.shape[-2])
+                mm = Result(mm, spin=(spin1, spin2), ell=ell, axis=-2)
 
                 if bins is not None:
                     mm = binned(mm, bins, weights)
