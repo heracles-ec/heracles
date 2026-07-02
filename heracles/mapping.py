@@ -151,7 +151,7 @@ def transform(
     for (k, i), m in data.items():
         current += 1
         progress.update(current, total)
-
+        m = getattr(m, "array", m)
         with progress.task(f"({k}, {i})"):
             try:
                 field = fields[k]
