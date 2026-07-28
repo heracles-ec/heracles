@@ -1,17 +1,24 @@
 import numpy as np
 
-try:
-    from scipy.special import legendre_p_all
-except ImportError:
-    # old scipy
-    from scipy.special import lpn
 
-    def legendre_p_all(n, z, *, diff_n=0):
-        """
-        All Legendre polynomials of the first kind up to the specified degree n.
-        """
-        assert diff_n == 1, "only diff_n=1 is supported"
-        return lpn(n, z)
+def legendre_p_all(n, x, *, diff_n=0):
+    """
+    All Legendre polynomials of the first kind up to the specified degree n,
+    evaluated at a scalar x, optionally with their first derivatives.
+    """
+    allP = np.empty(n + 1)
+    allP[0] = 1.0
+    if n >= 1:
+        allP[1] = x
+    for l in range(1, n):
+        allP[l + 1] = ((2 * l + 1) * x * allP[l] - l * allP[l - 1]) / (l + 1)
+    if diff_n == 0:
+        return allP
+    assert diff_n == 1, "only diff_n=1 is supported"
+    ls = np.arange(1, n + 1)
+    alldP = np.zeros_like(allP)
+    alldP[1:] = ls * (allP[:-1] - x * allP[1:]) / (1 - x**2)
+    return allP, alldP
 
 
 try:
