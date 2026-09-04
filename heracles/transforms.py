@@ -119,7 +119,8 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
 
     return res
 
-def T(f, theta, theta_max=None, n_quad=None):
+
+def purify(f, theta, theta_max=None):
     r"""
     Delta-function ("T") correction operator (Chon et al. 2004) applied to a
     correlation function `f` tabulated at cos(theta) = x.
@@ -132,12 +133,14 @@ def T(f, theta, theta_max=None, n_quad=None):
 
     where x_max = cos(radians(theta_max)) (or 1 if theta_max is None).
 
-    `f` is only known at the tabulated points `theta` (the same grid used
-    elsewhere in this module, e.g. from `_cached_gauss_legendre`). Since the
-    integrand is highly oscillatory, each int_{x_i}^{x_max} is evaluated
-    with a dedicated high-order Gauss-Legendre rule mapped from [-1, 1]
-    onto [x_i, x_max], with `f` reconstructed at the quadrature nodes via a
-    cubic-spline interpolant of the tabulated values.
+    `f` is only known at the tabulated points `theta`. Every
+    int_{x_i}^{x_max} is read off a *single* reverse cumulative trapezoidal
+    integration over the tabulated nodes -- since trapezoidal panel
+    integrals between consecutive nodes are additive over sub-intervals, a
+    reverse cumulative sum of them directly gives the tail integral from
+    each node up to x_max, in one O(N) pass, instead of re-interpolating
+    `f` and running a fresh high-order quadrature per evaluation point
+    (O(N * n_quad)).
 
     Args:
         f: array of function values, tabulated at the angles in `theta`.
@@ -157,9 +160,6 @@ def T(f, theta, theta_max=None, n_quad=None):
             points theta_i, since the prefactors blow up there regardless
             of theta'=0 or the integration domain. theta_i in that band
             also get T[f](theta_i) = f(theta_i) (no correction).
-        n_quad: number of Gauss-Legendre points used for each int_x^x_max
-            integral. Defaults to 4x the number of tabulated points
-            (at least 64).
 
     Returns:
         Array of T[f](theta), same shape as `theta`.
@@ -170,56 +170,65 @@ def T(f, theta, theta_max=None, n_quad=None):
         (recommended for f that doesn't vanish at theta'=0); leaving it
         None integrates all the way to the singularity and, unless f
         vanishes there to at least second order, the integral is formally
-        a Hadamard finite-part integral that plain Gauss-Legendre
-        quadrature does not converge to. Separately, prefac1 = 8(2-x)/(1+x)^2
-        and prefac2 = 8/(1+x) both diverge as x -> -1 (theta -> 180); with
+        a Hadamard finite-part integral that this quadrature does not
+        converge to. Separately, prefac1 = 8(2-x)/(1+x)^2 and
+        prefac2 = 8/(1+x) both diverge as x -> -1 (theta -> 180); with
         theta_max=None this endpoint is *not* guarded and T[f] will blow up
         for theta_i near 180 whenever the (theta_max-truncated or not)
         integral doesn't vanish fast enough to cancel the pole.
-    """
-    from scipy.interpolate import CubicSpline
 
+        The trapezoidal rule is only as accurate as the tabulated grid is
+        dense/well-resolved (O(h^2) in the local node spacing) -- it is not
+        adaptive like the point-by-point Gauss-Legendre quadrature this
+        replaced. The integral's upper limit is also only approximated by
+        the nearest tabulated node <= x_max, not x_max itself exactly.
+    """
     theta = np.atleast_1d(np.asarray(theta, dtype=np.float64))
     f = np.atleast_1d(np.asarray(f, dtype=np.float64))
     if f.shape != theta.shape:
         raise ValueError("f and theta must have the same shape")
 
+    n = len(theta)
     x = np.cos(np.radians(theta))
     x_max = 1.0 if theta_max is None else np.cos(np.radians(theta_max))
 
-    # interpolant of f(x); CubicSpline requires strictly increasing x
     order = np.argsort(x)
-    interp = CubicSpline(x[order], f[order], extrapolate=True)
+    xs = x[order]
+    gs = f[order] / (1 - xs) ** 2
+    g1 = (1 + xs) * gs
+    g2 = gs
 
-    if n_quad is None:
-        n_quad = max(4 * len(x), 64)
-    u, w = _cached_gauss_legendre(n_quad)
+    # cumulative trapezoidal integration over the tabulated grid: panel
+    # integrals between consecutive sorted nodes are additive over
+    # sub-intervals, so a reverse cumulative sum of them gives the tail
+    # integral from each node up to (approximately) x_max. This is *not*
+    # the same as summing partial Gauss-Legendre weights, which are only
+    # exact for the full-interval sum, not sub-interval slices of it.
+    dx = np.diff(xs)
+    panel1 = dx * (g1[:-1] + g1[1:]) / 2
+    panel2 = dx * (g2[:-1] + g2[1:]) / 2
+
+    # panels beyond x_max don't contribute (the integral's upper limit is
+    # approximated by the nearest tabulated node <= x_max)
+    beyond = xs[1:] > x_max
+    panel1[beyond] = 0.0
+    panel2[beyond] = 0.0
+
+    int1 = np.empty(n)
+    int2 = np.empty(n)
+    int1[order] = np.concatenate([np.cumsum(panel1[::-1])[::-1], [0.0]])
+    int2[order] = np.concatenate([np.cumsum(panel2[::-1])[::-1], [0.0]])
 
     prefac1 = 8 * (2 - x) / (1 + x) ** 2
     prefac2 = 8 / (1 + x)
 
-    int1 = np.zeros_like(x)
-    int2 = np.zeros_like(x)
-    for i, xi in enumerate(x):
-        if xi >= x_max:
-            continue
-        if theta_max is not None and theta[i] >= 180.0 - theta_max:
-            # evaluation point falls in the prefac1/prefac2 pole's excluded
-            # neighborhood of theta=180; leave uncorrected
-            continue
-        # map the [-1, 1] Gauss-Legendre rule onto [xi, x_max]
-        half = (x_max - xi) / 2
-        xp = half * u + (xi + x_max) / 2
-        wp = half * w
+    result = f + prefac1 * int1 + prefac2 * int2
 
-        fp = interp(xp)
-        integ1 = ((1 + xp) * fp) / (1 - xp) ** 2
-        integ2 = fp / (1 - xp) ** 2
-
-        int1[i] = np.dot(wp, integ1)
-        int2[i] = np.dot(wp, integ2)
-
-    return f + prefac1 * int1 + prefac2 * int2
+    # x_i >= x_max, or theta_i within theta_max of 180, get no correction
+    skip = x >= x_max
+    if theta_max is not None:
+        skip |= theta >= 180.0 - theta_max
+    return np.where(skip, f, result)
 
 
 def _cl2corr(cls, lmax=None, sampling_factor=1):
@@ -540,7 +549,7 @@ def _purified_corr2cl(corr_wd, theta_max=None, progress: Progress | None = None)
         lmax = len(xvals) - 1
 
         Xi_p, Xi_m = wd[0, 0], wd[1, 1]
-        Xi_p_dec = T(Xi_p, theta, theta_max=theta_max)
+        Xi_p_dec = purify(Xi_p, theta, theta_max=theta_max)
 
         zeros = np.zeros_like(Xi_p)
         # Xi^BB, transformed with d^l_{2,2} alone (the "+"-matrix)
