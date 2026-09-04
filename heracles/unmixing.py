@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from .progress import NoProgress, Progress
 from .result import binned
 from .transforms import cl2corr, corr2cl
 from .utils import get_cl
@@ -29,11 +30,11 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(x, x0=-2, k=50):
+def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def naturalspice(d, m, fields, theta_max=None):
+def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress | None = None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -41,9 +42,14 @@ def naturalspice(d, m, fields, theta_max=None):
         m: mask Cl
         fields: list of fields
         theta_max: maximum angle to use for the unmixing, in degrees. If None, use all angles.
+        purify: whether to purify the EE/BB estimator (only affects s1=s2=2 fields)
+        progress: optional progress reporter
     Returns:
         corr_d: Corrected Cl
     """
+    if progress is None:
+        progress = NoProgress()
+
     first_wd = list(d.values())[0]
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
@@ -52,19 +58,23 @@ def naturalspice(d, m, fields, theta_max=None):
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
-    wd = cl2corr(d)
-    wm = cl2corr(m)
-    corr_wds = _naturalspice(wd, wm, fields, theta_max=theta_max)
+    with progress.task("data correlations") as task:
+        wd = cl2corr(d, progress=task)
+    with progress.task("mask correlations") as task:
+        wm = cl2corr(m, progress=task)
+    with progress.task("unmixing") as task:
+        corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, progress=task)
 
     # trnasform back to Cl
-    corr_d = corr2cl(corr_wds)
+    with progress.task("transform back to Cl") as task:
+        corr_d = corr2cl(corr_wd, purify=purify, progress=task)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))
     return corr_d
 
 
-def _naturalspice(wd, wm, fields, theta_max=None):
+def _naturalspice(wd, wm, fields, theta_max=None, progress: Progress | None = None):
     """
     Natural unmixing of the data correlation function.
     Args:
@@ -72,9 +82,13 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         wm: mask correlation function
         fields: list of fields
         theta_max: maximum angle in degrees for the logistic cutoff. If None, uses default x0=-2.
+        progress: optional progress reporter
     Returns:
         corr_d: Corrected Cl
     """
+    if progress is None:
+        progress = NoProgress()
+
     masks = {}
     for key, field in fields.items():
         if field.mask is not None:
@@ -91,7 +105,10 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         x0 = -5
 
     corr_wds = {}
+    current, total = 0, len(wd)
     for key in wd.keys():
+        current += 1
+        progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
         _wm = get_cl(m_key, wm).array

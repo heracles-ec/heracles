@@ -27,6 +27,7 @@ except ImportError:
     # Python < 3.13
     from dataclasses import replace
 
+from .progress import NoProgress, Progress
 from .result import get_result_array
 
 gauss_legendre = None
@@ -118,6 +119,86 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
 
     return res
 
+def T(f, theta, n_quad=None):
+    r"""
+    Delta-function ("T") correction operator (Chon et al. 2004) applied to a
+    correlation function `f` tabulated at cos(theta) = x.
+
+    For every input angle theta_i (x_i = cos(theta_i)), computes
+
+        T[f](theta_i) = f(theta_i)
+            + prefac1(x_i) * int_{x_i}^{1} (1+x') f(x') / (1-x')^2 dx'
+            + prefac2(x_i) * int_{x_i}^{1} f(x') / (1-x')^2 dx'
+
+    `f` is only known at the tabulated points `theta` (the same grid used
+    elsewhere in this module, e.g. from `_cached_gauss_legendre`). Since the
+    integrand is highly oscillatory, each int_{x_i}^{1} is evaluated with a
+    dedicated high-order Gauss-Legendre rule mapped from [-1, 1] onto
+    [x_i, 1], with `f` reconstructed at the quadrature nodes via a
+    cubic-spline interpolant of the tabulated values.
+
+    Args:
+        f: array of function values, tabulated at the angles in `theta`.
+        theta: array of angles (degrees) at which `f` is tabulated, and at
+            which T[f] is evaluated.
+        n_quad: number of Gauss-Legendre points used for each int_x^1
+            integral. Defaults to 4x the number of tabulated points
+            (at least 64).
+
+    Returns:
+        Array of T[f](theta), same shape as `theta`.
+
+    Note:
+        The kernel f(x')/(1-x')^2 is singular as x' -> 1, which is always
+        the upper limit of integration. Unless f vanishes at x'=1 to at
+        least second order, these integrals are formally divergent and
+        should be understood in the Hadamard finite-part sense; plain
+        Gauss-Legendre quadrature does *not* converge to the finite-part
+        value in that case. In addition, since `theta` typically holds
+        interior Gauss-Legendre nodes (which never include x'=1), the
+        spline interpolant must extrapolate right at the singular
+        endpoint, which is the least reliable place to do so. Treat this
+        implementation as provisional and check it against the reference
+        formula/paper for your actual f before trusting it near x'=1.
+    """
+    from scipy.interpolate import CubicSpline
+
+    theta = np.atleast_1d(np.asarray(theta, dtype=np.float64))
+    f = np.atleast_1d(np.asarray(f, dtype=np.float64))
+    if f.shape != theta.shape:
+        raise ValueError("f and theta must have the same shape")
+
+    x = np.cos(np.radians(theta))
+
+    # interpolant of f(x); CubicSpline requires strictly increasing x
+    order = np.argsort(x)
+    interp = CubicSpline(x[order], f[order], extrapolate=True)
+
+    if n_quad is None:
+        n_quad = max(4 * len(x), 64)
+    u, w = _cached_gauss_legendre(n_quad)
+
+    prefac1 = 8 * (2 - x) / (1 + x) ** 2
+    prefac2 = 8 / (1 + x)
+
+    int1 = np.zeros_like(x)
+    int2 = np.zeros_like(x)
+    for i, xi in enumerate(x):
+        if xi >= 1.0:
+            continue
+        # map the [-1, 1] Gauss-Legendre rule onto [xi, 1]
+        half = (1 - xi) / 2
+        xp = half * u + (xi + 1) / 2
+        wp = half * w
+
+        fp = interp(xp)
+        integ1 = ((1 + xp) * fp) / (1 - xp) ** 2
+        integ2 = fp / (1 - xp) ** 2
+
+        int1[i] = np.dot(wp, integ1)
+        int2[i] = np.dot(wp, integ2)
+
+    return f + prefac1 * int1 + prefac2 * int2
 
 def _cl2corr(cls, lmax=None, sampling_factor=1):
     """
@@ -211,160 +292,181 @@ def _corr2cl(corrs, lmax=None, sampling_factor=1):
     return 2 * np.pi * cls
 
 
-def cl2corr(cls):
+def cl2corr(cls, progress: Progress | None = None):
     """
     Transforms cls to correlation functions
     Args:
         cls: Data Cl
+        progress: optional progress reporter
     Returns:
         corr: correlation function
     """
+    if progress is None:
+        progress = NoProgress()
+
     wds = {}
+    current, total = 0, len(cls)
     for key in cls.keys():
-        cl = cls[key]
-        s1, s2 = cl.spin
-        # Grab metadata
-        dtype = cl.array.dtype
-        # Determine lmax from ell field or shape along ell axis
-        lmax = len(get_result_array(cl, "ell")[0]) - 1
-        xvals, _ = _cached_gauss_legendre(lmax + 1)
-        # Initialize wd
-        wd = np.zeros_like(cl)
-        if (s1 != 0) and (s2 != 0):
-            _cl = np.array(
-                [
-                    np.zeros_like(cl[0, 0]),
-                    cl[0, 0],  # EE like spin-2
-                    cl[1, 1],  # BB like spin-2
-                    np.zeros_like(cl[0, 0]),
-                ]
+        current += 1
+        progress.update(current, total)
+        with progress.task(f"{key}"):
+            cl = cls[key]
+            s1, s2 = cl.spin
+            # Grab metadata
+            dtype = cl.array.dtype
+            # Determine lmax from ell field or shape along ell axis
+            lmax = len(get_result_array(cl, "ell")[0]) - 1
+            xvals, _ = _cached_gauss_legendre(lmax + 1)
+            # Initialize wd
+            wd = np.zeros_like(cl)
+            if (s1 != 0) and (s2 != 0):
+                # Purify flips the sign of BB before transforming, which swaps
+                # which combination (EE+BB or EE-BB) ends up multiplied by
+                # which Wigner matrix (d22 or d2m2). Reading out the opposite
+                # slot then gives the "dec" correlation: the same EE+BB
+                # combination as the normal E^+, but transformed with the
+                # opposite Wigner matrix.
+                _cl = np.array(
+                    [
+                        np.zeros_like(cl[0, 0]),
+                        cl[0, 0],  # EE like spin-2
+                        cl[1, 1],   # BB like spin-2
+                        np.zeros_like(cl[0, 0]),
+                    ]
+                )
+                _icl = np.array(
+                    [
+                        np.zeros_like(cl[0, 0]),
+                        -cl[0, 1],  # EB like spin-0
+                        cl[1, 0],  # EB like spin-0
+                        np.zeros_like(cl[0, 0]),
+                    ]
+                )
+                # transform to corrs
+                _wd = _cl2corr(_cl.T).T + 1j * _cl2corr(_icl.T).T
+                _rwd = _wd.real
+                _iwd = _wd.imag
+                # reorder (purify reads the opposite Wigner-matrix slot)
+                wd[0, 0] = _rwd[1]  # E^+ (or E^+_dec)
+                wd[1, 1] = _rwd[2]  # E^- (or E^-_dec)
+                wd[0, 1] = _iwd[1]  # EB like spin-0
+                wd[1, 0] = _iwd[2]  # EB like spin-0
+            elif (s1 != 0) or (s2 != 0):
+                _clp = np.array(
+                    [
+                        np.zeros_like(cl[0]),
+                        np.zeros_like(cl[0]),
+                        np.zeros_like(cl[0]),
+                        cl[0] + cl[1],  # TE like spin-2
+                    ]
+                )
+                _clm = np.array(
+                    [
+                        np.zeros_like(cl[0]),
+                        np.zeros_like(cl[0]),
+                        np.zeros_like(cl[0]),
+                        cl[0] - cl[1],  # TE like spin-2
+                    ]
+                )
+                # trnsform to corrs
+                wd[0] = _cl2corr(_clp.T).T[3]
+                wd[1] = _cl2corr(_clm.T).T[3]
+            elif (s1 == 0) and (s2 == 0):
+                wd = _cl2corr(cl).T[0]
+            else:
+                raise ValueError("Invalid spin combination")
+            # Add metadata back
+            wd = np.array(list(wd), dtype=dtype)
+            wds[key] = replace(
+                cls[key],
+                ell=xvals,
+                array=wd,
             )
-            _icl = np.array(
-                [
-                    np.zeros_like(cl[0, 0]),
-                    -cl[0, 1],  # EB like spin-0
-                    cl[1, 0],  # EB like spin-0
-                    np.zeros_like(cl[0, 0]),
-                ]
-            )
-            # transform to corrs
-            _wd = _cl2corr(_cl.T).T + 1j * _cl2corr(_icl.T).T
-            _rwd = _wd.real
-            _iwd = _wd.imag
-            # reorder
-            wd[0, 0] = _rwd[1]  # EE like spin-2
-            wd[1, 1] = _rwd[2]  # BB like spin-2
-            wd[0, 1] = _iwd[1]  # EB like spin-0
-            wd[1, 0] = _iwd[2]  # EB like spin-0
-        elif (s1 != 0) or (s2 != 0):
-            _clp = np.array(
-                [
-                    np.zeros_like(cl[0]),
-                    np.zeros_like(cl[0]),
-                    np.zeros_like(cl[0]),
-                    cl[0] + cl[1],  # TE like spin-2
-                ]
-            )
-            _clm = np.array(
-                [
-                    np.zeros_like(cl[0]),
-                    np.zeros_like(cl[0]),
-                    np.zeros_like(cl[0]),
-                    cl[0] - cl[1],  # TE like spin-2
-                ]
-            )
-            # trnsform to corrs
-            wd[0] = _cl2corr(_clp.T).T[3]
-            wd[1] = _cl2corr(_clm.T).T[3]
-        elif (s1 == 0) and (s2 == 0):
-            wd = _cl2corr(cl).T[0]
-        else:
-            raise ValueError("Invalid spin combination")
-        # Add metadata back
-        wd = np.array(list(wd), dtype=dtype)
-        wds[key] = replace(
-            cls[key],
-            ell=xvals,
-            array=wd,
-        )
     return wds
 
 
-def corr2cl(wds):
+def corr2cl(wds, progress: Progress | None = None):
     """
     Transforms correlation functions to cls
     Args:
-        corrs: data corrs
+        wds: data correlation functions
+        progress: optional progress reporter
     Returns:
         corr: correlation function
     """
+    if progress is None:
+        progress = NoProgress()
+
     cls = {}
+    current, total = 0, len(wds)
     for key in wds.keys():
-        wd = wds[key]
-        s1, s2 = wd.spin
-        # Grab metadata
-        dtype = wd.array.dtype
-        # Derive lmax from xvals stored in the correlation's ell field
-        xvals = get_result_array(wd, "ell")[0]
-        lmax = len(xvals) - 1
-        # initialize cl
-        cl = np.zeros_like(wd)
-        if (s1 != 0) and (s2 != 0):
-            _rwd = np.array(
-                [
-                    np.zeros_like(wd[0, 0]),
-                    wd[0, 0],  # EE like spin-2
-                    wd[1, 1],  # BB like spin-2
-                    np.zeros_like(wd[0, 0]),
-                ]
+        current += 1
+        progress.update(current, total)
+        with progress.task(f"{key}"):
+            wd = wds[key]
+            s1, s2 = wd.spin
+            # Grab metadata
+            dtype = wd.array.dtype
+            # Derive lmax from xvals stored in the correlation's ell field
+            xvals = get_result_array(wd, "ell")[0]
+            lmax = len(xvals) - 1
+            # initialize cl
+            cl = np.zeros_like(wd)
+            if (s1 != 0) and (s2 != 0):
+                _rwd = np.array(
+                    [
+                        np.zeros_like(wd[0, 0]),
+                        wd[0, 0],  # EE like spin-2
+                        wd[1, 1],  # BB like spin-2
+                        np.zeros_like(wd[0, 0]),
+                    ]
+                )
+                _rcl = _corr2cl(_rwd.T).T
+                cl[0, 0] = _rcl[1]  # EE like spin-2
+                cl[1, 1] = _rcl[2]  # BB like spin-2
+            # EB cross-term: unchanged by purify
+                _iwd = np.array(
+                    [
+                        np.zeros_like(wd[0, 0]),
+                        wd[0, 1],  # EB like spin-0
+                        wd[1, 0],  # EB like spin-0
+                        np.zeros_like(wd[0, 0]),
+                    ]
+                )
+                _icl = _corr2cl(_iwd.T).T
+                cl[0, 1] = -_icl[1]  # EB like spin-0
+                cl[1, 0] = _icl[2]  # EB like spin-0
+            elif (s1 != 0) or (s2 != 0):
+                _wp = np.array(
+                    [
+                        np.zeros_like(wd[0]),
+                        np.zeros_like(wd[0]),
+                        np.zeros_like(wd[0]),
+                        wd[0],  # TE like spin-2
+                    ]
+                )
+                _wm = np.array(
+                    [
+                        np.zeros_like(wd[0]),
+                        np.zeros_like(wd[0]),
+                        np.zeros_like(wd[0]),
+                        wd[1],  # TE like spin-2
+                    ]
+                )
+                _clp = _corr2cl(_wp.T).T[3]
+                _clm = _corr2cl(_wm.T).T[3]
+                cl[0] = (_clp + _clm) / 2
+                cl[1] = (_clp - _clm) / 2
+            elif (s1 == 0) and (s2 == 0):
+                # Treat everything as spin-0 and preserve 1D shape.
+                cl = _corr2cl(wd).T[0]
+            else:
+                raise ValueError("Invalid spin combination")
+            # Add metadata back
+            cl = np.array(list(cl), dtype=dtype)
+            cls[key] = replace(
+                wds[key],
+                ell=np.arange(lmax + 1),
+                array=cl,
             )
-            _iwd = np.array(
-                [
-                    np.zeros_like(wd[0, 0]),
-                    wd[0, 1],  # EB like spin-0
-                    wd[1, 0],  # EB like spin-0
-                    np.zeros_like(wd[0, 0]),
-                ]
-            )
-            # transform back to Cl
-            _rcl = _corr2cl(_rwd.T).T
-            _icl = _corr2cl(_iwd.T).T
-            # reorder
-            cl[0, 0] = _rcl[1]  # EE like spin-2
-            cl[1, 1] = _rcl[2]  # BB like spin-2
-            cl[0, 1] = -_icl[1]  # EB like spin-0
-            cl[1, 0] = _icl[2]  # EB like spin-0
-        elif (s1 != 0) or (s2 != 0):
-            _wp = np.array(
-                [
-                    np.zeros_like(wd[0]),
-                    np.zeros_like(wd[0]),
-                    np.zeros_like(wd[0]),
-                    wd[0],  # TE like spin-2
-                ]
-            )
-            _wm = np.array(
-                [
-                    np.zeros_like(wd[0]),
-                    np.zeros_like(wd[0]),
-                    np.zeros_like(wd[0]),
-                    wd[1],  # TE like spin-2
-                ]
-            )
-            _clp = _corr2cl(_wp.T).T[3]
-            _clm = _corr2cl(_wm.T).T[3]
-            cl[0] = (_clp + _clm) / 2
-            cl[1] = (_clp - _clm) / 2
-        elif (s1 == 0) and (s2 == 0):
-            # Treat everything as spin-0 and preserve 1D shape.
-            cl = _corr2cl(wd).T[0]
-        else:
-            raise ValueError("Invalid spin combination")
-        # Add metadata back
-        cl = np.array(list(cl), dtype=dtype)
-        cls[key] = replace(
-            wds[key],
-            ell=np.arange(lmax + 1),
-            array=cl,
-        )
     return cls
