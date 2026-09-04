@@ -119,7 +119,7 @@ def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
 
     return res
 
-def T(f, theta, n_quad=None):
+def T(f, theta, theta_max=None, n_quad=None):
     r"""
     Delta-function ("T") correction operator (Chon et al. 2004) applied to a
     correlation function `f` tabulated at cos(theta) = x.
@@ -127,21 +127,37 @@ def T(f, theta, n_quad=None):
     For every input angle theta_i (x_i = cos(theta_i)), computes
 
         T[f](theta_i) = f(theta_i)
-            + prefac1(x_i) * int_{x_i}^{1} (1+x') f(x') / (1-x')^2 dx'
-            + prefac2(x_i) * int_{x_i}^{1} f(x') / (1-x')^2 dx'
+            + prefac1(x_i) * int_{x_i}^{x_max} (1+x') f(x') / (1-x')^2 dx'
+            + prefac2(x_i) * int_{x_i}^{x_max} f(x') / (1-x')^2 dx'
+
+    where x_max = cos(radians(theta_max)) (or 1 if theta_max is None).
 
     `f` is only known at the tabulated points `theta` (the same grid used
     elsewhere in this module, e.g. from `_cached_gauss_legendre`). Since the
-    integrand is highly oscillatory, each int_{x_i}^{1} is evaluated with a
-    dedicated high-order Gauss-Legendre rule mapped from [-1, 1] onto
-    [x_i, 1], with `f` reconstructed at the quadrature nodes via a
+    integrand is highly oscillatory, each int_{x_i}^{x_max} is evaluated
+    with a dedicated high-order Gauss-Legendre rule mapped from [-1, 1]
+    onto [x_i, x_max], with `f` reconstructed at the quadrature nodes via a
     cubic-spline interpolant of the tabulated values.
 
     Args:
         f: array of function values, tabulated at the angles in `theta`.
         theta: array of angles (degrees) at which `f` is tabulated, and at
             which T[f] is evaluated.
-        n_quad: number of Gauss-Legendre points used for each int_x^1
+        theta_max: small angle (in degrees) excluding a neighborhood of the
+            theta'=0 singularity from the integration. The integral runs
+            over theta' in [theta_max, theta_i] instead of [0, theta_i];
+            for theta_i <= theta_max, the whole would-be domain is inside
+            the excluded core, so T[f](theta_i) = f(theta_i) (no
+            correction). If None, integrate all the way to theta'=0
+            (x'=1), which is singular unless f vanishes there.
+
+            `prefac1`/`prefac2` (below) have their own, unrelated pole at
+            theta_i=180 (x_i=-1); the same `theta_max` is reused to exclude
+            a mirrored neighborhood [180-theta_max, 180] of *evaluation*
+            points theta_i, since the prefactors blow up there regardless
+            of theta'=0 or the integration domain. theta_i in that band
+            also get T[f](theta_i) = f(theta_i) (no correction).
+        n_quad: number of Gauss-Legendre points used for each int_x^x_max
             integral. Defaults to 4x the number of tabulated points
             (at least 64).
 
@@ -149,17 +165,17 @@ def T(f, theta, n_quad=None):
         Array of T[f](theta), same shape as `theta`.
 
     Note:
-        The kernel f(x')/(1-x')^2 is singular as x' -> 1, which is always
-        the upper limit of integration. Unless f vanishes at x'=1 to at
-        least second order, these integrals are formally divergent and
-        should be understood in the Hadamard finite-part sense; plain
-        Gauss-Legendre quadrature does *not* converge to the finite-part
-        value in that case. In addition, since `theta` typically holds
-        interior Gauss-Legendre nodes (which never include x'=1), the
-        spline interpolant must extrapolate right at the singular
-        endpoint, which is the least reliable place to do so. Treat this
-        implementation as provisional and check it against the reference
-        formula/paper for your actual f before trusting it near x'=1.
+        The kernel f(x')/(1-x')^2 is singular as x' -> 1 (theta' -> 0).
+        Passing `theta_max` keeps the quadrature away from that endpoint
+        (recommended for f that doesn't vanish at theta'=0); leaving it
+        None integrates all the way to the singularity and, unless f
+        vanishes there to at least second order, the integral is formally
+        a Hadamard finite-part integral that plain Gauss-Legendre
+        quadrature does not converge to. Separately, prefac1 = 8(2-x)/(1+x)^2
+        and prefac2 = 8/(1+x) both diverge as x -> -1 (theta -> 180); with
+        theta_max=None this endpoint is *not* guarded and T[f] will blow up
+        for theta_i near 180 whenever the (theta_max-truncated or not)
+        integral doesn't vanish fast enough to cancel the pole.
     """
     from scipy.interpolate import CubicSpline
 
@@ -169,6 +185,7 @@ def T(f, theta, n_quad=None):
         raise ValueError("f and theta must have the same shape")
 
     x = np.cos(np.radians(theta))
+    x_max = 1.0 if theta_max is None else np.cos(np.radians(theta_max))
 
     # interpolant of f(x); CubicSpline requires strictly increasing x
     order = np.argsort(x)
@@ -184,11 +201,15 @@ def T(f, theta, n_quad=None):
     int1 = np.zeros_like(x)
     int2 = np.zeros_like(x)
     for i, xi in enumerate(x):
-        if xi >= 1.0:
+        if xi >= x_max:
             continue
-        # map the [-1, 1] Gauss-Legendre rule onto [xi, 1]
-        half = (1 - xi) / 2
-        xp = half * u + (xi + 1) / 2
+        if theta_max is not None and theta[i] >= 180.0 - theta_max:
+            # evaluation point falls in the prefac1/prefac2 pole's excluded
+            # neighborhood of theta=180; leave uncorrected
+            continue
+        # map the [-1, 1] Gauss-Legendre rule onto [xi, x_max]
+        half = (x_max - xi) / 2
+        xp = half * u + (xi + x_max) / 2
         wp = half * w
 
         fp = interp(xp)
@@ -199,6 +220,7 @@ def T(f, theta, n_quad=None):
         int2[i] = np.dot(wp, integ2)
 
     return f + prefac1 * int1 + prefac2 * int2
+
 
 def _cl2corr(cls, lmax=None, sampling_factor=1):
     """
@@ -320,12 +342,6 @@ def cl2corr(cls, progress: Progress | None = None):
             # Initialize wd
             wd = np.zeros_like(cl)
             if (s1 != 0) and (s2 != 0):
-                # Purify flips the sign of BB before transforming, which swaps
-                # which combination (EE+BB or EE-BB) ends up multiplied by
-                # which Wigner matrix (d22 or d2m2). Reading out the opposite
-                # slot then gives the "dec" correlation: the same EE+BB
-                # combination as the normal E^+, but transformed with the
-                # opposite Wigner matrix.
                 _cl = np.array(
                     [
                         np.zeros_like(cl[0, 0]),
@@ -469,4 +485,82 @@ def corr2cl(wds, progress: Progress | None = None):
                 ell=np.arange(lmax + 1),
                 array=cl,
             )
+    return cls
+
+
+def _purified_corr2cl(corr_wd, theta_max=None, progress: Progress | None = None):
+    """
+    Purified version of corr2cl for the natural-spice pipeline.
+
+    For s1=s2=2 (EE/BB) keys, uses the delta-function correction `T` to turn
+    the unmixed Xi^+ = corr_wd[key][0, 0] into the "dec" correlation
+    Xi^+_dec = T[Xi^+], then builds the pure EE/BB correlation functions
+
+        Xi^EE = Xi^+_dec + Xi^-
+        Xi^BB = Xi^+ - Xi^+_dec
+
+    which are transformed to Cl with the *opposite* Wigner matrix from the
+    one they would normally use (Xi^EE via d^l_{2,-2}, Xi^BB via d^l_{2,2}),
+    i.e.
+
+        Cl^EE = int 1/2 (Xi^+_dec + Xi^-) d^l_{2,-2}
+        Cl^BB = int 1/2 (Xi^+ - Xi^+_dec) d^l_{2,2}
+
+    All other keys (TE, TT) are unaffected by purification and are passed
+    through the ordinary corr2cl.
+    Args:
+        corr_wd: mask-deconvolved data correlation functions (e.g. the
+            output of heracles.unmixing._naturalspice)
+        theta_max: passed through to `T` as its own `theta_max`, excluding a
+            neighborhood of the theta'=0 (and, symmetrically, theta=180)
+            singularities from the T integral (see `T`). If None, T
+            integrates all the way to theta'=0, which is singular unless
+            Xi^+ vanishes there.
+        progress: optional progress reporter
+    Returns:
+        corr_d: purified Cl
+    """
+    if progress is None:
+        progress = NoProgress()
+
+    spin2_keys = [key for key, wd in corr_wd.items() if wd.spin[0] != 0 and wd.spin[1] != 0]
+    other = {key: wd for key, wd in corr_wd.items() if key not in spin2_keys}
+
+    cls = corr2cl(other) if other else {}
+
+    current, total = 0, len(spin2_keys)
+    for key in spin2_keys:
+        current += 1
+        progress.update(current, total)
+
+        wd = corr_wd[key]
+        dtype = wd.array.dtype
+        xvals = get_result_array(wd, "ell")[0]
+        theta = np.degrees(np.arccos(xvals))
+        lmax = len(xvals) - 1
+
+        Xi_p, Xi_m = wd[0, 0], wd[1, 1]
+        Xi_p_dec = T(Xi_p, theta, theta_max=theta_max)
+
+        zeros = np.zeros_like(Xi_p)
+        # Xi^BB, transformed with d^l_{2,2} alone (the "+"-matrix)
+        _rwd_BB = np.array([zeros, Xi_p - Xi_p_dec, zeros, zeros])
+        # Xi^EE, transformed with d^l_{2,-2} alone (the "-"-matrix)
+        _rwd_EE = np.array([zeros, zeros, Xi_p_dec + Xi_m, zeros])
+        cl_BB = _corr2cl(_rwd_BB.T).T[1]
+        cl_EE = _corr2cl(_rwd_EE.T).T[1]
+
+        # EB cross-term: unaffected by purification
+        _iwd = np.array([zeros, wd[0, 1], wd[1, 0], zeros])
+        _icl = _corr2cl(_iwd.T).T
+
+        cl = np.zeros_like(wd)
+        cl[0, 0] = cl_EE
+        cl[1, 1] = cl_BB
+        cl[0, 1] = -_icl[1]
+        cl[1, 0] = _icl[2]
+        cl = np.array(list(cl), dtype=dtype)
+
+        cls[key] = replace(wd, ell=np.arange(lmax + 1), array=cl)
+
     return cls

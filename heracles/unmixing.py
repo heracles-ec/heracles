@@ -19,7 +19,7 @@
 import numpy as np
 from .progress import NoProgress, Progress
 from .result import binned
-from .transforms import cl2corr, corr2cl
+from .transforms import cl2corr, corr2cl, _purified_corr2cl
 from .utils import get_cl
 from .transforms import _cached_gauss_legendre
 
@@ -66,8 +66,12 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
         corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, progress=task)
 
     # trnasform back to Cl
-    with progress.task("transform back to Cl") as task:
-        corr_d = corr2cl(corr_wd, purify=purify, progress=task)
+    if purify:
+        with progress.task("purified transform back to Cl") as task:
+            corr_d = _purified_corr2cl(corr_wd, theta_max=theta_max, progress=task)
+    else:
+        with progress.task("transform back to Cl") as task:
+            corr_d = corr2cl(corr_wd, progress=task)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))
