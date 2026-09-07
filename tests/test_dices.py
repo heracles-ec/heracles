@@ -158,6 +158,86 @@ def test_polspice(cls0):
     assert np.isclose(cl_txe[0, 2:], _cl_txe[0, 2:]).all()
 
 
+def test_decouple_recovers_ee_minus_bb():
+    """
+    The `naturalspice(..., purify=True)` EE/BB decoupling (PolSpice's
+    "decouple" estimator, Chon et al. 2004 eq. 65) builds both Cl^EE and
+    Cl^BB from the same d^l_{2,-2} kernel, normalized by a per-l coupling
+    factor Fl. For a full-sky (unmasked) correlation function -- so Fl
+    reduces to a constant, independent of l -- this construction must
+    recover Cl^EE - Cl^BB exactly, since that combination is exactly what
+    an ordinary (undecoupled) Xi^- round-trip already recovers losslessly;
+    it is only the individual EE/BB split that needs genuine mask
+    information to resolve.
+    """
+    rng = np.random.default_rng(0)
+    lmax = 40
+    ls = np.arange(lmax + 1)
+    cl_ee = np.zeros(lmax + 1)
+    cl_bb = np.zeros(lmax + 1)
+    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    cl_bb[2:] = 0.3 * rng.uniform(0.5, 1.5, lmax - 1) / (ls[2:] * (ls[2:] + 1)) ** 1.2
+
+    cl = np.zeros((2, 2, lmax + 1))
+    cl[0, 0] = cl_ee
+    cl[1, 1] = cl_bb
+    corr = heracles.transforms._cl2corr(cl, (2, 2), lmax=lmax)
+    xi_p, xi_m = corr[0, 0], corr[1, 1]
+    n = xi_p.shape[0]
+    xvals = np.polynomial.legendre.leggauss(n)[0]
+    theta = np.degrees(np.arccos(xvals))
+    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+    def isolate(x):
+        c = np.zeros((2, 2, n))
+        c[1, 1] = x
+        return heracles.transforms._corr2cl(c, (2, 2), lmax=lmax)[0, 0]
+
+    fl = isolate(csc2)  # no apodization (apod=1) -> Fl is exactly constant (=pi)
+    with np.errstate(invalid="ignore"):
+        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
+        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
+
+    np.testing.assert_allclose(
+        cl_ee_dec[2:] - cl_bb_dec[2:], cl_ee[2:] - cl_bb[2:], atol=1e-10
+    )
+
+
+def test_decouple_finite_with_apodization():
+    """
+    With a small `theta_max` (used as the Gaussian apodization FWHM/cutoff
+    for the decoupling normalization), the decoupled Cl^EE/Cl^BB must stay
+    finite -- unlike the earlier delta-function `purify()` operator, which
+    blew up for `theta` just past `theta_max`.
+    """
+    from heracles.unmixing import gaussian_apod
+
+    lmax = 40
+    ls = np.arange(lmax + 1)
+    cl = np.zeros((2, 2, lmax + 1))
+    cl[0, 0, 2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    corr = heracles.transforms._cl2corr(cl, (2, 2), lmax=lmax)
+    xi_p, xi_m = corr[0, 0], corr[1, 1]
+    n = xi_p.shape[0]
+    xvals = np.polynomial.legendre.leggauss(n)[0]
+    theta = np.degrees(np.arccos(xvals))
+
+    apod = gaussian_apod(theta, 30.0)
+    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+    def isolate(x):
+        c = np.zeros((2, 2, n))
+        c[1, 1] = x
+        return heracles.transforms._corr2cl(c, (2, 2), lmax=lmax)[0, 0]
+
+    fl = isolate(apod * csc2)
+    with np.errstate(invalid="ignore"):
+        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
+        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
+    assert np.all(np.isfinite(cl_ee_dec[2:]))
+    assert np.all(np.isfinite(cl_bb_dec[2:]))
+
+
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):
     assert len(cls1) == njk
     for key in cls1.keys():

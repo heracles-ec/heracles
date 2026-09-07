@@ -20,7 +20,6 @@ import numpy as np
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
 from .transforms import cl2corr, corr2cl, _corr2cl
-from .transforms import purify as _purify_xi_plus
 from .utils import get_cl
 from .transforms import _cached_gauss_legendre
 
@@ -33,6 +32,20 @@ except ImportError:
 
 def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
+
+
+def gaussian_apod(theta, theta_max):
+    """
+    Gaussian apodization window in theta (degrees), matching PolSpice's
+    `apodizefunction` type 0 (see apodize_mod.f90 in the PolSpice source):
+    `theta_max` is used as both the taper's FWHM and its hard cutoff radius.
+    If `theta_max` is None, no apodization is applied (flat weight of 1
+    everywhere).
+    """
+    if theta_max is None:
+        return np.ones_like(theta)
+    sigma = theta_max / np.sqrt(8 * np.log(2))
+    return np.where(theta < theta_max, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
 def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress | None = None):
@@ -68,17 +81,24 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
 
     # trnasform back to Cl
     if purify:
-        # For s1=s2=2 (EE/BB) keys, use the delta-function correction
-        # `purify` to turn the unmixed Xi^+ = corr_wd[key][0, 0] into the
-        # "dec" correlation Xi^+_dec = purify(Xi^+), then build the pure
-        # EE/BB correlation functions
-        #     Xi^EE = Xi^+_dec + Xi^-
-        #     Xi^BB = Xi^+ - Xi^+_dec
-        # which are transformed to Cl with the *opposite* Wigner matrix
-        # from the one they would normally use (Xi^EE via d^l_{2,-2},
-        # Xi^BB via d^l_{2,2}):
-        #     Cl^EE = int 1/2 (Xi^+_dec + Xi^-) d^l_{2,-2}
-        #     Cl^BB = int 1/2 (Xi^+ - Xi^+_dec) d^l_{2,2}
+        # For s1=s2=2 (EE/BB) keys, use PolSpice's "decouple" estimator
+        # (Chon et al. 2004, eq. 65): instead of the usual pairing
+        # (Xi^+ via d^l_{2,2}, Xi^- via d^l_{2,-2}), both Cl^EE and Cl^BB
+        # are built from the *same* kernel, d^l_{2,-2}, applied to
+        # (Xi^+ + Xi^-) and (Xi^+ - Xi^-) respectively, each normalized by
+        # a per-l coupling factor Fl computed from a csc^2(theta/2)-weighted
+        # (optionally Gaussian-apodized) quadrature of that same kernel:
+        #     Cl^EE = pi * int (Xi^+ + Xi^-) d^l_{2,-2} / Fl
+        #     Cl^BB = pi * int (Xi^+ - Xi^-) d^l_{2,-2} / Fl
+        #     Fl    =      int apod(theta) csc^2(theta/2) d^l_{2,-2}
+        # Each of these is computed by reusing `_corr2cl(..., (2, 2), ...)`
+        # on an isolated-slot array: feeding a quantity into the corr[1, 1]
+        # ("m_diag", d^l_{2,-2}-kernel) slot and reading back the output EE
+        # slot gives exactly pi * int (...) d^l_{2,-2} (the "pi" here is
+        # `_corr2cl`'s own 2*pi normalization, halved by `unrotate`), so an
+        # extra pi is applied explicitly to cl_EE/cl_BB below to get the
+        # single power of pi the formula above calls for once the ratio
+        # with Fl (which carries none) has cancelled the other one.
         # All other keys (TE, TT) are unaffected by purification and go
         # through the ordinary corr2cl.
         with progress.task("purified transform back to Cl") as task:
@@ -98,22 +118,37 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
                 xvals = get_result_array(wd, "ell")[0]
                 theta = np.degrees(np.arccos(xvals))
                 key_lmax = len(xvals) - 1
+                n = len(theta)
 
                 Xi_p, Xi_m = wd[0, 0], wd[1, 1]
-                Xi_p_dec = _purify_xi_plus(Xi_p, theta, theta_max=theta_max)
+                apod = gaussian_apod(theta, theta_max)
+                csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
-                n = len(theta)
-                corr_BB = np.zeros((2, 2, n))
-                corr_BB[0, 0] = Xi_p - Xi_p_dec  # -> Cl^BB via d^l_{2,2}
-                corr_EE = np.zeros((2, 2, n))
-                corr_EE[1, 1] = Xi_p_dec + Xi_m  # -> Cl^EE via d^l_{2,-2}
+                # feed each quantity into the corr[1, 1] ("m_diag",
+                # d^l_{2,-2}-kernel) slot only, all other slots zero, and
+                # read back the EE output slot -- this is exactly
+                # pi * sum_theta[w * (...) * d2m2(theta, l)], up to a
+                # constant prefactor from _corr2cl that cancels in the
+                # Fl-normalized ratio below.
+                corr_fl = np.zeros((2, 2, n))
+                corr_fl[1, 1] = apod * csc2
+                Fl = _corr2cl(corr_fl, (2, 2), lmax=key_lmax)[0, 0]
+
+                corr_ee = np.zeros((2, 2, n))
+                corr_ee[1, 1] = Xi_p + Xi_m
+                corr_bb = np.zeros((2, 2, n))
+                corr_bb[1, 1] = Xi_p - Xi_m
+                # l < 2 is unphysical for spin-2 fields and always zero in
+                # both Fl and the numerators (0/0); ignore the resulting
+                # divide warning, the l < 2 entries are discarded below.
+                with np.errstate(invalid="ignore"):
+                    cl_EE = np.pi * _corr2cl(corr_ee, (2, 2), lmax=key_lmax)[0, 0] / Fl
+                    cl_BB = np.pi * _corr2cl(corr_bb, (2, 2), lmax=key_lmax)[0, 0] / Fl
+
                 # EB cross-term: unaffected by purification
                 corr_eb = np.zeros((2, 2, n))
                 corr_eb[0, 1] = wd[0, 1]
                 corr_eb[1, 0] = wd[1, 0]
-
-                cl_BB = _corr2cl(corr_BB, (2, 2), lmax=key_lmax)[0, 0]
-                cl_EE = _corr2cl(corr_EE, (2, 2), lmax=key_lmax)[0, 0]
                 cl_eb = _corr2cl(corr_eb, (2, 2), lmax=key_lmax)
 
                 cl = np.zeros_like(wd.array)
