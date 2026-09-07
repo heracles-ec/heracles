@@ -116,7 +116,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     _alphas = _mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
-        wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
+        wmls0 = heracles.transforms._cl2corr(mls0[key].array, (0, 0))
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
@@ -133,18 +133,29 @@ def test_fast_mask_correction(cls0, jk_map):
 def test_polspice(cls0):
     from heracles.utils import get_cl
 
-    cls = np.array(
-        [
-            get_cl(("POS", "POS", 1, 1), cls0),
-            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
-            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
-            get_cl(("POS", "SHE", 1, 1), cls0)[0],
-        ]
-    ).T
-    corrs = heracles.transforms._cl2corr(cls)
-    _cls = heracles.transforms._corr2cl(corrs)
-    for cl, _cl in zip(cls.T, _cls.T):
-        assert np.isclose(cl[2:], _cl[2:]).all()
+    # TT round-trip (spin (0, 0))
+    cl_tt = get_cl(("POS", "POS", 1, 1), cls0)
+    corr_tt = heracles.transforms._cl2corr(cl_tt, (0, 0))
+    _cl_tt = heracles.transforms._corr2cl(corr_tt, (0, 0))
+    assert np.isclose(cl_tt[2:], _cl_tt[2:]).all()
+
+    # EE/BB round-trip (spin (2, 2), no EB/BE cross-term)
+    cl_ee = get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0]
+    cl_bb = get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1]
+    cl_eebb = np.array(
+        [[cl_ee, np.zeros_like(cl_ee)], [np.zeros_like(cl_bb), cl_bb]]
+    )
+    corr_eebb = heracles.transforms._cl2corr(cl_eebb, (2, 2))
+    _cl_eebb = heracles.transforms._corr2cl(corr_eebb, (2, 2))
+    assert np.isclose(cl_eebb[0, 0, 2:], _cl_eebb[0, 0, 2:]).all()
+    assert np.isclose(cl_eebb[1, 1, 2:], _cl_eebb[1, 1, 2:]).all()
+
+    # TE round-trip (one spin zero, no TB counterpart)
+    cl_te = get_cl(("POS", "SHE", 1, 1), cls0)[0]
+    cl_txe = np.array([cl_te, np.zeros_like(cl_te)])
+    corr_txe = heracles.transforms._cl2corr(cl_txe, (0, 2))
+    _cl_txe = heracles.transforms._corr2cl(corr_txe, (0, 2))
+    assert np.isclose(cl_txe[0, 2:], _cl_txe[0, 2:]).all()
 
 
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):

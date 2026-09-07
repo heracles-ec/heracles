@@ -51,73 +51,74 @@ def _cached_gauss_legendre(npoints, cache=True):
         return xvals, weights
 
 
-def legendre_funcs(lmax, x, m=(0, 2), lfacs=None, lfacs2=None, lrootfacs=None):
+def legendre_funcs(lmax, x, spin, lfacs=None, lfacs2=None, lrootfacs=None):
     """
-    Utility function to return array of Legendre and :math:`d_{mn}` functions for all :math:`\ell` up to lmax.
-    Note that :math:`d_{mn}` arrays start at :math:`\ell_{\rm min} = \max(m,n)`, so returned arrays are different sizes
+    Utility function to return the Legendre/Wigner-d functions needed to
+    transform a Cl of the given `spin` to/from a correlation function, for
+    all :math:`\ell` up to lmax. Note that the spin functions start at
+    :math:`\ell=2`, so are shorter than the spin (0, 0) case.
+
+    Only spin (0, 0), (0, 2)/(2, 0), and (2, 2) are supported.
 
     :param lmax: maximum :math:`\ell`
     :param x: scalar value of :math:`\cos(\theta)` at which to evaluate
-    :param m: m values to calculate :math:`d_{m,n}`, etc. as relevant
+    :param spin: (s1, s2) spin of the field pair -- selects which functions
+        are computed
     :param lfacs: optional pre-computed :math:`\ell(\ell+1)` float array
+        (ignored for spin (0, 0))
     :param lfacs2: optional pre-computed :math:`(\ell+2)*(\ell-1)` float array
     :param lrootfacs: optional pre-computed sqrt(lfacs*lfacs2) array
-    :return: :math:`(P,P'),(d_{11},d_{-1,1}), (d_{20}, d_{22}, d_{2,-2})` as requested, where P starts
-             at :math:`\ell=0`, but spin functions start at :math:`\ell=\ell_{\rm min}`
+    :return: `P`, starting at :math:`\ell=0`, for spin (0, 0); otherwise
+        `(d_{20}, d_{22}, d_{2,-2})`, starting at :math:`\ell=2`
     """
+    s1, s2 = spin
+    if s1 == 0 and s2 == 0:
+        return legendre_p_all(lmax, x)
+    elif not ({s1, s2} == {0, 2} or (s1 == 2 and s2 == 2)):
+        raise ValueError(
+            f"unsupported spin combination {spin!r}: only (0, 0), "
+            "(0, 2)/(2, 0), and (2, 2) are supported"
+        )
+
     allP, alldP = legendre_p_all(lmax, x, diff_n=1)
-    # Polarization functions all start at L=2
     fac1 = 1 - x
     fac2 = 1 + x
-    res = []
-    if 0 in m:
-        res.append((allP, alldP))
 
-    if 1 in m:
-        lfacs1 = np.arange(1, lmax + 1, dtype=np.float64)
-        lfacs1 *= 1 + lfacs1
-        d11 = fac1 * alldP[1:] / lfacs1 + allP[1:]
-        dm11 = fac2 * alldP[1:] / lfacs1 - allP[1:]
-        res.append((d11, dm11))
+    if lfacs is None:
+        ls = np.arange(2, lmax + 1, dtype=np.float64)
+        lfacs = ls * (ls + 1)
+        lfacs2 = (ls + 2) * (ls - 1)
+        lrootfacs = np.sqrt(lfacs * lfacs2)
+    P = allP[2:]
+    dP = alldP[2:]
 
-    if 2 in m:
-        if lfacs is None:
-            ls = np.arange(2, lmax + 1, dtype=np.float64)
-            lfacs = ls * (ls + 1)
-            lfacs2 = (ls + 2) * (ls - 1)
-            lrootfacs = np.sqrt(lfacs * lfacs2)
-        P = allP[2:]
-        dP = alldP[2:]
-
-        fac = fac1 / fac2
-        d22 = (
-            ((4 * x - 8) / fac2 + lfacs) * P + 4 * fac * (fac2 + (x - 2) / lfacs) * dP
+    fac = fac1 / fac2
+    d22 = (
+        ((4 * x - 8) / fac2 + lfacs) * P + 4 * fac * (fac2 + (x - 2) / lfacs) * dP
+    ) / lfacs2
+    if x > 0.998:
+        # for stability use series at small angles (thanks Pavel Motloch)
+        d2m2 = np.empty(lmax - 1)
+        indser = int(np.sqrt((400.0 + 3 / (1 - x**2)) / 150)) - 1
+        d2m2[indser:] = (
+            (lfacs[indser:] - (4 * x + 8) / fac1) * P[indser:]
+            + 4 / fac * (-fac1 + (x + 2) / lfacs[indser:]) * dP[indser:]
+        ) / lfacs2[indser:]
+        sin2 = 1 - x**2
+        d2m2[:indser] = (
+            lfacs[:indser]
+            * lfacs2[:indser]
+            * sin2**2
+            / 7680
+            * (20 + sin2 * (16 - lfacs[:indser]))
+        )
+    else:
+        d2m2 = (
+            (lfacs - (4 * x + 8) / fac1) * P
+            + 4 / fac * (-fac1 + (x + 2) / lfacs) * dP
         ) / lfacs2
-        if x > 0.998:
-            # for stability use series at small angles (thanks Pavel Motloch)
-            d2m2 = np.empty(lmax - 1)
-            indser = int(np.sqrt((400.0 + 3 / (1 - x**2)) / 150)) - 1
-            d2m2[indser:] = (
-                (lfacs[indser:] - (4 * x + 8) / fac1) * P[indser:]
-                + 4 / fac * (-fac1 + (x + 2) / lfacs[indser:]) * dP[indser:]
-            ) / lfacs2[indser:]
-            sin2 = 1 - x**2
-            d2m2[:indser] = (
-                lfacs[:indser]
-                * lfacs2[:indser]
-                * sin2**2
-                / 7680
-                * (20 + sin2 * (16 - lfacs[:indser]))
-            )
-        else:
-            d2m2 = (
-                (lfacs - (4 * x + 8) / fac1) * P
-                + 4 / fac * (-fac1 + (x + 2) / lfacs) * dP
-            ) / lfacs2
-        d20 = (2 * x * dP - lfacs * P) / lrootfacs
-        res.append((d20, d22, d2m2))
-
-    return res
+    d20 = (2 * x * dP - lfacs * P) / lrootfacs
+    return d20, d22, d2m2
 
 
 def purify(f, theta, theta_max=None):
@@ -141,6 +142,19 @@ def purify(f, theta, theta_max=None):
     each node up to x_max, in one O(N) pass, instead of re-interpolating
     `f` and running a fresh high-order quadrature per evaluation point
     (O(N * n_quad)).
+
+    The kernel 1/(1-x')^2 is steep just below x_max (whenever theta_max is
+    small), where the tabulated grid -- spaced for the whole 0-180 degree
+    range -- is too coarse for a plain trapezoidal panel to resolve well.
+    The single panel that would otherwise straddle x_max (and, previously,
+    was dropped from the sum entirely) is instead replaced by the closed-form
+    integral of 1/(1-x')^2 and (1+x')/(1-x')^2 against a linear fit of f
+    between the two tabulated nodes bracketing x_max, evaluated exactly up
+    to x_max -- analogous in spirit to the small-angle series `legendre_funcs`
+    uses for d2m2 near x=1, though here f is arbitrary tabulated data rather
+    than a known analytic function, so only this one boundary panel can be
+    handled in closed form; panels further from x_max still use the plain
+    trapezoidal rule.
 
     Args:
         f: array of function values, tabulated at the angles in `theta`.
@@ -194,7 +208,8 @@ def purify(f, theta, theta_max=None):
 
     order = np.argsort(x)
     xs = x[order]
-    gs = f[order] / (1 - xs) ** 2
+    fs = f[order]
+    gs = fs / (1 - xs) ** 2
     g1 = (1 + xs) * gs
     g2 = gs
 
@@ -219,6 +234,29 @@ def purify(f, theta, theta_max=None):
     int1[order] = np.concatenate([np.cumsum(panel1[::-1])[::-1], [0.0]])
     int2[order] = np.concatenate([np.cumsum(panel2[::-1])[::-1], [0.0]])
 
+    if theta_max is not None and n >= 2:
+        # Analytic correction for the steep sliver [xa, x_max] just below
+        # x_max, which the plain trapezoidal panels above dropped entirely
+        # (xa is the tabulated node closest to, but not above, x_max; xb
+        # the next one, used only to get a local slope for f -- extrapolate
+        # off (xa, xb) if x_max happens to fall beyond the tabulated grid).
+        idx_a = int(np.clip(np.searchsorted(xs, x_max, side="right") - 1, 0, n - 2))
+        xa, fa = xs[idx_a], fs[idx_a]
+        xb, fb = xs[idx_a + 1], fs[idx_a + 1]
+        ua, ub = 1 - xa, 1 - x_max
+        if xb != xa and ub > 0:
+            s = (fb - fa) / (xb - xa)
+            A = fa + s * (1 - xa)
+            # F2(u) is the antiderivative of f(x')/(1-x')^2 in u=1-x', with
+            # f linearised as A - s*u; F1(u) likewise for (1+x')f/(1-x')^2.
+            F2 = lambda u: A / u + s * np.log(u)  # noqa: E731
+            F1 = lambda u: 2 * A / u + (A + 2 * s) * np.log(u) - s * u  # noqa: E731
+            I2_bnd = F2(ub) - F2(ua)
+            I1_bnd = F1(ub) - F1(ua)
+            include = x <= xa
+            int1 = np.where(include, int1 + I1_bnd, int1)
+            int2 = np.where(include, int2 + I2_bnd, int2)
+
     prefac1 = 8 * (2 - x) / (1 + x) ** 2
     prefac2 = 8 / (1 + x)
 
@@ -231,96 +269,217 @@ def purify(f, theta, theta_max=None):
     return np.where(skip, f, result)
 
 
-def _cl2corr(cls, lmax=None, sampling_factor=1):
+def rotate(cl, spin):
     """
-    Get the correlation function from the power spectra, evaluated at points cos(theta) = xvals.
+    Rotate a Cl (or correlation function) array of the given spin into the
+    "+/-" basis used for the real-space transforms in `_cl2corr`/`_corr2cl`.
+
+    spin (2, 2): `cl` is `[[EE, EB], [BE, BB]]`, returns
+
+        [[EE+BB, EE-BB],
+         [EB+BE, EB-BE]]
+
+    i.e. sum/difference applied to the diagonal pair (EE, BB) for row 0, and
+    to the anti-diagonal pair (EB, BE) for row 1.
+
+    spin (0, 2) or (2, 0): `cl` is `[Ta, Tb]` (e.g. T x E and T x B),
+    returns `[Ta+Tb, Ta-Tb]`.
+
+    Not defined for spin (0, 0), since there is nothing to combine.
+    """
+    if spin == (0, 0):
+        raise ValueError("rotate is not defined for spin (0, 0)")
+    elif spin in ((0, 2), (2, 0)):
+        return np.array([cl[0] + cl[1], cl[0] - cl[1]])
+    elif spin == (2, 2):
+        EE, EB = cl[0, 0], cl[0, 1]
+        BE, BB = cl[1, 0], cl[1, 1]
+        return np.array(
+            [
+                [EE + BB, EE - BB],
+                [EB + BE, EB - BE],
+            ]
+        )
+    else:
+        raise ValueError(
+            f"unsupported spin combination {spin!r}: only (0, 0), "
+            "(0, 2)/(2, 0), and (2, 2) are supported"
+        )
+
+
+def unrotate(cl, spin):
+    """
+    Inverse of `rotate` for the given spin.
+
+    For spin (2, 2), given `[[p_diag, m_diag], [p_anti, m_anti]]` as
+    produced by `rotate`, recovers the original `[[EE, EB], [BE, BB]]`. Note
+    this is *not* the same as calling `rotate` a second time: `rotate`
+    pairs the diagonal and anti-diagonal entries of its input, whereas
+    undoing it means un-pairing its own *rows* instead -- a different
+    grouping (`rotate(rotate(cl, (2, 2)), (2, 2))` is generally not `2*cl`).
+
+    For spin (0, 2)/(2, 0), `rotate`'s sum/difference of a plain pair *is*
+    self-inverse up to a factor of 2, so this is just that same formula,
+    halved.
+
+    Not defined for spin (0, 0), since there is nothing to un-combine.
+    """
+    if spin == (0, 0):
+        raise ValueError("unrotate is not defined for spin (0, 0)")
+    elif spin in ((0, 2), (2, 0)):
+        return np.array([(cl[0] + cl[1]) / 2, (cl[0] - cl[1]) / 2])
+    elif spin == (2, 2):
+        p_diag, m_diag = cl[0, 0], cl[0, 1]
+        p_anti, m_anti = cl[1, 0], cl[1, 1]
+        return np.array(
+            [
+                [(p_diag + m_diag) / 2, (p_anti + m_anti) / 2],
+                [(p_anti - m_anti) / 2, (p_diag - m_diag) / 2],
+            ]
+        )
+    else:
+        raise ValueError(
+            f"unsupported spin combination {spin!r}: only (0, 0), "
+            "(0, 2)/(2, 0), and (2, 2) are supported"
+        )
+
+
+def _cl2corr(cl, spin, lmax=None, sampling_factor=1):
+    """
+    Get the correlation function from the power spectra, evaluated at points
+    cos(theta) = xvals, dispatching directly on the spin of `cl` instead of
+    always going through a fixed [T, Q+U, Q-U, cross] layout.
     Use roots of Legendre polynomials (np.polynomial.legendre.leggauss) for accurate back integration with corr2cl.
     Note currently does not work at xvals=1 (can easily calculate that as special case!).
 
-    :param cls: 2D array cls(L,ix), with L (:math:`\equiv \ell`) starting at zero and ix-0,1,2,3 in
-                order TT, EE, BB, TE. cls should include :math:`\ell(\ell+1)/2\pi` factors.
-    :param xvals: array of :math:`\cos(\theta)` values at which to calculate correlation function.
-    :param lmax: optional maximum L to use from the cls arrays
-    :return: 2D array of corrs[i, ix], where ix=0,1,2,3 are T, Q+U, Q-U and cross
+    :param cl: Cl array, shape depending on spin: 1D `cl[l]` for spin (0, 0);
+        2D `cl[a, l]` (a in 0, 1) for spin (0, 2)/(2, 0); 3D
+        `cl[[EE, EB], [BE, BB]][l]` for spin (2, 2). Should include
+        :math:`\ell(\ell+1)/2\pi` factors.
+    :param spin: (s1, s2) spin of the field pair; only (0, 0), (0, 2)/(2, 0),
+        and (2, 2) are supported
+    :param lmax: optional maximum L to use from the cl array
+    :param sampling_factor: oversampling factor for the quadrature grid
+    :return: correlation function array with the same leading shape as `cl`,
+        but with the l axis replaced by the quadrature (theta) axis
     """
-
-    if cls.ndim == 1:
-        cls = np.array(
-            [cls, np.zeros_like(cls), np.zeros_like(cls), np.zeros_like(cls)]
-        ).T
+    cl = np.asarray(cl, dtype=np.float64)
 
     if lmax is None:
-        lmax = cls.shape[0] - 1
+        lmax = cl.shape[-1] - 1
 
-    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
-
+    xvals, _ = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
     ls = np.arange(0, lmax + 1, dtype=np.float64)
-    corrs = np.zeros((len(xvals), 4))
-    lfacs = ls * (ls + 1)
-    lfacs[0] = 1
     facs = (2 * ls + 1) / (4 * np.pi)
 
-    ct = facs * cls[: lmax + 1, 0]
-    # For polarization, all arrays start at 2
-    cp = facs[2:] * (cls[2 : lmax + 1, 1] + cls[2 : lmax + 1, 2])
-    cm = facs[2:] * (cls[2 : lmax + 1, 1] - cls[2 : lmax + 1, 2])
-    cc = facs[2:] * cls[2 : lmax + 1, 3]
-    ls = ls[2:]
-    lfacs = lfacs[2:]
-    lfacs2 = (ls + 2) * (ls - 1)
-    lrootfacs = np.sqrt(lfacs * lfacs2)
-    for i, x in enumerate(xvals):
-        (P, _), (d20, d22, d2m2) = legendre_funcs(
-            lmax, x, [0, 2], lfacs, lfacs2, lrootfacs
+    if spin == (0, 0):
+        ct = facs * cl[: lmax + 1]
+        corr = np.empty(len(xvals))
+        for i, x in enumerate(xvals):
+            P = legendre_funcs(lmax, x, spin)
+            corr[i] = np.dot(ct, P)
+        return corr
+    elif spin not in ((0, 2), (2, 0), (2, 2)):
+        raise ValueError(
+            f"unsupported spin combination {spin!r}: only (0, 0), "
+            "(0, 2)/(2, 0), and (2, 2) are supported"
         )
-        corrs[i, 0] = np.dot(ct, P)  # T
-        corrs[i, 1] = np.dot(cp, d22)  # Q+U
-        corrs[i, 2] = np.dot(cm, d2m2)  # Q-U
-        corrs[i, 3] = np.dot(cc, d20)  # cross
-    return corrs
+
+    # For polarization, all arrays start at 2
+    ls2 = ls[2:]
+    lfacs = ls2 * (ls2 + 1)
+    lfacs2 = (ls2 + 2) * (ls2 - 1)
+    lrootfacs = np.sqrt(lfacs * lfacs2)
+
+    if spin in ((0, 2), (2, 0)):
+        # T x spin-2 cross correlation: both combinations use the same d20
+        cp, cm = facs[2:] * rotate(cl[:, 2 : lmax + 1], spin)
+        corr = np.empty((2, len(xvals)))
+        for i, x in enumerate(xvals):
+            d20, _, _ = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
+            corr[0, i] = np.dot(cp, d20)
+            corr[1, i] = np.dot(cm, d20)
+        return corr
+
+    # spin (2, 2): EE/BB use d22/d2m2 on the rotated diagonal pair,
+    # EB/BE use d22/d2m2 (negated) on the rotated anti-diagonal pair
+    r = rotate(cl, spin)
+    cp = facs[2:] * r[0, 0, 2 : lmax + 1]
+    cm = facs[2:] * r[0, 1, 2 : lmax + 1]
+    icp = facs[2:] * r[1, 1, 2 : lmax + 1]
+    icm = facs[2:] * r[1, 0, 2 : lmax + 1]
+    corr = np.zeros((2, 2, len(xvals)))
+    for i, x in enumerate(xvals):
+        _, d22, d2m2 = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
+        corr[0, 0, i] = np.dot(cp, d22)  # EE-like
+        corr[1, 1, i] = np.dot(cm, d2m2)  # BB-like
+        corr[0, 1, i] = -np.dot(icp, d22)  # EB-like
+        corr[1, 0, i] = -np.dot(icm, d2m2)  # BE-like
+    return corr
 
 
-def _corr2cl(corrs, lmax=None, sampling_factor=1):
+def _corr2cl(corr, spin, lmax=None, sampling_factor=1):
     """
-    Transform from correlation functions to power spectra.
+    Transform from correlation functions to power spectra, dispatching
+    directly on the spin of `corr` instead of always going through a fixed
+    [T, Q+U, Q-U, cross] layout.
     Note that using cl2corr followed by corr2cl is generally very accurate (< 1e-5 relative error) if
     xvals, weights = np.polynomial.legendre.leggauss(lmax+1)
 
-    :param corrs: 2D array, corrs[i, ix], where ix=0,1,2,3 are T, Q+U, Q-U and cross
-    :param xvals: values of :math:`\cos(\theta)` at which corrs stores values
-    :param weights: weights for integrating each point in xvals. Typically from np.polynomial.legendre.leggauss
+    :param corr: correlation array, mirroring `_cl2corr`'s output shape for
+        the given spin (1D, 2D, or 3D -- see `_cl2corr`)
+    :param spin: (s1, s2) spin of the field pair; only (0, 0), (0, 2)/(2, 0),
+        and (2, 2) are supported
     :param lmax: maximum :math:`\ell` to calculate :math:`C_\ell`
-    :return: array of power spectra, cl[L, ix], where L starts at zero and ix=0,1,2,3 in order TT, EE, BB, TE.
-      They include :math:`\ell(\ell+1)/2\pi` factors.
+    :param sampling_factor: oversampling factor for the quadrature grid
+    :return: Cl array with the same leading shape as `corr`, but with the
+        theta axis replaced by the l axis. Includes
+        :math:`\ell(\ell+1)/2\pi` factors.
     """
-
-    if corrs.ndim == 1:
-        corrs = np.array(
-            [corrs, np.zeros_like(corrs), np.zeros_like(corrs), np.zeros_like(corrs)]
-        ).T
+    corr = np.asarray(corr, dtype=np.float64)
 
     if lmax is None:
-        lmax = corrs.shape[0] - 1
+        lmax = corr.shape[-1] - 1
 
     xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
+
+    if spin == (0, 0):
+        cl = np.zeros(lmax + 1)
+        for x, weight, c in zip(xvals, weights, corr):
+            P = legendre_funcs(lmax, x, spin)
+            cl += (weight * c) * P
+        return 2 * np.pi * cl
+    elif spin not in ((0, 2), (2, 0), (2, 2)):
+        raise ValueError(
+            f"unsupported spin combination {spin!r}: only (0, 0), "
+            "(0, 2)/(2, 0), and (2, 2) are supported"
+        )
 
     # For polarization, all arrays start at 2
     ls = np.arange(2, lmax + 1, dtype=np.float64)
     lfacs = ls * (ls + 1)
     lfacs2 = (ls + 2) * (ls - 1)
     lrootfacs = np.sqrt(lfacs * lfacs2)
-    cls = np.zeros((lmax + 1, 4))
+
+    if spin in ((0, 2), (2, 0)):
+        clp = np.zeros(lmax + 1)
+        clm = np.zeros(lmax + 1)
+        for i, (x, weight) in enumerate(zip(xvals, weights)):
+            d20, _, _ = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
+            clp[2:] += (weight * corr[0, i]) * d20
+            clm[2:] += (weight * corr[1, i]) * d20
+        return 2 * np.pi * unrotate(np.array([clp, clm]), spin)
+
+    # spin (2, 2): undo each slot's own kernel (matching how _cl2corr
+    # produced it) to recover rotate(cl) exactly, then unrotate
+    r = np.zeros((2, 2, lmax + 1))
     for i, (x, weight) in enumerate(zip(xvals, weights)):
-        (P, _), (d20, d22, d2m2) = legendre_funcs(
-            lmax, x, [0, 2], lfacs, lfacs2, lrootfacs
-        )
-        cls[:, 0] += (weight * corrs[i, 0]) * P
-        T2 = (corrs[i, 1] * weight / 2) * d22
-        T4 = (corrs[i, 2] * weight / 2) * d2m2
-        cls[2:, 1] += T2 + T4
-        cls[2:, 2] += T2 - T4
-        cls[2:, 3] += (weight * corrs[i, 3]) * d20
-    return 2 * np.pi * cls
+        _, d22, d2m2 = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
+        r[0, 0, 2:] += (weight * corr[0, 0, i]) * d22
+        r[0, 1, 2:] += (weight * corr[1, 1, i]) * d2m2
+        r[1, 0, 2:] += -(weight * corr[1, 0, i]) * d2m2
+        r[1, 1, 2:] += -(weight * corr[0, 1, i]) * d22
+    return 2 * np.pi * unrotate(r, spin)
 
 
 def cl2corr(cls, progress: Progress | None = None):
@@ -342,64 +501,14 @@ def cl2corr(cls, progress: Progress | None = None):
         progress.update(current, total)
         with progress.task(f"{key}"):
             cl = cls[key]
-            s1, s2 = cl.spin
+            spin = cl.spin
             # Grab metadata
             dtype = cl.array.dtype
             # Determine lmax from ell field or shape along ell axis
             lmax = len(get_result_array(cl, "ell")[0]) - 1
             xvals, _ = _cached_gauss_legendre(lmax + 1)
-            # Initialize wd
-            wd = np.zeros_like(cl)
-            if (s1 != 0) and (s2 != 0):
-                _cl = np.array(
-                    [
-                        np.zeros_like(cl[0, 0]),
-                        cl[0, 0],  # EE like spin-2
-                        cl[1, 1],   # BB like spin-2
-                        np.zeros_like(cl[0, 0]),
-                    ]
-                )
-                _icl = np.array(
-                    [
-                        np.zeros_like(cl[0, 0]),
-                        -cl[0, 1],  # EB like spin-0
-                        cl[1, 0],  # EB like spin-0
-                        np.zeros_like(cl[0, 0]),
-                    ]
-                )
-                # transform to corrs
-                _wd = _cl2corr(_cl.T).T + 1j * _cl2corr(_icl.T).T
-                _rwd = _wd.real
-                _iwd = _wd.imag
-                # reorder (purify reads the opposite Wigner-matrix slot)
-                wd[0, 0] = _rwd[1]  # E^+ (or E^+_dec)
-                wd[1, 1] = _rwd[2]  # E^- (or E^-_dec)
-                wd[0, 1] = _iwd[1]  # EB like spin-0
-                wd[1, 0] = _iwd[2]  # EB like spin-0
-            elif (s1 != 0) or (s2 != 0):
-                _clp = np.array(
-                    [
-                        np.zeros_like(cl[0]),
-                        np.zeros_like(cl[0]),
-                        np.zeros_like(cl[0]),
-                        cl[0] + cl[1],  # TE like spin-2
-                    ]
-                )
-                _clm = np.array(
-                    [
-                        np.zeros_like(cl[0]),
-                        np.zeros_like(cl[0]),
-                        np.zeros_like(cl[0]),
-                        cl[0] - cl[1],  # TE like spin-2
-                    ]
-                )
-                # trnsform to corrs
-                wd[0] = _cl2corr(_clp.T).T[3]
-                wd[1] = _cl2corr(_clm.T).T[3]
-            elif (s1 == 0) and (s2 == 0):
-                wd = _cl2corr(cl).T[0]
-            else:
-                raise ValueError("Invalid spin combination")
+            # transform to corrs, dispatching directly on spin
+            wd = _cl2corr(cl.array, spin, lmax=lmax)
             # Add metadata back
             wd = np.array(list(wd), dtype=dtype)
             wds[key] = replace(
@@ -429,64 +538,14 @@ def corr2cl(wds, progress: Progress | None = None):
         progress.update(current, total)
         with progress.task(f"{key}"):
             wd = wds[key]
-            s1, s2 = wd.spin
+            spin = wd.spin
             # Grab metadata
             dtype = wd.array.dtype
             # Derive lmax from xvals stored in the correlation's ell field
             xvals = get_result_array(wd, "ell")[0]
             lmax = len(xvals) - 1
-            # initialize cl
-            cl = np.zeros_like(wd)
-            if (s1 != 0) and (s2 != 0):
-                _rwd = np.array(
-                    [
-                        np.zeros_like(wd[0, 0]),
-                        wd[0, 0],  # EE like spin-2
-                        wd[1, 1],  # BB like spin-2
-                        np.zeros_like(wd[0, 0]),
-                    ]
-                )
-                _rcl = _corr2cl(_rwd.T).T
-                cl[0, 0] = _rcl[1]  # EE like spin-2
-                cl[1, 1] = _rcl[2]  # BB like spin-2
-            # EB cross-term: unchanged by purify
-                _iwd = np.array(
-                    [
-                        np.zeros_like(wd[0, 0]),
-                        wd[0, 1],  # EB like spin-0
-                        wd[1, 0],  # EB like spin-0
-                        np.zeros_like(wd[0, 0]),
-                    ]
-                )
-                _icl = _corr2cl(_iwd.T).T
-                cl[0, 1] = -_icl[1]  # EB like spin-0
-                cl[1, 0] = _icl[2]  # EB like spin-0
-            elif (s1 != 0) or (s2 != 0):
-                _wp = np.array(
-                    [
-                        np.zeros_like(wd[0]),
-                        np.zeros_like(wd[0]),
-                        np.zeros_like(wd[0]),
-                        wd[0],  # TE like spin-2
-                    ]
-                )
-                _wm = np.array(
-                    [
-                        np.zeros_like(wd[0]),
-                        np.zeros_like(wd[0]),
-                        np.zeros_like(wd[0]),
-                        wd[1],  # TE like spin-2
-                    ]
-                )
-                _clp = _corr2cl(_wp.T).T[3]
-                _clm = _corr2cl(_wm.T).T[3]
-                cl[0] = (_clp + _clm) / 2
-                cl[1] = (_clp - _clm) / 2
-            elif (s1 == 0) and (s2 == 0):
-                # Treat everything as spin-0 and preserve 1D shape.
-                cl = _corr2cl(wd).T[0]
-            else:
-                raise ValueError("Invalid spin combination")
+            # transform to cl, dispatching directly on spin
+            cl = _corr2cl(wd.array, spin, lmax=lmax)
             # Add metadata back
             cl = np.array(list(cl), dtype=dtype)
             cls[key] = replace(
@@ -494,82 +553,4 @@ def corr2cl(wds, progress: Progress | None = None):
                 ell=np.arange(lmax + 1),
                 array=cl,
             )
-    return cls
-
-
-def _purified_corr2cl(corr_wd, theta_max=None, progress: Progress | None = None):
-    """
-    Purified version of corr2cl for the natural-spice pipeline.
-
-    For s1=s2=2 (EE/BB) keys, uses the delta-function correction `T` to turn
-    the unmixed Xi^+ = corr_wd[key][0, 0] into the "dec" correlation
-    Xi^+_dec = T[Xi^+], then builds the pure EE/BB correlation functions
-
-        Xi^EE = Xi^+_dec + Xi^-
-        Xi^BB = Xi^+ - Xi^+_dec
-
-    which are transformed to Cl with the *opposite* Wigner matrix from the
-    one they would normally use (Xi^EE via d^l_{2,-2}, Xi^BB via d^l_{2,2}),
-    i.e.
-
-        Cl^EE = int 1/2 (Xi^+_dec + Xi^-) d^l_{2,-2}
-        Cl^BB = int 1/2 (Xi^+ - Xi^+_dec) d^l_{2,2}
-
-    All other keys (TE, TT) are unaffected by purification and are passed
-    through the ordinary corr2cl.
-    Args:
-        corr_wd: mask-deconvolved data correlation functions (e.g. the
-            output of heracles.unmixing._naturalspice)
-        theta_max: passed through to `T` as its own `theta_max`, excluding a
-            neighborhood of the theta'=0 (and, symmetrically, theta=180)
-            singularities from the T integral (see `T`). If None, T
-            integrates all the way to theta'=0, which is singular unless
-            Xi^+ vanishes there.
-        progress: optional progress reporter
-    Returns:
-        corr_d: purified Cl
-    """
-    if progress is None:
-        progress = NoProgress()
-
-    spin2_keys = [key for key, wd in corr_wd.items() if wd.spin[0] != 0 and wd.spin[1] != 0]
-    other = {key: wd for key, wd in corr_wd.items() if key not in spin2_keys}
-
-    cls = corr2cl(other) if other else {}
-
-    current, total = 0, len(spin2_keys)
-    for key in spin2_keys:
-        current += 1
-        progress.update(current, total)
-
-        wd = corr_wd[key]
-        dtype = wd.array.dtype
-        xvals = get_result_array(wd, "ell")[0]
-        theta = np.degrees(np.arccos(xvals))
-        lmax = len(xvals) - 1
-
-        Xi_p, Xi_m = wd[0, 0], wd[1, 1]
-        Xi_p_dec = purify(Xi_p, theta, theta_max=theta_max)
-
-        zeros = np.zeros_like(Xi_p)
-        # Xi^BB, transformed with d^l_{2,2} alone (the "+"-matrix)
-        _rwd_BB = np.array([zeros, Xi_p - Xi_p_dec, zeros, zeros])
-        # Xi^EE, transformed with d^l_{2,-2} alone (the "-"-matrix)
-        _rwd_EE = np.array([zeros, zeros, Xi_p_dec + Xi_m, zeros])
-        cl_BB = _corr2cl(_rwd_BB.T).T[1]
-        cl_EE = _corr2cl(_rwd_EE.T).T[1]
-
-        # EB cross-term: unaffected by purification
-        _iwd = np.array([zeros, wd[0, 1], wd[1, 0], zeros])
-        _icl = _corr2cl(_iwd.T).T
-
-        cl = np.zeros_like(wd)
-        cl[0, 0] = cl_EE
-        cl[1, 1] = cl_BB
-        cl[0, 1] = -_icl[1]
-        cl[1, 0] = _icl[2]
-        cl = np.array(list(cl), dtype=dtype)
-
-        cls[key] = replace(wd, ell=np.arange(lmax + 1), array=cl)
-
     return cls

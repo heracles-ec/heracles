@@ -18,8 +18,9 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from .progress import NoProgress, Progress
-from .result import binned
-from .transforms import cl2corr, corr2cl, _purified_corr2cl
+from .result import binned, get_result_array
+from .transforms import cl2corr, corr2cl, _corr2cl
+from .transforms import purify as _purify_xi_plus
 from .utils import get_cl
 from .transforms import _cached_gauss_legendre
 
@@ -67,8 +68,62 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
 
     # trnasform back to Cl
     if purify:
+        # For s1=s2=2 (EE/BB) keys, use the delta-function correction
+        # `purify` to turn the unmixed Xi^+ = corr_wd[key][0, 0] into the
+        # "dec" correlation Xi^+_dec = purify(Xi^+), then build the pure
+        # EE/BB correlation functions
+        #     Xi^EE = Xi^+_dec + Xi^-
+        #     Xi^BB = Xi^+ - Xi^+_dec
+        # which are transformed to Cl with the *opposite* Wigner matrix
+        # from the one they would normally use (Xi^EE via d^l_{2,-2},
+        # Xi^BB via d^l_{2,2}):
+        #     Cl^EE = int 1/2 (Xi^+_dec + Xi^-) d^l_{2,-2}
+        #     Cl^BB = int 1/2 (Xi^+ - Xi^+_dec) d^l_{2,2}
+        # All other keys (TE, TT) are unaffected by purification and go
+        # through the ordinary corr2cl.
         with progress.task("purified transform back to Cl") as task:
-            corr_d = _purified_corr2cl(corr_wd, theta_max=theta_max, progress=task)
+            spin2_keys = [
+                key for key, wd in corr_wd.items() if wd.spin[0] != 0 and wd.spin[1] != 0
+            ]
+            other = {key: wd for key, wd in corr_wd.items() if key not in spin2_keys}
+            corr_d = corr2cl(other) if other else {}
+
+            current, total = 0, len(spin2_keys)
+            for key in spin2_keys:
+                current += 1
+                task.update(current, total)
+
+                wd = corr_wd[key]
+                dtype = wd.array.dtype
+                xvals = get_result_array(wd, "ell")[0]
+                theta = np.degrees(np.arccos(xvals))
+                key_lmax = len(xvals) - 1
+
+                Xi_p, Xi_m = wd[0, 0], wd[1, 1]
+                Xi_p_dec = _purify_xi_plus(Xi_p, theta, theta_max=theta_max)
+
+                n = len(theta)
+                corr_BB = np.zeros((2, 2, n))
+                corr_BB[0, 0] = Xi_p - Xi_p_dec  # -> Cl^BB via d^l_{2,2}
+                corr_EE = np.zeros((2, 2, n))
+                corr_EE[1, 1] = Xi_p_dec + Xi_m  # -> Cl^EE via d^l_{2,-2}
+                # EB cross-term: unaffected by purification
+                corr_eb = np.zeros((2, 2, n))
+                corr_eb[0, 1] = wd[0, 1]
+                corr_eb[1, 0] = wd[1, 0]
+
+                cl_BB = _corr2cl(corr_BB, (2, 2), lmax=key_lmax)[0, 0]
+                cl_EE = _corr2cl(corr_EE, (2, 2), lmax=key_lmax)[0, 0]
+                cl_eb = _corr2cl(corr_eb, (2, 2), lmax=key_lmax)
+
+                cl = np.zeros_like(wd.array)
+                cl[0, 0] = cl_EE
+                cl[1, 1] = cl_BB
+                cl[0, 1] = cl_eb[0, 1]
+                cl[1, 0] = cl_eb[1, 0]
+                cl = np.array(list(cl), dtype=dtype)
+
+                corr_d[key] = replace(wd, ell=np.arange(key_lmax + 1), array=cl)
     else:
         with progress.task("transform back to Cl") as task:
             corr_d = corr2cl(corr_wd, progress=task)
