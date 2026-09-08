@@ -34,7 +34,7 @@ def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def gaussian_apod(theta, theta_max):
+def gaussian(theta, theta_max):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
     `apodizefunction` type 0 (see apodize_mod.f90 in the PolSpice source):
@@ -48,7 +48,7 @@ def gaussian_apod(theta, theta_max):
     return np.where(theta < theta_max, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress | None = None):
+def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logistic", progress: Progress | None = None):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -77,88 +77,39 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
     with progress.task("mask correlations") as task:
         wm = cl2corr(m, progress=task)
     with progress.task("unmixing") as task:
-        corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, progress=task)
+        corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task)
 
     # trnasform back to Cl
     if purify:
-        # For s1=s2=2 (EE/BB) keys, use PolSpice's "decouple" estimator
-        # (Chon et al. 2004, eq. 65): instead of the usual pairing
-        # (Xi^+ via d^l_{2,2}, Xi^- via d^l_{2,-2}), both Cl^EE and Cl^BB
-        # are built from the *same* kernel, d^l_{2,-2}, applied to
-        # (Xi^+ + Xi^-) and (Xi^+ - Xi^-) respectively, each normalized by
-        # a per-l coupling factor Fl computed from a csc^2(theta/2)-weighted
-        # (optionally Gaussian-apodized) quadrature of that same kernel:
-        #     Cl^EE = pi * int (Xi^+ + Xi^-) d^l_{2,-2} / Fl
-        #     Cl^BB = pi * int (Xi^+ - Xi^-) d^l_{2,-2} / Fl
-        #     Fl    =      int apod(theta) csc^2(theta/2) d^l_{2,-2}
-        # Each of these is computed by reusing `_corr2cl(..., (2, 2), ...)`
-        # on an isolated-slot array: feeding a quantity into the corr[1, 1]
-        # ("m_diag", d^l_{2,-2}-kernel) slot and reading back the output EE
-        # slot gives exactly pi * int (...) d^l_{2,-2} (the "pi" here is
-        # `_corr2cl`'s own 2*pi normalization, halved by `unrotate`), so an
-        # extra pi is applied explicitly to cl_EE/cl_BB below to get the
-        # single power of pi the formula above calls for once the ratio
-        # with Fl (which carries none) has cancelled the other one.
-        # All other keys (TE, TT) are unaffected by purification and go
-        # through the ordinary corr2cl.
         with progress.task("purified transform back to Cl") as task:
+            # start from the regular transform, which already gives us
+            # correct EB/BE (purification only affects EE/BB)
+            corr_d = corr2cl(corr_wd)
+
             spin2_keys = [
                 key for key, wd in corr_wd.items() if wd.spin[0] != 0 and wd.spin[1] != 0
             ]
-            other = {key: wd for key, wd in corr_wd.items() if key not in spin2_keys}
-            corr_d = corr2cl(other) if other else {}
-
             current, total = 0, len(spin2_keys)
             for key in spin2_keys:
                 current += 1
                 task.update(current, total)
 
                 wd = corr_wd[key]
-                dtype = wd.array.dtype
-                xvals = get_result_array(wd, "ell")[0]
-                theta = np.degrees(np.arccos(xvals))
-                key_lmax = len(xvals) - 1
-                n = len(theta)
-
+                n = wd.array.shape[-1]
+                key_lmax = n - 1
                 Xi_p, Xi_m = wd[0, 0], wd[1, 1]
-                apod = gaussian_apod(theta, theta_max)
-                csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
-
-                # feed each quantity into the corr[1, 1] ("m_diag",
-                # d^l_{2,-2}-kernel) slot only, all other slots zero, and
-                # read back the EE output slot -- this is exactly
-                # pi * sum_theta[w * (...) * d2m2(theta, l)], up to a
-                # constant prefactor from _corr2cl that cancels in the
-                # Fl-normalized ratio below.
-                corr_fl = np.zeros((2, 2, n))
-                corr_fl[1, 1] = apod * csc2
-                Fl = _corr2cl(corr_fl, (2, 2), lmax=key_lmax)[0, 0]
-
                 corr_ee = np.zeros((2, 2, n))
                 corr_ee[1, 1] = Xi_p + Xi_m
                 corr_bb = np.zeros((2, 2, n))
                 corr_bb[1, 1] = Xi_p - Xi_m
-                # l < 2 is unphysical for spin-2 fields and always zero in
-                # both Fl and the numerators (0/0); ignore the resulting
-                # divide warning, the l < 2 entries are discarded below.
-                with np.errstate(invalid="ignore"):
-                    cl_EE = np.pi * _corr2cl(corr_ee, (2, 2), lmax=key_lmax)[0, 0] / Fl
-                    cl_BB = np.pi * _corr2cl(corr_bb, (2, 2), lmax=key_lmax)[0, 0] / Fl
+                cl_EE = np.pi * _corr2cl(corr_ee, (2, 2), lmax=key_lmax)[0, 0]
+                cl_BB = np.pi * _corr2cl(corr_bb, (2, 2), lmax=key_lmax)[0, 0]
 
-                # EB cross-term: unaffected by purification
-                corr_eb = np.zeros((2, 2, n))
-                corr_eb[0, 1] = wd[0, 1]
-                corr_eb[1, 0] = wd[1, 0]
-                cl_eb = _corr2cl(corr_eb, (2, 2), lmax=key_lmax)
-
-                cl = np.zeros_like(wd.array)
+                cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
                 cl[1, 1] = cl_BB
-                cl[0, 1] = cl_eb[0, 1]
-                cl[1, 0] = cl_eb[1, 0]
-                cl = np.array(list(cl), dtype=dtype)
 
-                corr_d[key] = replace(wd, ell=np.arange(key_lmax + 1), array=cl)
+                corr_d[key] = replace(corr_d[key], array=cl)
     else:
         with progress.task("transform back to Cl") as task:
             corr_d = corr2cl(corr_wd, progress=task)
@@ -168,7 +119,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, progress: Progress 
     return corr_d
 
 
-def _naturalspice(wd, wm, fields, theta_max=None, progress: Progress | None = None):
+def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progress: Progress | None = None):
     """
     Natural unmixing of the data correlation function.
     Args:
@@ -207,7 +158,12 @@ def _naturalspice(wd, wm, fields, theta_max=None, progress: Progress | None = No
         m_key = (masks[a], masks[b], i, j)
         _wm = get_cl(m_key, wm).array
         _wd = wd[key].array
-        _wm *= logistic(np.log10(abs(_wm)), x0=x0)
-        corr_wds[key] = replace(wd[key], array=(_wd / _wm))
+        if apodization == "logistic":
+            _wm *= logistic(np.log10(abs(_wm)), x0=x0)
+        elif apodization == "gaussian":
+            xvals = wm[m_key].ell
+            theta = np.degrees(np.arccos(xvals))
+            _wm /= gaussian(theta, theta_max)
+        corr_wds[key] = replace(wd[key], array=_wd/_wm)
 
     return corr_wds
