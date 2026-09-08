@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
+from scipy.integrate import cumulative_trapezoid
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
-from .transforms import cl2corr, corr2cl, _corr2cl
+from .transforms import cl2corr, corr2cl, _corr2cl, legendre_funcs, legendre_p_all
 from .utils import get_cl
 from .transforms import _cached_gauss_legendre
 
@@ -64,6 +65,80 @@ def _isolate(x, lmax):
     return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
+def _cplus(cl_ee_plus_bb, cl_mask, lmax, beta):
+    """
+    C+(beta) = Xi_+^raw(beta) / Xi_mask(beta), evaluated at arbitrary
+    angles `beta` (radians) -- not just the fixed Gauss-Legendre
+    quadrature nodes. Port of PolSpice's `cplus` (cumul2.f90): the raw
+    (masked, not yet mask-ratio-divided) Xi_+ = Xi_QQ+Xi_UU correlation of
+    the data, normalized by the mask's own (real-space) autocorrelation.
+    """
+    ell = np.arange(lmax + 1)
+    w2l1 = 2 * ell + 1
+    beta = np.atleast_1d(beta)
+    x = np.cos(beta)
+    out = np.empty(len(x))
+    for i, xx in enumerate(x):
+        p_ell = legendre_p_all(lmax, xx)
+        _, d22, _ = legendre_funcs(lmax, xx, (2, 2))
+        num = np.sum(cl_ee_plus_bb[2:] * d22 * w2l1[2:])
+        den = np.sum(cl_mask * p_ell * w2l1)
+        out[i] = num / den if den > 0 else 0.0
+    return out
+
+
+def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
+    """
+    Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
+    correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
+    into the "pure" E/B correlation function used by the decouple
+    estimator (Chon et al. 2004, eq. 60-65). This is the piece missing
+    from a plain Fl-normalized Legendre transform: it accounts for E/B
+    leakage from the finite integration range (`thetamax`) via a
+    cumulative integral of C+(beta) against two trigonometric kernels.
+
+    Args:
+        cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
+        cl_mask: raw Cl of the (scalar) mask
+        lmax: maximum l
+        xvals: cos(theta) values (Gauss-Legendre nodes) at which to
+            evaluate the correction
+        thetamax: integration domain in radians
+    Returns:
+        c_beta: the cumulative-integral correction, evaluated at `xvals`
+    """
+    cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
+    cl_mask = cl_mask[: lmax + 1]
+
+    # fine, fixed grid for the cumulative integral (PolSpice instead uses
+    # an adaptive-tolerance Simpson's rule; a sufficiently oversampled
+    # fixed grid + cumulative trapezoid is used here for simplicity)
+    n_grid = max(8 * (lmax + 1), 4000)
+    eps = 1e-6
+    beta_grid = np.linspace(eps, thetamax - eps, n_grid)
+    cp_grid = _cplus(cl_sum, cl_mask, lmax, beta_grid)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        fsub1 = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * cp_grid
+        fsub2 = np.tan(beta_grid / 2) ** 3 * cp_grid
+
+    sum1_grid = cumulative_trapezoid(fsub1, beta_grid, initial=0.0)
+    sum2_grid = cumulative_trapezoid(fsub2, beta_grid, initial=0.0)
+
+    theta_nodes = np.arccos(xvals)
+    cp_nodes = np.interp(theta_nodes, beta_grid, cp_grid)
+    sum1_nodes = np.interp(theta_nodes, beta_grid, sum1_grid)
+    sum2_nodes = np.interp(theta_nodes, beta_grid, sum2_grid)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        c_beta = (
+            cp_nodes
+            + sum1_nodes / np.sin(theta_nodes / 2) ** 2
+            - 2 * sum2_nodes * (2 + np.cos(theta_nodes)) / np.sin(theta_nodes / 2) ** 4
+        )
+    return c_beta
+
+
 def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logistic", progress: Progress | None = None):
     """
     Natural unmixing of the data Cl.
@@ -103,6 +178,13 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
             # "decouple") only changes how EE/BB are estimated.
             corr_d = corr2cl(corr_wd)
 
+            masks = {}
+            for key, field in fields.items():
+                if field.mask is not None:
+                    masks[key] = field.mask
+
+            thetamax_rad = np.pi if theta_max is None else np.radians(theta_max)
+
             spin2_keys = [
                 key for key, cwd in corr_wd.items() if cwd.spin[0] != 0 and cwd.spin[1] != 0
             ]
@@ -111,14 +193,16 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 current += 1
                 task.update(current, total)
 
-                # PolSpice's decoupled EE/BB (Chon et al. 2004, eq. 65;
-                # deal_with_xi_and_cl.f90:do_cl_from_xi, decouple branch) is
-                # built in two stages (spice_subs.f90: correct_xi_from_mask
-                # then do_cl_from_xi): first the *natural* mask-ratio
+                # PolSpice's decoupled EE/BB (Chon et al. 2004, eq. 60-65;
+                # spice_subs.f90 -> deal_with_xi_and_cl.f90/cumul2.f90) is
+                # built in three stages: (1) the *natural* mask-ratio
                 # correlation (Xi_p, Xi_m from corr_wd, same as TT/TE/EB
-                # above), then a second Legendre transform of Xi_p +/- Xi_m
-                # weighted by the csc^2(theta/2) kernel, normalized by Fl --
-                # the same kernel applied to the apodization window alone.
+                # above); (2) a cumulative-integral correction (`cumul`)
+                # that turns that into the "pure" E/B correlation function,
+                # accounting for E/B leakage from the finite integration
+                # range; (3) a Legendre transform weighted by the
+                # csc^2(theta/2) kernel, normalized by Fl -- the same
+                # kernel applied to the apodization window alone.
                 xvals = get_result_array(wd[key], "ell")[0]
                 key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
@@ -128,10 +212,21 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
 
                 Xi_p, Xi_m = corr_wd[key][0, 0], corr_wd[key][1, 1]
 
+                a, b, i, j = key
+                m_key = (masks[a], masks[b], i, j)
+                cl_ee_raw = d[key].array[0, 0]
+                cl_bb_raw = d[key].array[1, 1]
+                cl_mask_raw = get_cl(m_key, m).array
+                c_beta = _cumul_pure_eb(
+                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
+                )
+                xi_EE = 0.5 * (c_beta - Xi_p + Xi_m)
+                xi_BB = 0.5 * (c_beta + Xi_p - Xi_m)
+
                 fl = _isolate(apod * csc2, key_lmax)
                 with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = _isolate(Xi_p + Xi_m, key_lmax) / fl
-                    cl_BB = _isolate(Xi_p - Xi_m, key_lmax) / fl
+                    cl_EE = _isolate(xi_EE, key_lmax) / fl
+                    cl_BB = _isolate(xi_BB, key_lmax) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
