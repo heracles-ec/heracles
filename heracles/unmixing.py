@@ -34,7 +34,7 @@ def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def gaussian(theta, theta_max):
+def gaussian_apod(theta, theta_max):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
     `apodizefunction` type 0 (see apodize_mod.f90 in the PolSpice source):
@@ -46,6 +46,22 @@ def gaussian(theta, theta_max):
         return np.ones_like(theta)
     sigma = theta_max / np.sqrt(8 * np.log(2))
     return np.where(theta < theta_max, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
+
+
+def _isolate(x, lmax):
+    """
+    Feed correlation function `x` through the spin-(2,2) "-" (Xi_m) slot and
+    return the resulting E-mode (l-space) component. This is the building
+    block of PolSpice's EE/BB "decouple" estimator (Chon et al. 2004, eq. 65):
+    both the numerator (Xi_p +/- Xi_m of the masked data, weighted by the
+    csc^2(theta/2) kernel) and the normalization Fl (the same kernel applied
+    to the apodized mask correlation) are obtained by running the relevant
+    theta-space quantity through this same transform.
+    """
+    n = x.shape[-1]
+    corr = np.zeros((2, 2, n))
+    corr[1, 1] = x
+    return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
 def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logistic", progress: Progress | None = None):
@@ -82,28 +98,40 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     # trnasform back to Cl
     if purify:
         with progress.task("purified transform back to Cl") as task:
-            # start from the regular transform, which already gives us
-            # correct EB/BE (purification only affects EE/BB)
+            # start from the regular (natural/mask-ratio) transform, which
+            # already gives us correct TT/TE/EB -- purification (PolSpice's
+            # "decouple") only changes how EE/BB are estimated.
             corr_d = corr2cl(corr_wd)
 
             spin2_keys = [
-                key for key, wd in corr_wd.items() if wd.spin[0] != 0 and wd.spin[1] != 0
+                key for key, cwd in corr_wd.items() if cwd.spin[0] != 0 and cwd.spin[1] != 0
             ]
             current, total = 0, len(spin2_keys)
             for key in spin2_keys:
                 current += 1
                 task.update(current, total)
 
-                wd = corr_wd[key]
-                n = wd.array.shape[-1]
-                key_lmax = n - 1
-                Xi_p, Xi_m = wd[0, 0], wd[1, 1]
-                corr_ee = np.zeros((2, 2, n))
-                corr_ee[1, 1] = Xi_p + Xi_m
-                corr_bb = np.zeros((2, 2, n))
-                corr_bb[1, 1] = Xi_p - Xi_m
-                cl_EE = np.pi * _corr2cl(corr_ee, (2, 2), lmax=key_lmax)[0, 0]
-                cl_BB = np.pi * _corr2cl(corr_bb, (2, 2), lmax=key_lmax)[0, 0]
+                # PolSpice's decoupled EE/BB (Chon et al. 2004, eq. 65;
+                # deal_with_xi_and_cl.f90:do_cl_from_xi, decouple branch) is
+                # built in two stages (spice_subs.f90: correct_xi_from_mask
+                # then do_cl_from_xi): first the *natural* mask-ratio
+                # correlation (Xi_p, Xi_m from corr_wd, same as TT/TE/EB
+                # above), then a second Legendre transform of Xi_p +/- Xi_m
+                # weighted by the csc^2(theta/2) kernel, normalized by Fl --
+                # the same kernel applied to the apodization window alone.
+                xvals = get_result_array(wd[key], "ell")[0]
+                key_lmax = len(xvals) - 1
+                theta = np.degrees(np.arccos(xvals))
+                apod = gaussian_apod(theta, theta_max)
+                with np.errstate(divide="ignore"):
+                    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+                Xi_p, Xi_m = corr_wd[key][0, 0], corr_wd[key][1, 1]
+
+                fl = _isolate(apod * csc2, key_lmax)
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    cl_EE = _isolate(Xi_p + Xi_m, key_lmax) / fl
+                    cl_BB = _isolate(Xi_p - Xi_m, key_lmax) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
@@ -163,7 +191,7 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         elif apodization == "gaussian":
             xvals = wm[m_key].ell
             theta = np.degrees(np.arccos(xvals))
-            _wm /= gaussian(theta, theta_max)
+            _wm /= gaussian_apod(theta, theta_max)
         corr_wds[key] = replace(wd[key], array=_wd/_wm)
 
     return corr_wds
