@@ -220,8 +220,8 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 c_beta = _cumul_pure_eb(
                     cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
                 )
-                xi_EE = 0.5 * (c_beta - Xi_p + Xi_m)
-                xi_BB = 0.5 * (c_beta + Xi_p - Xi_m)
+                xi_EE = 0.5 * (c_beta + Xi_p - Xi_m)
+                xi_BB = 0.5 * (c_beta - Xi_p + Xi_m)
 
                 fl = _isolate(apod * csc2, key_lmax)
                 with np.errstate(invalid="ignore", divide="ignore"):
