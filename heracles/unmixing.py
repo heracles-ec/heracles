@@ -70,31 +70,7 @@ def _isolate(x, lmax, mumin=None):
     return _corr2cl(corr, (2, 2), lmax=lmax, mumin=mumin)[0, 0]
 
 
-def _cplus(cl_ee_plus_bb, cl_mask, lmax, beta):
-    """
-    C+(beta) = Xi_+^raw(beta) / Xi_mask(beta), evaluated at arbitrary
-    angles `beta` (radians) -- not just the fixed Gauss-Legendre
-    quadrature nodes. Port of PolSpice's `cplus` (cumul2.f90): the raw
-    (masked, not yet mask-ratio-divided) Xi_+ = Xi_QQ+Xi_UU correlation of
-    the data, normalized by the mask's own (real-space) autocorrelation.
-
-    This is just `_cl2corr`'s own spin-(2,2)/(0,0) machinery (which
-    already rotates the Cl into the +/- basis internally) evaluated at
-    arbitrary points instead of the Gauss-Legendre quadrature grid -- the
-    same rotate-then-transform-then-divide-by-the-mask-correlation done by
-    `_naturalspice` itself when no apodization is applied, just off-grid.
-    """
-    beta = np.atleast_1d(beta)
-    xvals = np.cos(beta)
-    cl = np.zeros((2, 2, lmax + 1))
-    cl[0, 0] = cl_ee_plus_bb[: lmax + 1]
-    xi_p = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals)[0, 0]
-    xi_mask = _cl2corr(cl_mask[: lmax + 1], (0, 0), lmax=lmax, xvals=xvals)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(xi_mask > 0, xi_p / xi_mask, 0.0)
-
-
-def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
+def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, cp_nodes, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -102,7 +78,8 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     estimator (Chon et al. 2004, eq. 60-65). This is the piece missing
     from a plain Fl-normalized Legendre transform: it accounts for E/B
     leakage from the finite integration range (`thetamax`) via a
-    cumulative integral of C+(beta) against two trigonometric kernels.
+    cumulative integral of C+(beta) = Xi_+^raw(beta)/Xi_mask(beta) against
+    two trigonometric kernels.
 
     Args:
         cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
@@ -110,6 +87,13 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
         lmax: maximum l
         xvals: cos(theta) values (Gauss-Legendre nodes) at which to
             evaluate the correction
+        cp_nodes: C+(beta) at those same nodes -- since `xvals` is the
+            same Gauss-Legendre grid the caller's own data/mask
+            correlation functions are already evaluated on, this is
+            simply their (already computed) ratio, e.g.
+            `wd[key][0, 0] / wm[key]` -- PolSpice's `cplus` (cumul2.f90)
+            re-derives it from the Cls instead, but there is nothing to
+            recompute here.
         thetamax: integration domain in radians
     Returns:
         c_beta: the cumulative-integral correction, evaluated at `xvals`
@@ -118,18 +102,25 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     cl_mask = cl_mask[: lmax + 1]
 
     theta_nodes = np.arccos(xvals)
-    cp_nodes = _cplus(cl_sum, cl_mask, lmax, theta_nodes)
 
     # cumulative integral from 0 to each node, via a fixed grid + cumulative
-    # trapezoid rule (matching PolSpice's own fixed-step cumul() far more
-    # closely in spirit than adaptive quadrature, and empirically found to
-    # differ from scipy.integrate.quad by <0.2% -- not the bottleneck for
-    # matching PolSpice); nodes beyond thetamax are capped there, same as
-    # PolSpice's own cumul()
+    # trapezoid rule -- matching PolSpice's own `cumul_simpson` (cumul2.f90),
+    # which likewise samples C+(beta) on an independent fine mesh of
+    # [0, thetamax] rather than reusing the Gauss-Legendre node grid, since
+    # the cumulative integral needs a genuinely finer sampling than the
+    # handful of quadrature nodes gives; nodes beyond thetamax are capped
+    # there, same as PolSpice's own cumul()
     ngrid = 2000
     eps = 1e-6
     beta_grid = np.linspace(eps, max(thetamax - eps, eps), ngrid)
-    cp_grid = _cplus(cl_sum, cl_mask, lmax, beta_grid)
+    xvals_grid = np.cos(beta_grid)
+    cl = np.zeros((2, 2, lmax + 1))
+    cl[0, 0] = cl_sum
+    xi_p_grid = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals_grid)[0, 0]
+    xi_mask_grid = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_grid)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cp_grid = np.where(xi_mask_grid > 0, xi_p_grid / xi_mask_grid, 0.0)
+
     # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing needed
     # there; singular as beta -> pi (see module docs/notebook)
     fsub1_grid = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * cp_grid
@@ -262,12 +253,18 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 m_key = (masks[a], masks[b], i, j)
                 wm_arr = get_cl(m_key, wm).array
                 Xi_m = wd[key][1, 1] / wm_arr
+                # C+(beta) at the Gauss-Legendre nodes is just the ratio of
+                # the Xi_+ (EE+BB) and mask correlations already computed
+                # above at those same nodes -- no need to re-derive it from
+                # the Cls (see _cumul_pure_eb's docstring)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cp_nodes = np.where(wm_arr > 0, wd[key][0, 0] / wm_arr, 0.0)
 
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
                 c_beta = _cumul_pure_eb(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
+                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, cp_nodes, thetamax_rad
                 )
                 xi_EE = 0.5 * (c_beta + Xi_m)
                 xi_BB = 0.5 * (c_beta - Xi_m)
