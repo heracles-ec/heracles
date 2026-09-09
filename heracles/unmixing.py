@@ -35,22 +35,25 @@ def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def gaussian(theta, fwhm, thetamax=None):
+def gaussian(theta, thetamax):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
-    `apodizefunction` type 0 (apodize_mod.f90): `fwhm` (PolSpice's
-    `-apodizesigma`, despite the name) sets the taper's FWHM, and
-    `thetamax` (PolSpice's separate `-thetamax`) sets its hard cutoff --
-    these are two independent PolSpice options, not the same value.
-    If `thetamax` is None, it defaults to `fwhm` (matching the previous,
-    single-parameter behaviour). If `fwhm` is None, no apodization is
-    applied (flat weight of 1 everywhere).
+    `apodizefunction` type 0 (apodize_mod.f90): `thetamax` (PolSpice's
+    separate `-thetamax`) sets its hard cutoff. The taper's FWHM is fixed
+    at `thetamax / 2`, per Chon et al. (2004)'s recommended
+    `apodizesigma = thetamax / 2` -- PolSpice's `-apodizesigma` and
+    `-thetamax` are independent options in general, but naturalspice
+    doesn't expose apodizesigma separately, so this bakes in that
+    recommended ratio (verified against PolSpice's own Fl(l) dump,
+    SPICE_FL_DEBUG, with matching -apodizesigma: exact to machine
+    precision; using `thetamax` itself as the width, instead of half of
+    it, is wrong by a large, l-dependent factor).
+    If `thetamax` is None, no apodization is applied (flat weight of 1
+    everywhere).
     """
-    if fwhm is None:
-        return np.ones_like(theta)
     if thetamax is None:
-        thetamax = fwhm
-    sigma = fwhm / np.sqrt(8 * np.log(2))
+        return np.ones_like(theta)
+    sigma = (thetamax / 2) / np.sqrt(8 * np.log(2))
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
@@ -255,7 +258,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 # the previous behaviour, was wrong by a large,
                 # l-dependent factor).
                 apod = (
-                    gaussian(theta, theta_max / 2, thetamax=theta_max)
+                    gaussian(theta, thetamax=theta_max)
                     if theta_max is not None
                     else np.ones_like(theta)
                 )
