@@ -22,7 +22,6 @@ from .progress import NoProgress, Progress
 from .result import binned, get_result_array
 from .transforms import cl2corr, corr2cl, _corr2cl, legendre_funcs, legendre_p_all
 from .utils import get_cl
-from .transforms import _cached_gauss_legendre
 
 try:
     from copy import replace
@@ -49,7 +48,7 @@ def gaussian_apod(theta, theta_max):
     return np.where(theta < theta_max, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def _isolate(x, lmax):
+def _isolate(x, lmax, mumin=None):
     """
     Feed correlation function `x` through the spin-(2,2) "-" (Xi_m) slot and
     return the resulting E-mode (l-space) component. This is the building
@@ -57,12 +56,13 @@ def _isolate(x, lmax):
     both the numerator (Xi_p +/- Xi_m of the masked data, weighted by the
     csc^2(theta/2) kernel) and the normalization Fl (the same kernel applied
     to the apodized mask correlation) are obtained by running the relevant
-    theta-space quantity through this same transform.
+    theta-space quantity through this same transform. `mumin` must match
+    whatever quadrature grid `x` itself was evaluated on.
     """
     n = x.shape[-1]
     corr = np.zeros((2, 2, n))
     corr[1, 1] = x
-    return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
+    return _corr2cl(corr, (2, 2), lmax=lmax, mumin=mumin)[0, 0]
 
 
 def _cplus(cl_ee_plus_bb, cl_mask, lmax, beta):
@@ -162,6 +162,13 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     if progress is None:
         progress = NoProgress()
 
+    # PolSpice restricts its entire quadrature grid to cos(theta) in
+    # [mumin, 1] whenever a finite -thetamax is given (spice_subs.f90:
+    # `mumin = cos(thetamax)`), rather than treating theta_max merely as
+    # an extra cutoff applied after transforming on the full sphere. Match
+    # that here: mumin=None (the default) behaves exactly as before.
+    mumin = None if theta_max is None else np.cos(np.radians(theta_max))
+
     first_wd = list(d.values())[0]
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
@@ -171,9 +178,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     d = binned(d, np.arange(0, lmax_mask + 1))
 
     with progress.task("data correlations") as task:
-        wd = cl2corr(d, progress=task)
+        wd = cl2corr(d, progress=task, mumin=mumin)
     with progress.task("mask correlations") as task:
-        wm = cl2corr(m, progress=task)
+        wm = cl2corr(m, progress=task, mumin=mumin)
     with progress.task("unmixing") as task:
         corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task)
 
@@ -183,7 +190,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
             # start from the regular (natural/mask-ratio) transform, which
             # already gives us correct TT/TE/EB -- purification (PolSpice's
             # "decouple") only changes how EE/BB are estimated.
-            corr_d = corr2cl(corr_wd)
+            corr_d = corr2cl(corr_wd, mumin=mumin)
 
             masks = {}
             for key, field in fields.items():
@@ -230,10 +237,10 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 xi_EE = 0.5 * (c_beta + Xi_p - Xi_m)
                 xi_BB = 0.5 * (c_beta - Xi_p + Xi_m)
 
-                fl = _isolate(apod * csc2, key_lmax)
+                fl = _isolate(apod * csc2, key_lmax, mumin=mumin)
                 with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = _isolate(xi_EE, key_lmax) / fl
-                    cl_BB = _isolate(xi_BB, key_lmax) / fl
+                    cl_EE = _isolate(xi_EE, key_lmax, mumin=mumin) / fl
+                    cl_BB = _isolate(xi_BB, key_lmax, mumin=mumin) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
@@ -242,7 +249,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 corr_d[key] = replace(corr_d[key], array=cl)
     else:
         with progress.task("transform back to Cl") as task:
-            corr_d = corr2cl(corr_wd, progress=task)
+            corr_d = corr2cl(corr_wd, progress=task, mumin=mumin)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))
@@ -271,8 +278,9 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
 
     if theta_max is not None:
         first_wm = list(wm.values())[0]
-        lmax_mask = first_wm.shape[first_wm.axis[0]]
-        xvals, _ = _cached_gauss_legendre(lmax_mask)
+        # reuse wm's own grid (which may be mumin-restricted) rather than
+        # recomputing a fresh, possibly-inconsistent one
+        xvals = get_result_array(first_wm, "ell")[0]
         theta = np.arccos(xvals) * 180 / np.pi
         i_theta_max = np.abs(theta - theta_max).argmin()
         x0 = np.log10(abs(first_wm[i_theta_max]))
