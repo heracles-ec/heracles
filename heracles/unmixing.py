@@ -65,6 +65,34 @@ def gaussian(theta, thetamax):
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
+def apod_window(theta, thetamax, wm_arr=None, type="logistic"):
+    """
+    Unified apodization-window dispatch, shared by `naturalspice`'s
+    purify loop and `_naturalspice`. Returns a multiplicative weight the
+    same shape as `theta`, in [0, 1].
+
+    If `thetamax` is None, no apodization is applied (flat weight of 1)
+    regardless of `type` -- this is the single guard both call sites
+    used to duplicate.
+
+    `type="logistic"` needs `wm_arr` (the mask correlation function's own
+    array): the weight is a sigmoid in log10(abs(wm_arr)), centered on
+    the mask correlation's own value at the node closest to `thetamax`,
+    which suppresses the natural (mask-ratio) estimator near the mask
+    correlation's zero-crossings without needing `theta` itself.
+    `type="gaussian"` only needs `theta`/`thetamax` (PolSpice's
+    apodizefunction type 0, see `gaussian`). Any other `type` (or an
+    unset `wm_arr` for "logistic") also means no apodization.
+    """
+    if thetamax is None or type not in ("logistic", "gaussian"):
+        return 1.0
+    if type == "logistic":
+        i_theta_max = np.abs(theta - thetamax).argmin()
+        x0 = np.log10(abs(wm_arr[i_theta_max]))
+        return logistic(np.log10(abs(wm_arr)), x0=x0)
+    return gaussian(theta, thetamax)
+
+
 def purify_xip(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
@@ -183,6 +211,16 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
         fields: list of fields
         theta_max: maximum angle to use for the unmixing, in degrees. If None, use all angles.
         purify: whether to purify the EE/BB estimator (only affects s1=s2=2 fields)
+        apodization: apodization window passed to `apod_window`, shared by
+            both the natural (TT/TE/EB) estimator and, when `purify` is
+            True, the purified EE/BB estimator's Fl-normalization step --
+            "logistic" and "gaussian" give genuinely different results
+            for each, so a PolSpice-matching `purify=True` run needs
+            "gaussian" explicitly (matching its own `-apodizetype 0`
+            window; the default "logistic" is a heracles-only heuristic
+            that does not correspond to anything PolSpice does at this
+            step). Comparisons against real PolSpice output should always
+            pass the same apodization type PolSpice itself was run with.
         progress: optional progress reporter
     Returns:
         corr_d: Corrected Cl
@@ -228,55 +266,19 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 current += 1
                 task.update(current, total)
 
-                # PolSpice's decoupled EE/BB (Chon et al. 2004, eq. 60-65;
-                # spice_subs.f90 -> deal_with_xi_and_cl.f90/cumul2.f90) is
-                # built in three stages: (1) the *natural*, unweighted
-                # mask-ratio correlation Xi_p = Xi_data/Xi_mask (note: NOT
-                # corr_wd, which additionally carries _naturalspice's
-                # logistic/gaussian apodization -- correct_xi_from_mask in
-                # PolSpice is a plain ratio, apodization is a separate,
-                # later step); (2) a cumulative-integral correction
-                # (`cumul`) that turns that into the "pure" E/B correlation
-                # function, accounting for E/B leakage from the finite
-                # integration range; (3) a Legendre transform weighted by
-                # the csc^2(theta/2) kernel, normalized by Fl -- the same
-                # kernel applied to the apodization window alone.
-                #
-                # Deriving PolSpice's xi(:,2)/xi(:,3) (its natural-ratio
-                # QQ/UU, pre-cumul) in terms of heracles' Xi_p/Xi_m gives
-                # exactly xi2 = (Xi_p+Xi_m)/2, xi3 = (Xi_p-Xi_m)/2, so
-                # xi2-xi3 = Xi_m and xi2+xi3 = Xi_p; cumul()'s own
-                # xi_E/B_final = (c_beta +/- (xi2-xi3))/2 therefore only
-                # needs Xi_m (not Xi_p) here -- verified to < 0.1% against
-                # PolSpice's own cumul() dump (SPICE_CUMUL_DEBUG) at every
-                # node except where xi_B_final crosses zero.
+                a, b, i, j = key
+                m_key = (masks[a], masks[b], i, j)
+
                 xvals = get_result_array(wd[key], "ell")[0]
                 key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
-                # NOTE: this apodization window is PolSpice's independent
-                # -apodizesigma option, *not* the same thing as theta_max
-                # (-thetamax, the integration cutoff handled via
-                # thetamax_rad below) -- naturalspice doesn't currently
-                # expose apodizesigma separately. Chon et al.
-                # (2004) recommend apodizesigma = theta_max/2, so that is
-                # used as the default width whenever theta_max is given
-                # (verified against PolSpice's own Fl(l) dump,
-                # SPICE_FL_DEBUG, with matching -apodizesigma: exact to
-                # machine precision -- using theta_max itself as the width,
-                # the previous behaviour, was wrong by a large,
-                # l-dependent factor).
-                apod = (
-                    gaussian(theta, thetamax=theta_max)
-                    if theta_max is not None
-                    else np.ones_like(theta)
-                )
+                wm_arr = get_cl(m_key, wm).array
+
+                apod = apod_window(theta, theta_max, wm_arr=wm_arr, type=apodization)
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
                 # Purify
-                a, b, i, j = key
-                m_key = (masks[a], masks[b], i, j)
-                wm_arr = get_cl(m_key, wm).array
                 Xi_m = wd[key][1, 1] / wm_arr
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
@@ -330,16 +332,6 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         if field.mask is not None:
             masks[key] = field.mask
 
-    if theta_max is not None:
-        first_wm = list(wm.values())[0]
-        # reuse wm's own grid rather than recomputing a fresh one
-        xvals = get_result_array(first_wm, "ell")[0]
-        theta = np.arccos(xvals) * 180 / np.pi
-        i_theta_max = np.abs(theta - theta_max).argmin()
-        x0 = np.log10(abs(first_wm[i_theta_max]))
-    else:
-        x0 = -5
-
     corr_wds = {}
     current, total = 0, len(wd)
     for key in wd.keys():
@@ -347,28 +339,25 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        # the natural, unweighted mask-ratio correlation -- read-only, no
-        # in-place mutation of wm's arrays (unlike the old *=/ /= version),
-        # so no .copy() is needed and later, unrelated uses of wm (e.g.
-        # purify's own C+(beta) computation, which needs the pristine,
-        # unapodized mask correlation) can't be corrupted by this
-        _wm = get_cl(m_key, wm).array
+        # look the mask correlation up via get_cl, not a direct wm[m_key]
+        # index -- wm's keys may only have the symmetric ordering stored
+        # (get_cl checks both and transposes as needed; plain indexing
+        # would KeyError on those)
+        _wm_result = get_cl(m_key, wm)
+        _wm = _wm_result.array
         _wd = wd[key].array
         ratio = _wd / _wm
-        # apply the apodization window as a multiplicative factor on the
-        # ratio itself, not folded into the mask denominator -- both
-        # options are genuine (0, 1)-ranged windows (logistic: ~0 well
-        # below x0, ~1 well above; gaussian: ~1 near theta=0, ~0 beyond
-        # thetamax), so "apod * ratio" is the natural, consistent way to
-        # apply either
-        if apodization == "logistic":
-            apod = logistic(np.log10(abs(_wm)), x0=x0)
-        elif apodization == "gaussian":
-            xvals = wm[m_key].ell
+        # theta is only needed by apod_window when theta_max is actually
+        # given (it returns a flat 1.0 without it otherwise) -- skip
+        # computing it in that case, since .ell isn't always populated
+        # (e.g. the ratio dicts jackknife.py's correct_footprint_naturalspice
+        # passes in as wm)
+        if theta_max is not None:
+            xvals = _wm_result.ell
             theta = np.degrees(np.arccos(xvals))
-            apod = gaussian(theta, theta_max)
         else:
-            apod = 1.0
+            theta = None
+        apod = apod_window(theta, theta_max, wm_arr=_wm, type=apodization)
         corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds
