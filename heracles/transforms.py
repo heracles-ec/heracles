@@ -127,81 +127,6 @@ def legendre_funcs(lmax, x, spin, lfacs=None, lfacs2=None, lrootfacs=None):
     return d20, d22, d2m2
 
 
-def rotate(cl, spin):
-    """
-    Rotate a Cl (or correlation function) array of the given spin into the
-    "+/-" basis used for the real-space transforms in `_cl2corr`/`_corr2cl`.
-
-    spin (2, 2): `cl` is `[[EE, EB], [BE, BB]]`, returns
-
-        [[EE+BB, EE-BB],
-         [EB+BE, EB-BE]]
-
-    i.e. sum/difference applied to the diagonal pair (EE, BB) for row 0, and
-    to the anti-diagonal pair (EB, BE) for row 1.
-
-    spin (0, 2) or (2, 0): `cl` is `[Ta, Tb]` (e.g. T x E and T x B),
-    returns `[Ta+Tb, Ta-Tb]`.
-
-    Not defined for spin (0, 0), since there is nothing to combine.
-    """
-    if spin == (0, 0):
-        raise ValueError("rotate is not defined for spin (0, 0)")
-    elif spin in ((0, 2), (2, 0)):
-        return np.array([cl[0] + cl[1], cl[0] - cl[1]])
-    elif spin == (2, 2):
-        EE, EB = cl[0, 0], cl[0, 1]
-        BE, BB = cl[1, 0], cl[1, 1]
-        return np.array(
-            [
-                [EE + BB, EE - BB],
-                [EB + BE, EB - BE],
-            ]
-        )
-    else:
-        raise ValueError(
-            f"unsupported spin combination {spin!r}: only (0, 0), "
-            "(0, 2)/(2, 0), and (2, 2) are supported"
-        )
-
-
-def unrotate(cl, spin):
-    """
-    Inverse of `rotate` for the given spin.
-
-    For spin (2, 2), given `[[p_diag, m_diag], [p_anti, m_anti]]` as
-    produced by `rotate`, recovers the original `[[EE, EB], [BE, BB]]`. Note
-    this is *not* the same as calling `rotate` a second time: `rotate`
-    pairs the diagonal and anti-diagonal entries of its input, whereas
-    undoing it means un-pairing its own *rows* instead -- a different
-    grouping (`rotate(rotate(cl, (2, 2)), (2, 2))` is generally not `2*cl`).
-
-    For spin (0, 2)/(2, 0), `rotate`'s sum/difference of a plain pair *is*
-    self-inverse up to a factor of 2, so this is just that same formula,
-    halved.
-
-    Not defined for spin (0, 0), since there is nothing to un-combine.
-    """
-    if spin == (0, 0):
-        raise ValueError("unrotate is not defined for spin (0, 0)")
-    elif spin in ((0, 2), (2, 0)):
-        return np.array([(cl[0] + cl[1]) / 2, (cl[0] - cl[1]) / 2])
-    elif spin == (2, 2):
-        p_diag, m_diag = cl[0, 0], cl[0, 1]
-        p_anti, m_anti = cl[1, 0], cl[1, 1]
-        return np.array(
-            [
-                [(p_diag + m_diag) / 2, (p_anti + m_anti) / 2],
-                [(p_anti - m_anti) / 2, (p_diag - m_diag) / 2],
-            ]
-        )
-    else:
-        raise ValueError(
-            f"unsupported spin combination {spin!r}: only (0, 0), "
-            "(0, 2)/(2, 0), and (2, 2) are supported"
-        )
-
-
 def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     """
     Get the correlation function of a single, already-rotated Cl COMPONENT
@@ -211,8 +136,8 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     -> d^l_{2,-2}; (2, 0) (alias (0, 2)) -> d^l_{2,0} (l from 2 for the
     polarization kernels). `cl` must already be the desired linear
     combination of physical fields (e.g. Cl^EE+Cl^BB for kernel (2, 2)) --
-    use `rotate()` first to build that combination from a full [[EE, EB],
-    [BE, BB]] (or [Ta, Tb]) array.
+    add/subtract the relevant pair first to build that combination from a
+    full [[EE, EB], [BE, BB]] (or [Ta, Tb]) array.
     Use roots of Legendre polynomials (np.polynomial.legendre.leggauss) for accurate back integration with corr2cl.
     Note currently does not work at xvals=1 (can easily calculate that as special case!).
 
@@ -346,15 +271,16 @@ def cl2corr(cls, progress: Progress | None = None):
             # Determine lmax from ell field or shape along ell axis
             lmax = len(get_result_array(cl, "ell")[0]) - 1
             xvals, _ = _cached_gauss_legendre(lmax + 1)
-            # transform to corrs, dispatching directly on spin: rotate into
-            # the "+/-" basis, then transform each rotated component with
-            # its own kernel
+            # transform to corrs, dispatching directly on spin: add/subtract
+            # into the "+/-" basis, then transform each component with its
+            # own kernel
             if spin == (0, 0):
                 wd = _cl2corr(cl.array, (0, 0), lmax=lmax)
             elif spin in ((0, 2), (2, 0)):
                 # T x spin-2 cross correlation: both combinations use the
                 # same d20 kernel
-                cp, cm = rotate(cl.array, spin)
+                Ta, Tb = cl.array[0], cl.array[1]
+                cp, cm = Ta + Tb, Ta - Tb
                 wd = np.array(
                     [
                         _cl2corr(cp, (2, 0), lmax=lmax),
@@ -362,22 +288,24 @@ def cl2corr(cls, progress: Progress | None = None):
                     ]
                 )
             else:
-                # spin (2, 2): EE/BB use d22/d2m2 on the rotated diagonal
-                # pair, EB/BE use d22/d2m2 (negated) on the rotated
-                # anti-diagonal pair. Kept as one shared loop (rather than
-                # 4 separate _cl2corr component calls) so allP/alldP are
-                # computed once per quadrature point instead of 4 times.
+                # spin (2, 2): EE/BB use d22/d2m2 on the diagonal pair's
+                # sum/difference, EB/BE use d22/d2m2 (negated) on the
+                # anti-diagonal pair's sum/difference. Kept as one shared
+                # loop (rather than 4 separate _cl2corr component calls)
+                # so allP/alldP are computed once per quadrature point
+                # instead of 4 times.
                 ls = np.arange(0, lmax + 1, dtype=np.float64)
                 facs = (2 * ls + 1) / (4 * np.pi)
                 ls2 = ls[2:]
                 lfacs = ls2 * (ls2 + 1)
                 lfacs2 = (ls2 + 2) * (ls2 - 1)
                 lrootfacs = np.sqrt(lfacs * lfacs2)
-                r = rotate(cl.array, spin)
-                cp = facs[2:] * r[0, 0, 2 : lmax + 1]
-                cm = facs[2:] * r[0, 1, 2 : lmax + 1]
-                icp = facs[2:] * r[1, 1, 2 : lmax + 1]
-                icm = facs[2:] * r[1, 0, 2 : lmax + 1]
+                EE, EB = cl.array[0, 0], cl.array[0, 1]
+                BE, BB = cl.array[1, 0], cl.array[1, 1]
+                cp = facs[2:] * (EE + BB)[2 : lmax + 1]
+                cm = facs[2:] * (EE - BB)[2 : lmax + 1]
+                icp = facs[2:] * (EB - BE)[2 : lmax + 1]
+                icm = facs[2:] * (EB + BE)[2 : lmax + 1]
                 wd = np.zeros((2, 2, len(xvals)))
                 for i, x in enumerate(xvals):
                     _, d22, d2m2 = legendre_funcs(
@@ -424,14 +352,14 @@ def corr2cl(wds, progress: Progress | None = None):
             weights = _cached_gauss_legendre(len(xvals))[1]
             lmax = len(xvals) - 1
             # transform to cl, dispatching directly on spin: undo each
-            # rotated component's own kernel, then unrotate back to the
+            # component's own kernel, then add/subtract back to the
             # physical [[EE, EB], [BE, BB]] (or [Ta, Tb]) layout
             if spin == (0, 0):
                 cl = _corr2cl(wd.array, (0, 0), lmax=lmax)
             elif spin in ((0, 2), (2, 0)):
                 clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax)
                 clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax)
-                cl = unrotate(np.array([clp, clm]), spin)
+                cl = np.array([(clp + clm) / 2, (clp - clm) / 2])
             else:
                 # spin (2, 2): kept as one shared loop, mirroring cl2corr's
                 # (2, 2) branch -- see there for the kernel/slot mapping.
@@ -448,7 +376,11 @@ def corr2cl(wds, progress: Progress | None = None):
                     r[0, 1, 2:] += (weight * wd.array[1, 1, i]) * d2m2
                     r[1, 0, 2:] += -(weight * wd.array[1, 0, i]) * d2m2
                     r[1, 1, 2:] += -(weight * wd.array[0, 1, i]) * d22
-                cl = 2 * np.pi * unrotate(r, spin)
+                p_diag, m_diag = r[0, 0], r[0, 1]
+                p_anti, m_anti = r[1, 0], r[1, 1]
+                EE, BB = (p_diag + m_diag) / 2, (p_diag - m_diag) / 2
+                EB, BE = (p_anti + m_anti) / 2, (p_anti - m_anti) / 2
+                cl = 2 * np.pi * np.array([[EE, EB], [BE, BB]])
             # Add metadata back
             cl = np.array(list(cl), dtype=dtype)
             cls[key] = replace(
