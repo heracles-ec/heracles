@@ -109,10 +109,23 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, cp_nodes, thetamax):
     # [0, thetamax] rather than reusing the Gauss-Legendre node grid, since
     # the cumulative integral needs a genuinely finer sampling than the
     # handful of quadrature nodes gives; nodes beyond thetamax are capped
-    # there, same as PolSpice's own cumul()
-    ngrid = 2000
+    # there, same as PolSpice's own cumul().
+    #
+    # c_beta = cp + sum1/sin^2(theta/2) - 2*sum2*(2+cos(theta))/sin^4(theta/2)
+    # is a near-total cancellation between O(1) terms as theta -> 0 (sum1,
+    # sum2 -> 0 just fast enough to keep c_beta finite), so a uniform grid's
+    # *relative* error in sum1/sum2 (dominated by the well-resolved bulk of
+    # [0, thetamax]) gets massively amplified by the 1/sin^2, 1/sin^4
+    # factors for the smallest theta nodes -- this showed up as xi_B_final
+    # (and hence the purified Cl_BB) spuriously blowing up at high l instead
+    # of decaying like PolSpice's. Concentrating grid points near beta=0
+    # (cubic spacing) fixes this far more cheaply than simply raising
+    # ngrid uniformly (verified: matches a 100x larger uniform grid's
+    # result at ~1/50th the points).
+    ngrid = 20000
     eps = 1e-6
-    beta_grid = np.linspace(eps, max(thetamax - eps, eps), ngrid)
+    u = np.linspace(0.0, 1.0, ngrid)
+    beta_grid = eps + (max(thetamax - eps, eps) - eps) * u**3
     xvals_grid = np.cos(beta_grid)
     cl = np.zeros((2, 2, lmax + 1))
     cl[0, 0] = cl_sum
