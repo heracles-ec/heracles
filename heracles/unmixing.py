@@ -21,7 +21,7 @@ from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import CubicSpline
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
-from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl
+from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl, legendre_funcs
 from .utils import get_cl
 
 try:
@@ -70,7 +70,32 @@ def _isolate(x, lmax):
     return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
-def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
+def _recover_cl_sum(xvals, Xi_p_raw, lmax):
+    """
+    Recover Cl_EE+Cl_BB (band-limited to degree `lmax`) from its raw
+    (masked, not mask-ratio-divided) spin-(2,2) "+" correlation function
+    `Xi_p_raw`, evaluated at the Gauss-Legendre nodes `xvals`.
+
+    This is an *exact* inversion (to machine precision), but not via
+    `_corr2cl`'s usual round trip -- that requires both the d22 and d2m2
+    "+"/"-" slots together (see `_isolate`); feeding only the "+" slot in
+    is not itself orthogonal under this quadrature. Instead, solve the
+    true (well-conditioned, full-rank) linear system
+    `Xi_p_raw(x_i) = sum_l facs[l]*(Cl_EE+Cl_BB)[l]*d22_l(x_i)` directly.
+    """
+    ls = np.arange(0, lmax + 1, dtype=np.float64)
+    facs = (2 * ls + 1) / (4 * np.pi)
+    design = np.empty((len(xvals), lmax - 1))
+    for i, x in enumerate(xvals):
+        _, d22, _ = legendre_funcs(lmax, x, (2, 2))
+        design[i, :] = facs[2:] * d22
+    coeffs, *_ = np.linalg.lstsq(design, Xi_p_raw, rcond=None)
+    cl_sum = np.zeros(lmax + 1)
+    cl_sum[2:] = coeffs
+    return cl_sum
+
+
+def _cumul_pure_eb(lmax, xvals, Xi_p, Xi_mask, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -82,24 +107,31 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
     two trigonometric kernels.
 
     Args:
-        cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
-        cl_mask: raw Cl of the (scalar) mask
         lmax: maximum l
-        xvals: cos(theta) values (Gauss-Legendre nodes) at which to
-            evaluate the correction
+        xvals: cos(theta) values (Gauss-Legendre nodes) at which `Xi_p`
+            and `Xi_mask` are given
         Xi_p: the natural (mask-ratio) Xi_+ = (EE+BB)-like correlation at
-            those same nodes -- C+(beta) at the Gauss-Legendre nodes is
-            just this, since `xvals` is the same grid the caller's own
-            data/mask correlation functions are already evaluated on,
-            i.e. `wd[key][0, 0] / wm[key]`. PolSpice's `cplus`
-            (cumul2.f90) re-derives it from the Cls instead, but there is
-            nothing to recompute here.
+            those nodes -- C+(beta) at the Gauss-Legendre nodes is just
+            this, i.e. `wd[key][0, 0] / wm[key]`
+        Xi_mask: the (unratioed) mask correlation function at those same
+            nodes, i.e. `wm[key]`
         thetamax: integration domain in radians
     Returns:
         c_beta: the cumulative-integral correction, evaluated at `xvals`
     """
-    cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
-    cl_mask = cl_mask[: lmax + 1]
+    # Xi_p and Xi_mask are, between them, exactly equivalent to the
+    # underlying Cl_EE+Cl_BB and Cl_mask (both band-limited to degree
+    # lmax) -- this function needs values of C+(beta) off the native
+    # grid, which means going back to *some* finite representation of the
+    # Cls one way or another. Recovering that representation from
+    # Xi_p/Xi_mask instead of being handed cl_ee/cl_bb/cl_mask directly
+    # is measurably more expensive (the (lmax+1)-node linear solve in
+    # `_recover_cl_sum` accounts for most of it -- roughly a 1.6x slowdown
+    # of naturalspice(purify=True) end to end), with no accuracy
+    # difference; it buys a purely theta-space signature (no raw Cls) at
+    # that cost, not a speedup.
+    cl_sum = _recover_cl_sum(xvals, Xi_p * Xi_mask, lmax)
+    cl_mask = _corr2cl(Xi_mask, (0, 0), lmax=lmax)
 
     theta_nodes = np.arccos(xvals)
 
@@ -284,12 +316,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 # it from the Cls (see _cumul_pure_eb's docstring).
                 Xi_p = wd[key][0, 0] / wm_arr
 
-                cl_ee_raw = d[key].array[0, 0]
-                cl_bb_raw = d[key].array[1, 1]
-                cl_mask_raw = get_cl(m_key, m).array
-                c_beta = _cumul_pure_eb(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, Xi_p, thetamax_rad
-                )
+                c_beta = _cumul_pure_eb(key_lmax, xvals, Xi_p, wm_arr, thetamax_rad)
                 xi_EE = 0.5 * (c_beta + Xi_m)
                 xi_BB = 0.5 * (c_beta - Xi_m)
 
