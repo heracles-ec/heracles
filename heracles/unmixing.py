@@ -54,23 +54,7 @@ def gaussian(theta, fwhm, thetamax=None):
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def _isolate(x, lmax):
-    """
-    Feed correlation function `x` through the spin-(2,2) "-" (Xi_m) slot and
-    return the resulting E-mode (l-space) component. This is the building
-    block of PolSpice's EE/BB "decouple" estimator (Chon et al. 2004, eq. 65):
-    both the numerator (Xi_p +/- Xi_m of the masked data, weighted by the
-    csc^2(theta/2) kernel) and the normalization Fl (the same kernel applied
-    to the apodized mask correlation) are obtained by running the relevant
-    theta-space quantity through this same transform.
-    """
-    n = x.shape[-1]
-    corr = np.zeros((2, 2, n))
-    corr[1, 1] = x
-    return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
-
-
-def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
+def purify_xip(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -150,9 +134,7 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     # coarse: ~8*(lmax+1)) evaluated with a single _cl2corr call each.
     n_native = len(xvals)
     xvals_all = np.concatenate([xvals, xvals_coarse])
-    cl = np.zeros((2, 2, lmax + 1))
-    cl[0, 0] = cl_sum
-    xi_p_all = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals_all)[0, 0]
+    xi_p_all = _cl2corr(cl_sum, (2, 2), lmax=lmax, xvals=xvals_all)
     xi_mask_all = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_all)
     with np.errstate(divide="ignore", invalid="ignore"):
         cp_all = np.where(xi_mask_all > 0, xi_p_all / xi_mask_all, 0.0)
@@ -280,46 +262,33 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
+                # Purify
                 a, b, i, j = key
                 m_key = (masks[a], masks[b], i, j)
                 wm_arr = get_cl(m_key, wm).array
                 Xi_m = wd[key][1, 1] / wm_arr
-
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
-                c_beta = _cumul_pure_eb(
+                Xi_p_dec = purify_xip(
                     cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
                 )
-                xi_EE = 0.5 * (c_beta + Xi_m)
-                xi_BB = 0.5 * (c_beta - Xi_m)
+                xi_EE = 0.5 * (Xi_p_dec + Xi_m)
+                xi_BB = 0.5 * (Xi_p_dec - Xi_m)
 
-                # PolSpice applies the apodization window to xi_final
-                # itself, for every channel, right before the Legendre
-                # transform (spice_subs.f90: `xi_final(l,:) = xi_final(l,:)
-                # * tempo` under `if (apodize)`) -- separate from (in
-                # addition to) apod entering Fl below. c_beta/Xi_m
-                # themselves are unaffected (cumul() never calls
-                # apodizefunction).
+                # Apodize
                 xi_EE = xi_EE * apod
                 xi_BB = xi_BB * apod
 
-                # PolSpice's do_cl_from_xi (decouple branch): cl_raw(l) =
-                # 2*_isolate(xi_final)(l), Fl(l) = _isolate(apod*csc2)(l)/pi
-                # (both exact identities of _isolate's own d2m2-kernel sum,
-                # not dependent on any full-sky assumption), so
-                # cl = cl_raw/Fl = 2*pi*isolate(xi_final)/isolate(apod*csc2).
-                # Verified against PolSpice's own Fl(l)/cl(l,2)/cl(l,3) dump
-                # (SPICE_FL_DEBUG) to machine precision for l >= 2.
-                fl = _isolate(apod * csc2, key_lmax)
-                with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = 2 * np.pi * _isolate(xi_EE, key_lmax) / fl
-                    cl_BB = 2 * np.pi * _isolate(xi_BB, key_lmax) / fl
+                # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
+                fl = _corr2cl(apod * csc2, (2, -2), key_lmax)
+                cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2), key_lmax) / fl
+                cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2), key_lmax) / fl
 
+                # Replace the EE/BB entries in the output dictionary with the purified values
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
                 cl[1, 1] = cl_BB
-
                 corr_d[key] = replace(corr_d[key], array=cl)
     else:
         with progress.task("transform back to Cl") as task:

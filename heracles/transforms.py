@@ -202,29 +202,33 @@ def unrotate(cl, spin):
         )
 
 
-def _cl2corr(cl, spin, lmax=None, sampling_factor=1, xvals=None):
+def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     """
-    Get the correlation function from the power spectra, evaluated at points
-    cos(theta) = xvals, dispatching directly on the spin of `cl` instead of
-    always going through a fixed [T, Q+U, Q-U, cross] layout.
+    Get the correlation function of a single, already-rotated Cl COMPONENT
+    (1D array `cl[l]`) from the power spectrum, evaluated at points
+    cos(theta) = xvals, via the explicit kernel selected by `kernel`:
+    (0, 0) -> Legendre P_l (l from 0); (2, 2) -> Wigner d^l_{2,2}; (2, -2)
+    -> d^l_{2,-2}; (2, 0) (alias (0, 2)) -> d^l_{2,0} (l from 2 for the
+    polarization kernels). `cl` must already be the desired linear
+    combination of physical fields (e.g. Cl^EE+Cl^BB for kernel (2, 2)) --
+    use `rotate()` first to build that combination from a full [[EE, EB],
+    [BE, BB]] (or [Ta, Tb]) array.
     Use roots of Legendre polynomials (np.polynomial.legendre.leggauss) for accurate back integration with corr2cl.
     Note currently does not work at xvals=1 (can easily calculate that as special case!).
 
-    :param cl: Cl array, shape depending on spin: 1D `cl[l]` for spin (0, 0);
-        2D `cl[a, l]` (a in 0, 1) for spin (0, 2)/(2, 0); 3D
-        `cl[[EE, EB], [BE, BB]][l]` for spin (2, 2). Should include
+    :param cl: Cl component array, `cl[l]`. Should include
         :math:`\ell(\ell+1)/2\pi` factors.
-    :param spin: (s1, s2) spin of the field pair; only (0, 0), (0, 2)/(2, 0),
-        and (2, 2) are supported
+    :param kernel: (s1, s2) kernel selector; only (0, 0), (2, 0)/(0, 2),
+        (2, 2), and (2, -2) are supported
     :param lmax: optional maximum L to use from the cl array
     :param sampling_factor: oversampling factor for the quadrature grid,
         ignored if `xvals` is given
     :param xvals: if given, evaluate the correlation function at these
         cos(theta) points directly instead of the Gauss-Legendre quadrature
         grid -- e.g. to evaluate at arbitrary angles, not just quadrature
-        nodes (`corr2cl` then cannot be used to transform the result back)
-    :return: correlation function array with the same leading shape as `cl`,
-        but with the l axis replaced by the quadrature (theta) axis
+        nodes (`_corr2cl` then cannot be used to transform the result back)
+    :return: correlation function component array, the l axis replaced by
+        the quadrature (theta) axis
     """
     cl = np.asarray(cl, dtype=np.float64)
 
@@ -238,17 +242,17 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, xvals=None):
     ls = np.arange(0, lmax + 1, dtype=np.float64)
     facs = (2 * ls + 1) / (4 * np.pi)
 
-    if spin == (0, 0):
+    if kernel == (0, 0):
         ct = facs * cl[: lmax + 1]
         corr = np.empty(len(xvals))
         for i, x in enumerate(xvals):
-            P = legendre_funcs(lmax, x, spin)
+            P = legendre_funcs(lmax, x, (0, 0))
             corr[i] = np.dot(ct, P)
         return corr
-    elif spin not in ((0, 2), (2, 0), (2, 2)):
+    elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
         raise ValueError(
-            f"unsupported spin combination {spin!r}: only (0, 0), "
-            "(0, 2)/(2, 0), and (2, 2) are supported"
+            f"unsupported kernel {kernel!r}: only (0, 0), (0, 2)/(2, 0), "
+            "(2, 2), and (2, -2) are supported"
         )
 
     # For polarization, all arrays start at 2
@@ -257,50 +261,32 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, xvals=None):
     lfacs2 = (ls2 + 2) * (ls2 - 1)
     lrootfacs = np.sqrt(lfacs * lfacs2)
 
-    if spin in ((0, 2), (2, 0)):
-        # T x spin-2 cross correlation: both combinations use the same d20
-        cp, cm = facs[2:] * rotate(cl[:, 2 : lmax + 1], spin)
-        corr = np.empty((2, len(xvals)))
-        for i, x in enumerate(xvals):
-            d20, _, _ = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
-            corr[0, i] = np.dot(cp, d20)
-            corr[1, i] = np.dot(cm, d20)
-        return corr
-
-    # spin (2, 2): EE/BB use d22/d2m2 on the rotated diagonal pair,
-    # EB/BE use d22/d2m2 (negated) on the rotated anti-diagonal pair
-    r = rotate(cl, spin)
-    cp = facs[2:] * r[0, 0, 2 : lmax + 1]
-    cm = facs[2:] * r[0, 1, 2 : lmax + 1]
-    icp = facs[2:] * r[1, 1, 2 : lmax + 1]
-    icm = facs[2:] * r[1, 0, 2 : lmax + 1]
-    corr = np.zeros((2, 2, len(xvals)))
+    ct = facs[2:] * cl[2 : lmax + 1]
+    corr = np.empty(len(xvals))
     for i, x in enumerate(xvals):
-        _, d22, d2m2 = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
-        corr[0, 0, i] = np.dot(cp, d22)  # EE-like
-        corr[1, 1, i] = np.dot(cm, d2m2)  # BB-like
-        corr[0, 1, i] = -np.dot(icp, d22)  # EB-like
-        corr[1, 0, i] = -np.dot(icm, d2m2)  # BE-like
+        d20, d22, d2m2 = legendre_funcs(lmax, x, (2, 2), lfacs, lfacs2, lrootfacs)
+        d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
+        corr[i] = np.dot(ct, d)
     return corr
 
 
-def _corr2cl(corr, spin, lmax=None, sampling_factor=1):
+def _corr2cl(corr, kernel, lmax=None, sampling_factor=1):
     """
-    Transform from correlation functions to power spectra, dispatching
-    directly on the spin of `corr` instead of always going through a fixed
-    [T, Q+U, Q-U, cross] layout.
-    Note that using cl2corr followed by corr2cl is generally very accurate (< 1e-5 relative error) if
+    Transform a single correlation-function component (1D array) back to a
+    single Cl component, via the explicit kernel selected by `kernel` --
+    see `_cl2corr` for the supported kernel values and conventions. This is
+    the inverse of `_cl2corr`.
+    Note that using _cl2corr followed by _corr2cl is generally very accurate (< 1e-5 relative error) if
     xvals, weights = np.polynomial.legendre.leggauss(lmax+1)
 
-    :param corr: correlation array, mirroring `_cl2corr`'s output shape for
-        the given spin (1D, 2D, or 3D -- see `_cl2corr`)
-    :param spin: (s1, s2) spin of the field pair; only (0, 0), (0, 2)/(2, 0),
-        and (2, 2) are supported
+    :param corr: correlation function component array, mirroring
+        `_cl2corr`'s output shape
+    :param kernel: (s1, s2) kernel selector; only (0, 0), (2, 0)/(0, 2),
+        (2, 2), and (2, -2) are supported
     :param lmax: maximum :math:`\ell` to calculate :math:`C_\ell`
     :param sampling_factor: oversampling factor for the quadrature grid
-    :return: Cl array with the same leading shape as `corr`, but with the
-        theta axis replaced by the l axis. Includes
-        :math:`\ell(\ell+1)/2\pi` factors.
+    :return: Cl component array, the theta axis replaced by the l axis.
+        Includes :math:`\ell(\ell+1)/2\pi` factors.
     """
     corr = np.asarray(corr, dtype=np.float64)
 
@@ -309,16 +295,16 @@ def _corr2cl(corr, spin, lmax=None, sampling_factor=1):
 
     xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
 
-    if spin == (0, 0):
+    if kernel == (0, 0):
         cl = np.zeros(lmax + 1)
         for x, weight, c in zip(xvals, weights, corr):
-            P = legendre_funcs(lmax, x, spin)
+            P = legendre_funcs(lmax, x, (0, 0))
             cl += (weight * c) * P
         return 2 * np.pi * cl
-    elif spin not in ((0, 2), (2, 0), (2, 2)):
+    elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
         raise ValueError(
-            f"unsupported spin combination {spin!r}: only (0, 0), "
-            "(0, 2)/(2, 0), and (2, 2) are supported"
+            f"unsupported kernel {kernel!r}: only (0, 0), (0, 2)/(2, 0), "
+            "(2, 2), and (2, -2) are supported"
         )
 
     # For polarization, all arrays start at 2
@@ -327,25 +313,12 @@ def _corr2cl(corr, spin, lmax=None, sampling_factor=1):
     lfacs2 = (ls + 2) * (ls - 1)
     lrootfacs = np.sqrt(lfacs * lfacs2)
 
-    if spin in ((0, 2), (2, 0)):
-        clp = np.zeros(lmax + 1)
-        clm = np.zeros(lmax + 1)
-        for i, (x, weight) in enumerate(zip(xvals, weights)):
-            d20, _, _ = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
-            clp[2:] += (weight * corr[0, i]) * d20
-            clm[2:] += (weight * corr[1, i]) * d20
-        return 2 * np.pi * unrotate(np.array([clp, clm]), spin)
-
-    # spin (2, 2): undo each slot's own kernel (matching how _cl2corr
-    # produced it) to recover rotate(cl) exactly, then unrotate
-    r = np.zeros((2, 2, lmax + 1))
-    for i, (x, weight) in enumerate(zip(xvals, weights)):
-        _, d22, d2m2 = legendre_funcs(lmax, x, spin, lfacs, lfacs2, lrootfacs)
-        r[0, 0, 2:] += (weight * corr[0, 0, i]) * d22
-        r[0, 1, 2:] += (weight * corr[1, 1, i]) * d2m2
-        r[1, 0, 2:] += -(weight * corr[1, 0, i]) * d2m2
-        r[1, 1, 2:] += -(weight * corr[0, 1, i]) * d22
-    return 2 * np.pi * unrotate(r, spin)
+    cl = np.zeros(lmax + 1)
+    for x, weight, c in zip(xvals, weights, corr):
+        d20, d22, d2m2 = legendre_funcs(lmax, x, (2, 2), lfacs, lfacs2, lrootfacs)
+        d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
+        cl[2:] += (weight * c) * d
+    return 2 * np.pi * cl
 
 
 def cl2corr(cls, progress: Progress | None = None):
@@ -373,8 +346,47 @@ def cl2corr(cls, progress: Progress | None = None):
             # Determine lmax from ell field or shape along ell axis
             lmax = len(get_result_array(cl, "ell")[0]) - 1
             xvals, _ = _cached_gauss_legendre(lmax + 1)
-            # transform to corrs, dispatching directly on spin
-            wd = _cl2corr(cl.array, spin, lmax=lmax)
+            # transform to corrs, dispatching directly on spin: rotate into
+            # the "+/-" basis, then transform each rotated component with
+            # its own kernel
+            if spin == (0, 0):
+                wd = _cl2corr(cl.array, (0, 0), lmax=lmax)
+            elif spin in ((0, 2), (2, 0)):
+                # T x spin-2 cross correlation: both combinations use the
+                # same d20 kernel
+                cp, cm = rotate(cl.array, spin)
+                wd = np.array(
+                    [
+                        _cl2corr(cp, (2, 0), lmax=lmax),
+                        _cl2corr(cm, (2, 0), lmax=lmax),
+                    ]
+                )
+            else:
+                # spin (2, 2): EE/BB use d22/d2m2 on the rotated diagonal
+                # pair, EB/BE use d22/d2m2 (negated) on the rotated
+                # anti-diagonal pair. Kept as one shared loop (rather than
+                # 4 separate _cl2corr component calls) so allP/alldP are
+                # computed once per quadrature point instead of 4 times.
+                ls = np.arange(0, lmax + 1, dtype=np.float64)
+                facs = (2 * ls + 1) / (4 * np.pi)
+                ls2 = ls[2:]
+                lfacs = ls2 * (ls2 + 1)
+                lfacs2 = (ls2 + 2) * (ls2 - 1)
+                lrootfacs = np.sqrt(lfacs * lfacs2)
+                r = rotate(cl.array, spin)
+                cp = facs[2:] * r[0, 0, 2 : lmax + 1]
+                cm = facs[2:] * r[0, 1, 2 : lmax + 1]
+                icp = facs[2:] * r[1, 1, 2 : lmax + 1]
+                icm = facs[2:] * r[1, 0, 2 : lmax + 1]
+                wd = np.zeros((2, 2, len(xvals)))
+                for i, x in enumerate(xvals):
+                    _, d22, d2m2 = legendre_funcs(
+                        lmax, x, spin, lfacs, lfacs2, lrootfacs
+                    )
+                    wd[0, 0, i] = np.dot(cp, d22)  # EE-like
+                    wd[1, 1, i] = np.dot(cm, d2m2)  # BB-like
+                    wd[0, 1, i] = -np.dot(icp, d22)  # EB-like
+                    wd[1, 0, i] = -np.dot(icm, d2m2)  # BE-like
             # Add metadata back
             wd = np.array(list(wd), dtype=dtype)
             wds[key] = replace(
@@ -409,9 +421,34 @@ def corr2cl(wds, progress: Progress | None = None):
             dtype = wd.array.dtype
             # Derive lmax from xvals stored in the correlation's ell field
             xvals = get_result_array(wd, "ell")[0]
+            weights = _cached_gauss_legendre(len(xvals))[1]
             lmax = len(xvals) - 1
-            # transform to cl, dispatching directly on spin
-            cl = _corr2cl(wd.array, spin, lmax=lmax)
+            # transform to cl, dispatching directly on spin: undo each
+            # rotated component's own kernel, then unrotate back to the
+            # physical [[EE, EB], [BE, BB]] (or [Ta, Tb]) layout
+            if spin == (0, 0):
+                cl = _corr2cl(wd.array, (0, 0), lmax=lmax)
+            elif spin in ((0, 2), (2, 0)):
+                clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax)
+                clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax)
+                cl = unrotate(np.array([clp, clm]), spin)
+            else:
+                # spin (2, 2): kept as one shared loop, mirroring cl2corr's
+                # (2, 2) branch -- see there for the kernel/slot mapping.
+                ls = np.arange(2, lmax + 1, dtype=np.float64)
+                lfacs = ls * (ls + 1)
+                lfacs2 = (ls + 2) * (ls - 1)
+                lrootfacs = np.sqrt(lfacs * lfacs2)
+                r = np.zeros((2, 2, lmax + 1))
+                for i, (x, weight) in enumerate(zip(xvals, weights)):
+                    _, d22, d2m2 = legendre_funcs(
+                        lmax, x, spin, lfacs, lfacs2, lrootfacs
+                    )
+                    r[0, 0, 2:] += (weight * wd.array[0, 0, i]) * d22
+                    r[0, 1, 2:] += (weight * wd.array[1, 1, i]) * d2m2
+                    r[1, 0, 2:] += -(weight * wd.array[1, 0, i]) * d2m2
+                    r[1, 1, 2:] += -(weight * wd.array[0, 1, i]) * d22
+                cl = 2 * np.pi * unrotate(r, spin)
             # Add metadata back
             cl = np.array(list(cl), dtype=dtype)
             cls[key] = replace(

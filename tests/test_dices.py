@@ -139,23 +139,30 @@ def test_polspice(cls0):
     _cl_tt = heracles.transforms._corr2cl(corr_tt, (0, 0))
     assert np.isclose(cl_tt[2:], _cl_tt[2:]).all()
 
-    # EE/BB round-trip (spin (2, 2), no EB/BE cross-term)
+    # EE/BB round-trip (spin (2, 2), no EB/BE cross-term): rotate manually
+    # into the "+"/"-" combinations, then transform each rotated component
+    # with its own kernel -- (2, 2) for "+", (2, -2) for "-"
     cl_ee = get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0]
     cl_bb = get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1]
-    cl_eebb = np.array(
-        [[cl_ee, np.zeros_like(cl_ee)], [np.zeros_like(cl_bb), cl_bb]]
-    )
-    corr_eebb = heracles.transforms._cl2corr(cl_eebb, (2, 2))
-    _cl_eebb = heracles.transforms._corr2cl(corr_eebb, (2, 2))
-    assert np.isclose(cl_eebb[0, 0, 2:], _cl_eebb[0, 0, 2:]).all()
-    assert np.isclose(cl_eebb[1, 1, 2:], _cl_eebb[1, 1, 2:]).all()
+    cp, cm = cl_ee + cl_bb, cl_ee - cl_bb
+    xi_p = heracles.transforms._cl2corr(cp, (2, 2))
+    xi_m = heracles.transforms._cl2corr(cm, (2, -2))
+    _cp = heracles.transforms._corr2cl(xi_p, (2, 2))
+    _cm = heracles.transforms._corr2cl(xi_m, (2, -2))
+    _cl_ee, _cl_bb = (_cp + _cm) / 2, (_cp - _cm) / 2
+    assert np.isclose(cl_ee[2:], _cl_ee[2:]).all()
+    assert np.isclose(cl_bb[2:], _cl_bb[2:]).all()
 
-    # TE round-trip (one spin zero, no TB counterpart)
+    # TE round-trip (one spin zero, no TB counterpart): both rotated
+    # combinations share the same (2, 0) kernel
     cl_te = get_cl(("POS", "SHE", 1, 1), cls0)[0]
-    cl_txe = np.array([cl_te, np.zeros_like(cl_te)])
-    corr_txe = heracles.transforms._cl2corr(cl_txe, (0, 2))
-    _cl_txe = heracles.transforms._corr2cl(corr_txe, (0, 2))
-    assert np.isclose(cl_txe[0, 2:], _cl_txe[0, 2:]).all()
+    cp, cm = cl_te, cl_te
+    corr_p = heracles.transforms._cl2corr(cp, (2, 0))
+    corr_m = heracles.transforms._cl2corr(cm, (2, 0))
+    _cp = heracles.transforms._corr2cl(corr_p, (2, 0))
+    _cm = heracles.transforms._corr2cl(corr_m, (2, 0))
+    _cl_te = (_cp + _cm) / 2
+    assert np.isclose(cl_te[2:], _cl_te[2:]).all()
 
 
 def test_decouple_recovers_ee_minus_bb():
@@ -178,20 +185,15 @@ def test_decouple_recovers_ee_minus_bb():
     cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
     cl_bb[2:] = 0.3 * rng.uniform(0.5, 1.5, lmax - 1) / (ls[2:] * (ls[2:] + 1)) ** 1.2
 
-    cl = np.zeros((2, 2, lmax + 1))
-    cl[0, 0] = cl_ee
-    cl[1, 1] = cl_bb
-    corr = heracles.transforms._cl2corr(cl, (2, 2), lmax=lmax)
-    xi_p, xi_m = corr[0, 0], corr[1, 1]
+    xi_p = heracles.transforms._cl2corr(cl_ee + cl_bb, (2, 2), lmax=lmax)
+    xi_m = heracles.transforms._cl2corr(cl_ee - cl_bb, (2, -2), lmax=lmax)
     n = xi_p.shape[0]
     xvals = np.polynomial.legendre.leggauss(n)[0]
     theta = np.degrees(np.arccos(xvals))
     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
     def isolate(x):
-        c = np.zeros((2, 2, n))
-        c[1, 1] = x
-        return heracles.transforms._corr2cl(c, (2, 2), lmax=lmax)[0, 0]
+        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
 
     fl = isolate(csc2)  # no apodization (apod=1) -> Fl is exactly constant (=pi)
     with np.errstate(invalid="ignore"):
@@ -214,10 +216,10 @@ def test_decouple_finite_with_apodization():
 
     lmax = 40
     ls = np.arange(lmax + 1)
-    cl = np.zeros((2, 2, lmax + 1))
-    cl[0, 0, 2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
-    corr = heracles.transforms._cl2corr(cl, (2, 2), lmax=lmax)
-    xi_p, xi_m = corr[0, 0], corr[1, 1]
+    cl_ee = np.zeros(lmax + 1)
+    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    xi_p = heracles.transforms._cl2corr(cl_ee, (2, 2), lmax=lmax)
+    xi_m = heracles.transforms._cl2corr(cl_ee, (2, -2), lmax=lmax)
     n = xi_p.shape[0]
     xvals = np.polynomial.legendre.leggauss(n)[0]
     theta = np.degrees(np.arccos(xvals))
@@ -226,9 +228,7 @@ def test_decouple_finite_with_apodization():
     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
     def isolate(x):
-        c = np.zeros((2, 2, n))
-        c[1, 1] = x
-        return heracles.transforms._corr2cl(c, (2, 2), lmax=lmax)[0, 0]
+        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
 
     fl = isolate(apod * csc2)
     with np.errstate(invalid="ignore"):
