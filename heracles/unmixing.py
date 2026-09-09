@@ -53,7 +53,7 @@ def gaussian_apod(theta, fwhm, thetamax=None):
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def _isolate(x, lmax, mumin=None):
+def _isolate(x, lmax):
     """
     Feed correlation function `x` through the spin-(2,2) "-" (Xi_m) slot and
     return the resulting E-mode (l-space) component. This is the building
@@ -61,13 +61,12 @@ def _isolate(x, lmax, mumin=None):
     both the numerator (Xi_p +/- Xi_m of the masked data, weighted by the
     csc^2(theta/2) kernel) and the normalization Fl (the same kernel applied
     to the apodized mask correlation) are obtained by running the relevant
-    theta-space quantity through this same transform. `mumin` must match
-    whatever quadrature grid `x` itself was evaluated on.
+    theta-space quantity through this same transform.
     """
     n = x.shape[-1]
     corr = np.zeros((2, 2, n))
     corr[1, 1] = x
-    return _corr2cl(corr, (2, 2), lmax=lmax, mumin=mumin)[0, 0]
+    return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
 def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
@@ -172,13 +171,6 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     if progress is None:
         progress = NoProgress()
 
-    # PolSpice restricts its entire quadrature grid to cos(theta) in
-    # [mumin, 1] whenever a finite -thetamax is given (spice_subs.f90:
-    # `mumin = cos(thetamax)`), rather than treating theta_max merely as
-    # an extra cutoff applied after transforming on the full sphere. Match
-    # that here: mumin=None (the default) behaves exactly as before.
-    mumin = None if theta_max is None else np.cos(np.radians(theta_max))
-
     first_wd = list(d.values())[0]
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
@@ -188,9 +180,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     d = binned(d, np.arange(0, lmax_mask + 1))
 
     with progress.task("data correlations") as task:
-        wd = cl2corr(d, progress=task, mumin=mumin)
+        wd = cl2corr(d, progress=task)
     with progress.task("mask correlations") as task:
-        wm = cl2corr(m, progress=task, mumin=mumin)
+        wm = cl2corr(m, progress=task)
     with progress.task("unmixing") as task:
         corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task)
 
@@ -200,7 +192,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
             # start from the regular (natural/mask-ratio) transform, which
             # already gives us correct TT/TE/EB -- purification (PolSpice's
             # "decouple") only changes how EE/BB are estimated.
-            corr_d = corr2cl(corr_wd, mumin=mumin)
+            corr_d = corr2cl(corr_wd)
 
             masks = {}
             for key, field in fields.items():
@@ -244,9 +236,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 theta = np.degrees(np.arccos(xvals))
                 # NOTE: this apodization window is PolSpice's independent
                 # -apodizesigma option, *not* the same thing as theta_max
-                # (-thetamax, the grid/integration cutoff already handled
-                # via mumin/thetamax_rad above) -- naturalspice doesn't
-                # currently expose apodizesigma separately. Chon et al.
+                # (-thetamax, the integration cutoff handled via
+                # thetamax_rad below) -- naturalspice doesn't currently
+                # expose apodizesigma separately. Chon et al.
                 # (2004) recommend apodizesigma = theta_max/2, so that is
                 # used as the default width whenever theta_max is given
                 # (verified against PolSpice's own Fl(l) dump,
@@ -269,10 +261,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 # C+(beta) at the Gauss-Legendre nodes is just Xi_p, the
                 # ratio of the Xi_+ (EE+BB) and mask correlations already
                 # computed above at those same nodes -- no need to re-derive
-                # it from the Cls (see _cumul_pure_eb's docstring). No
-                # zero-guard needed: theta_max/mumin already restricts this
-                # grid to where wm_arr (the mask correlation) is nonzero,
-                # same as the unguarded Xi_m above.
+                # it from the Cls (see _cumul_pure_eb's docstring).
                 Xi_p = wd[key][0, 0] / wm_arr
 
                 cl_ee_raw = d[key].array[0, 0]
@@ -301,10 +290,10 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 # cl = cl_raw/Fl = 2*pi*isolate(xi_final)/isolate(apod*csc2).
                 # Verified against PolSpice's own Fl(l)/cl(l,2)/cl(l,3) dump
                 # (SPICE_FL_DEBUG) to machine precision for l >= 2.
-                fl = _isolate(apod * csc2, key_lmax, mumin=mumin)
+                fl = _isolate(apod * csc2, key_lmax)
                 with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = 2 * np.pi * _isolate(xi_EE, key_lmax, mumin=mumin) / fl
-                    cl_BB = 2 * np.pi * _isolate(xi_BB, key_lmax, mumin=mumin) / fl
+                    cl_EE = 2 * np.pi * _isolate(xi_EE, key_lmax) / fl
+                    cl_BB = 2 * np.pi * _isolate(xi_BB, key_lmax) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
@@ -313,7 +302,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 corr_d[key] = replace(corr_d[key], array=cl)
     else:
         with progress.task("transform back to Cl") as task:
-            corr_d = corr2cl(corr_wd, progress=task, mumin=mumin)
+            corr_d = corr2cl(corr_wd, progress=task)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))
@@ -342,8 +331,7 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
 
     if theta_max is not None:
         first_wm = list(wm.values())[0]
-        # reuse wm's own grid (which may be mumin-restricted) rather than
-        # recomputing a fresh, possibly-inconsistent one
+        # reuse wm's own grid rather than recomputing a fresh one
         xvals = get_result_array(first_wm, "ell")[0]
         theta = np.arccos(xvals) * 180 / np.pi
         i_theta_max = np.abs(theta - theta_max).argmin()

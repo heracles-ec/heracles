@@ -34,22 +34,15 @@ gauss_legendre = None
 _gauss_legendre_cache = {}
 
 
-def _cached_gauss_legendre(npoints, cache=True, mumin=None):
+def _cached_gauss_legendre(npoints, cache=True):
     """
-    Gauss-Legendre quadrature nodes/weights for `npoints` points.
-
-    By default (`mumin=None`) these are the standard nodes on [-1, 1]. If
-    `mumin` is given, the nodes/weights are rescaled to [mumin, 1] instead
-    -- matching PolSpice's `mumin = cos(thetamax)` (`spice_subs.f90`),
-    which restricts its entire quadrature grid to the angular range
-    [0, thetamax] whenever a finite `-thetamax` is given, rather than
-    treating it merely as an extra integration cutoff applied afterwards.
+    Gauss-Legendre quadrature nodes/weights for `npoints` points on [-1, 1].
     """
-    key = (npoints, mumin)
+    key = npoints
     if cache and key in _gauss_legendre_cache:
         return _gauss_legendre_cache[key]
     else:
-        if gauss_legendre is not None and mumin is None:
+        if gauss_legendre is not None:
             xvals = np.empty(npoints)
             weights = np.empty(npoints)
             gauss_legendre(xvals, weights, npoints)
@@ -57,11 +50,6 @@ def _cached_gauss_legendre(npoints, cache=True, mumin=None):
             weights.flags.writeable = False
         else:
             xvals, weights = np.polynomial.legendre.leggauss(npoints)
-            if mumin is not None:
-                # rescale from [-1, 1] to [mumin, 1]
-                half_width = 0.5 * (1.0 - mumin)
-                xvals = half_width * xvals + (1.0 - half_width)
-                weights = half_width * weights
             xvals.flags.writeable = False
             weights.flags.writeable = False
         if cache:
@@ -214,7 +202,7 @@ def unrotate(cl, spin):
         )
 
 
-def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None, xvals=None):
+def _cl2corr(cl, spin, lmax=None, sampling_factor=1, xvals=None):
     """
     Get the correlation function from the power spectra, evaluated at points
     cos(theta) = xvals, dispatching directly on the spin of `cl` instead of
@@ -231,9 +219,6 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None, xvals=None):
     :param lmax: optional maximum L to use from the cl array
     :param sampling_factor: oversampling factor for the quadrature grid,
         ignored if `xvals` is given
-    :param mumin: if given, restrict the quadrature grid to
-        cos(theta) in [mumin, 1] instead of the default [-1, 1], ignored if
-        `xvals` is given
     :param xvals: if given, evaluate the correlation function at these
         cos(theta) points directly instead of the Gauss-Legendre quadrature
         grid -- e.g. to evaluate at arbitrary angles, not just quadrature
@@ -247,7 +232,7 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None, xvals=None):
         lmax = cl.shape[-1] - 1
 
     if xvals is None:
-        xvals, _ = _cached_gauss_legendre(int(sampling_factor * lmax) + 1, mumin=mumin)
+        xvals, _ = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
     else:
         xvals = np.asarray(xvals, dtype=np.float64)
     ls = np.arange(0, lmax + 1, dtype=np.float64)
@@ -299,7 +284,7 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None, xvals=None):
     return corr
 
 
-def _corr2cl(corr, spin, lmax=None, sampling_factor=1, mumin=None):
+def _corr2cl(corr, spin, lmax=None, sampling_factor=1):
     """
     Transform from correlation functions to power spectra, dispatching
     directly on the spin of `corr` instead of always going through a fixed
@@ -313,9 +298,6 @@ def _corr2cl(corr, spin, lmax=None, sampling_factor=1, mumin=None):
         and (2, 2) are supported
     :param lmax: maximum :math:`\ell` to calculate :math:`C_\ell`
     :param sampling_factor: oversampling factor for the quadrature grid
-    :param mumin: if given, restrict the quadrature grid to
-        cos(theta) in [mumin, 1] instead of the default [-1, 1] -- must
-        match whatever `mumin` produced `corr` (e.g. via `_cl2corr`)
     :return: Cl array with the same leading shape as `corr`, but with the
         theta axis replaced by the l axis. Includes
         :math:`\ell(\ell+1)/2\pi` factors.
@@ -325,7 +307,7 @@ def _corr2cl(corr, spin, lmax=None, sampling_factor=1, mumin=None):
     if lmax is None:
         lmax = corr.shape[-1] - 1
 
-    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1, mumin=mumin)
+    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
 
     if spin == (0, 0):
         cl = np.zeros(lmax + 1)
@@ -366,16 +348,12 @@ def _corr2cl(corr, spin, lmax=None, sampling_factor=1, mumin=None):
     return 2 * np.pi * unrotate(r, spin)
 
 
-def cl2corr(cls, progress: Progress | None = None, mumin=None):
+def cl2corr(cls, progress: Progress | None = None):
     """
     Transforms cls to correlation functions
     Args:
         cls: Data Cl
         progress: optional progress reporter
-        mumin: if given, restrict the quadrature grid to cos(theta) in
-            [mumin, 1] instead of the default [-1, 1] (see
-            `_cached_gauss_legendre`). Pass the same `mumin` to a later
-            `corr2cl` call to transform back consistently.
     Returns:
         corr: correlation function
     """
@@ -394,9 +372,9 @@ def cl2corr(cls, progress: Progress | None = None, mumin=None):
             dtype = cl.array.dtype
             # Determine lmax from ell field or shape along ell axis
             lmax = len(get_result_array(cl, "ell")[0]) - 1
-            xvals, _ = _cached_gauss_legendre(lmax + 1, mumin=mumin)
+            xvals, _ = _cached_gauss_legendre(lmax + 1)
             # transform to corrs, dispatching directly on spin
-            wd = _cl2corr(cl.array, spin, lmax=lmax, mumin=mumin)
+            wd = _cl2corr(cl.array, spin, lmax=lmax)
             # Add metadata back
             wd = np.array(list(wd), dtype=dtype)
             wds[key] = replace(
@@ -407,15 +385,12 @@ def cl2corr(cls, progress: Progress | None = None, mumin=None):
     return wds
 
 
-def corr2cl(wds, progress: Progress | None = None, mumin=None):
+def corr2cl(wds, progress: Progress | None = None):
     """
     Transforms correlation functions to cls
     Args:
         wds: data correlation functions
         progress: optional progress reporter
-        mumin: if given, must match the `mumin` that produced `wds` (e.g.
-            via `cl2corr`) -- restricts the quadrature grid to cos(theta)
-            in [mumin, 1] instead of the default [-1, 1]
     Returns:
         corr: correlation function
     """
@@ -436,7 +411,7 @@ def corr2cl(wds, progress: Progress | None = None, mumin=None):
             xvals = get_result_array(wd, "ell")[0]
             lmax = len(xvals) - 1
             # transform to cl, dispatching directly on spin
-            cl = _corr2cl(wd.array, spin, lmax=lmax, mumin=mumin)
+            cl = _corr2cl(wd.array, spin, lmax=lmax)
             # Add metadata back
             cl = np.array(list(cl), dtype=dtype)
             cls[key] = replace(
