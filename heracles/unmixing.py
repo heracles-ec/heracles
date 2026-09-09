@@ -31,16 +31,19 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(x, x0=-2, k=20):
+def logistic(theta, thetamax, k=1.0):
     """
-    Logistic sigmoid, ranging from ~0 well below `x0` to ~1 well above it.
-    Used by `_naturalspice`'s default "logistic" apodization as a
-    multiplicative weight on the natural mask-ratio correlation, evaluated
-    at `x = log10(abs(Xi_mask))`: this suppresses the ratio near the mask
-    correlation's zero-crossings (where dividing by it would otherwise
-    blow up) while leaving it essentially untouched away from them.
+    Logistic-sigmoid apodization window in theta (degrees), analogous to
+    `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
+    with the step centered at `thetamax` and its smoothness set by `k`
+    (degrees^-1; larger k -> sharper step, k -> infinity recovers a hard
+    cutoff at thetamax).
+    If `thetamax` is None, no apodization is applied (flat weight of 1
+    everywhere).
     """
-    return 1.0 / (1.0 + np.exp(-k * (x - x0)))
+    if thetamax is None:
+        return np.ones_like(theta)
+    return 1.0 / (1.0 + np.exp(k * (theta - thetamax)))
 
 
 def gaussian(theta, thetamax):
@@ -65,32 +68,22 @@ def gaussian(theta, thetamax):
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def apod_window(theta, thetamax, wm_arr=None, type="logistic"):
+def apod_window(theta, thetamax, type="logistic"):
     """
     Unified apodization-window dispatch, shared by `naturalspice`'s
     purify loop and `_naturalspice`. Returns a multiplicative weight the
-    same shape as `theta`, in [0, 1].
-
-    If `thetamax` is None, no apodization is applied (flat weight of 1)
-    regardless of `type` -- this is the single guard both call sites
-    used to duplicate.
-
-    `type="logistic"` needs `wm_arr` (the mask correlation function's own
-    array): the weight is a sigmoid in log10(abs(wm_arr)), centered on
-    the mask correlation's own value at the node closest to `thetamax`,
-    which suppresses the natural (mask-ratio) estimator near the mask
-    correlation's zero-crossings without needing `theta` itself.
-    `type="gaussian"` only needs `theta`/`thetamax` (PolSpice's
-    apodizefunction type 0, see `gaussian`). Any other `type` (or an
-    unset `wm_arr` for "logistic") also means no apodization.
+    same shape as `theta`, in [0, 1]: `type="logistic"` (see `logistic`)
+    or `type="gaussian"` (PolSpice's apodizefunction type 0, see
+    `gaussian`) -- both take `theta`/`thetamax` the same way, and both
+    already return a flat weight of 1 (no apodization) if `thetamax` is
+    None. Any other `type` also means no apodization.
     """
-    if thetamax is None or type not in ("logistic", "gaussian"):
-        return 1.0
     if type == "logistic":
-        i_theta_max = np.abs(theta - thetamax).argmin()
-        x0 = np.log10(abs(wm_arr[i_theta_max]))
-        return logistic(np.log10(abs(wm_arr)), x0=x0)
-    return gaussian(theta, thetamax)
+        return logistic(theta, thetamax)
+    elif type == "gaussian":
+        return gaussian(theta, thetamax)
+    else:
+        return 1.0
 
 
 def purify_xip(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
@@ -274,7 +267,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 theta = np.degrees(np.arccos(xvals))
                 wm_arr = get_cl(m_key, wm).array
 
-                apod = apod_window(theta, theta_max, wm_arr=wm_arr, type=apodization)
+                apod = apod_window(theta, theta_max, type=apodization)
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
@@ -357,7 +350,7 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
             theta = np.degrees(np.arccos(xvals))
         else:
             theta = None
-        apod = apod_window(theta, theta_max, wm_arr=_wm, type=apodization)
+        apod = apod_window(theta, theta_max, type=apodization)
         corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds
