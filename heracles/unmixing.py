@@ -35,7 +35,7 @@ def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def gaussian_apod(theta, fwhm, thetamax=None):
+def gaussian(theta, fwhm, thetamax=None):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
     `apodizefunction` type 0 (apodize_mod.f90): `fwhm` (PolSpice's
@@ -54,20 +54,6 @@ def gaussian_apod(theta, fwhm, thetamax=None):
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def _isolate(x, lmax):
-    """
-    Feed correlation function `x` through the spin-(2,2) "-" (Xi_m) slot and
-    return the resulting E-mode (l-space) component. This is the building
-    block of PolSpice's EE/BB "decouple" estimator (Chon et al. 2004, eq. 65):
-    both the numerator (Xi_p +/- Xi_m of the masked data, weighted by the
-    csc^2(theta/2) kernel) and the normalization Fl (the same kernel applied
-    to the apodized mask correlation) are obtained by running the relevant
-    theta-space quantity through this same transform.
-    """
-    n = x.shape[-1]
-    corr = np.zeros((2, 2, n))
-    corr[1, 1] = x
-    return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
 def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
@@ -273,7 +259,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 # the previous behaviour, was wrong by a large,
                 # l-dependent factor).
                 apod = (
-                    gaussian_apod(theta, theta_max / 2, thetamax=theta_max)
+                    gaussian(theta, theta_max / 2, thetamax=theta_max)
                     if theta_max is not None
                     else np.ones_like(theta)
                 )
@@ -305,16 +291,21 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 xi_BB = xi_BB * apod
 
                 # PolSpice's do_cl_from_xi (decouple branch): cl_raw(l) =
-                # 2*_isolate(xi_final)(l), Fl(l) = _isolate(apod*csc2)(l)/pi
-                # (both exact identities of _isolate's own d2m2-kernel sum,
-                # not dependent on any full-sky assumption), so
-                # cl = cl_raw/Fl = 2*pi*isolate(xi_final)/isolate(apod*csc2).
-                # Verified against PolSpice's own Fl(l)/cl(l,2)/cl(l,3) dump
+                # 2*isolate(xi_final)(l), Fl(l) = isolate(apod*csc2)(l)/pi
+                # (both exact identities of this same d2m2-kernel sum, not
+                # dependent on any full-sky assumption), so cl = cl_raw/Fl
+                # = 2*pi*isolate(xi_final)/isolate(apod*csc2). Verified
+                # against PolSpice's own Fl(l)/cl(l,2)/cl(l,3) dump
                 # (SPICE_FL_DEBUG) to machine precision for l >= 2.
-                fl = _isolate(apod * csc2, key_lmax)
+                def isolate(x):
+                    corr = np.zeros((2, 2, key_lmax + 1))
+                    corr[1, 1] = x
+                    return _corr2cl(corr, (2, 2), lmax=key_lmax)[0, 0]
+
+                fl = isolate(apod * csc2)
                 with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = 2 * np.pi * _isolate(xi_EE, key_lmax) / fl
-                    cl_BB = 2 * np.pi * _isolate(xi_BB, key_lmax) / fl
+                    cl_EE = 2 * np.pi * isolate(xi_EE) / fl
+                    cl_BB = 2 * np.pi * isolate(xi_BB) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
@@ -379,7 +370,7 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         elif apodization == "gaussian":
             xvals = wm[m_key].ell
             theta = np.degrees(np.arccos(xvals))
-            _wm /= gaussian_apod(theta, theta_max)
+            _wm /= gaussian(theta, theta_max)
         corr_wds[key] = replace(wd[key], array=_wd/_wm)
 
     return corr_wds

@@ -210,7 +210,7 @@ def test_decouple_finite_with_apodization():
     finite -- unlike the earlier delta-function `purify()` operator, which
     blew up for `theta` just past `theta_max`.
     """
-    from heracles.unmixing import gaussian_apod
+    from heracles.unmixing import gaussian
 
     lmax = 40
     ls = np.arange(lmax + 1)
@@ -222,7 +222,7 @@ def test_decouple_finite_with_apodization():
     xvals = np.polynomial.legendre.leggauss(n)[0]
     theta = np.degrees(np.arccos(xvals))
 
-    apod = gaussian_apod(theta, 30.0)
+    apod = gaussian(theta, 30.0)
     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
     def isolate(x):
