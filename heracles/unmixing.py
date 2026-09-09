@@ -20,7 +20,7 @@ import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
-from .transforms import cl2corr, corr2cl, _corr2cl, legendre_funcs, legendre_p_all
+from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl
 from .utils import get_cl
 
 try:
@@ -77,19 +77,21 @@ def _cplus(cl_ee_plus_bb, cl_mask, lmax, beta):
     quadrature nodes. Port of PolSpice's `cplus` (cumul2.f90): the raw
     (masked, not yet mask-ratio-divided) Xi_+ = Xi_QQ+Xi_UU correlation of
     the data, normalized by the mask's own (real-space) autocorrelation.
+
+    This is just `_cl2corr`'s own spin-(2,2)/(0,0) machinery (which
+    already rotates the Cl into the +/- basis internally) evaluated at
+    arbitrary points instead of the Gauss-Legendre quadrature grid -- the
+    same rotate-then-transform-then-divide-by-the-mask-correlation done by
+    `_naturalspice` itself when no apodization is applied, just off-grid.
     """
-    ell = np.arange(lmax + 1)
-    w2l1 = 2 * ell + 1
     beta = np.atleast_1d(beta)
-    x = np.cos(beta)
-    out = np.empty(len(x))
-    for i, xx in enumerate(x):
-        p_ell = legendre_p_all(lmax, xx)
-        _, d22, _ = legendre_funcs(lmax, xx, (2, 2))
-        num = np.sum(cl_ee_plus_bb[2:] * d22 * w2l1[2:])
-        den = np.sum(cl_mask * p_ell * w2l1)
-        out[i] = num / den if den > 0 else 0.0
-    return out
+    xvals = np.cos(beta)
+    cl = np.zeros((2, 2, lmax + 1))
+    cl[0, 0] = cl_ee_plus_bb[: lmax + 1]
+    xi_p = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals)[0, 0]
+    xi_mask = _cl2corr(cl_mask[: lmax + 1], (0, 0), lmax=lmax, xvals=xvals)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(xi_mask > 0, xi_p / xi_mask, 0.0)
 
 
 def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):

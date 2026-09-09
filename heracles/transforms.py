@@ -214,7 +214,7 @@ def unrotate(cl, spin):
         )
 
 
-def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None):
+def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None, xvals=None):
     """
     Get the correlation function from the power spectra, evaluated at points
     cos(theta) = xvals, dispatching directly on the spin of `cl` instead of
@@ -229,9 +229,15 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None):
     :param spin: (s1, s2) spin of the field pair; only (0, 0), (0, 2)/(2, 0),
         and (2, 2) are supported
     :param lmax: optional maximum L to use from the cl array
-    :param sampling_factor: oversampling factor for the quadrature grid
+    :param sampling_factor: oversampling factor for the quadrature grid,
+        ignored if `xvals` is given
     :param mumin: if given, restrict the quadrature grid to
-        cos(theta) in [mumin, 1] instead of the default [-1, 1]
+        cos(theta) in [mumin, 1] instead of the default [-1, 1], ignored if
+        `xvals` is given
+    :param xvals: if given, evaluate the correlation function at these
+        cos(theta) points directly instead of the Gauss-Legendre quadrature
+        grid -- e.g. to evaluate at arbitrary angles, not just quadrature
+        nodes (`corr2cl` then cannot be used to transform the result back)
     :return: correlation function array with the same leading shape as `cl`,
         but with the l axis replaced by the quadrature (theta) axis
     """
@@ -240,7 +246,10 @@ def _cl2corr(cl, spin, lmax=None, sampling_factor=1, mumin=None):
     if lmax is None:
         lmax = cl.shape[-1] - 1
 
-    xvals, _ = _cached_gauss_legendre(int(sampling_factor * lmax) + 1, mumin=mumin)
+    if xvals is None:
+        xvals, _ = _cached_gauss_legendre(int(sampling_factor * lmax) + 1, mumin=mumin)
+    else:
+        xvals = np.asarray(xvals, dtype=np.float64)
     ls = np.arange(0, lmax + 1, dtype=np.float64)
     facs = (2 * ls + 1) / (4 * np.pi)
 
