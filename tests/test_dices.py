@@ -108,14 +108,14 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
-    # apodization="none": with theta_max=180 (the whole sphere), any real
+    # apodization=None: with theta_max=180 (the whole sphere), any real
     # theta-based apodization window (the default "logistic", or
     # "gaussian") inevitably tapers near theta=180 by construction (it's
     # exactly 0.5 there), so this exact-recovery check needs no
     # apodization at all rather than relying on a window that happens
     # not to taper
     __cls = heracles.unmixing.naturalspice(
-        cls0, cls_alphas, fields, theta_max=180, apodization="none"
+        cls0, cls_alphas, fields, theta_max=180, apodization=None
     )
     for key in list(cls0.keys()):
         cl = cls0[key].array

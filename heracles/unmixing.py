@@ -21,7 +21,7 @@ from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import CubicSpline
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
-from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl
+from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl, _cached_gauss_legendre
 from .utils import get_cl
 
 try:
@@ -31,7 +31,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(theta, thetamax, k=1.0):
+def logistic(theta, thetamax, k=20.0):
     """
     Logistic-sigmoid apodization window in theta (degrees), analogous to
     `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
@@ -76,17 +76,21 @@ def apod_window(theta, thetamax, type="logistic"):
     or `type="gaussian"` (PolSpice's apodizefunction type 0, see
     `gaussian`) -- both take `theta`/`thetamax` the same way, and both
     already return a flat weight of 1 (no apodization) if `thetamax` is
-    None. Any other `type` also means no apodization.
+    None. `type=None` explicitly means no apodization (flat weight of 1)
+    regardless of `thetamax`. Any other `type` will raise a ValueError,
+    to catch typos rather than silently applying no apodization.
     """
-    if type == "logistic":
+    if type is None:
+        return 1.0
+    elif type == "logistic":
         return logistic(theta, thetamax)
     elif type == "gaussian":
         return gaussian(theta, thetamax)
     else:
-        return 1.0
+        raise ValueError(f"Unknown apodization type: {type!r}")
 
 
-def purify_xip(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
+def purify_xip(cl_ee, cl_bb, cl_mask, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -100,21 +104,14 @@ def purify_xip(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     Args:
         cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
         cl_mask: raw Cl of the (scalar) mask
-        lmax: maximum l
-        xvals: cos(theta) values (Gauss-Legendre nodes) at which to
-            evaluate the correction -- C+(beta) at these nodes is computed
-            internally, the same way as at the coarse grid below (see
-            module/notebook discussion: C+ is a ratio, not itself
-            band-limited, so there is no way to get it here other than by
-            evaluating cl_ee/cl_bb/cl_mask's own transform, same as the
-            caller would have to do to hand it in as a separate argument)
         thetamax: integration domain in radians
     Returns:
-        c_beta: the cumulative-integral correction, evaluated at `xvals`
+        c_beta: the cumulative-integral correction, evaluated at the Gauss-Legendre nodes
     """
+    lmax = len(cl_ee) - 1
     cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
     cl_mask = cl_mask[: lmax + 1]
-
+    xvals, _ = _cached_gauss_legendre(int(lmax) + 1)
     theta_nodes = np.arccos(xvals)
 
     # cumulative integral from 0 to each node, via a fixed grid + cumulative
@@ -263,6 +260,11 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 m_key = (masks[a], masks[b], i, j)
 
                 xvals = get_result_array(wd[key], "ell")[0]
+                # the resolution wd/wm (and hence xvals/theta/apod/csc2/
+                # xi_EE/xi_BB below) were actually computed at -- this is
+                # lmax_mask, not the outer (pre-padding) lmax, and can
+                # genuinely differ from it (that's the whole point of
+                # padding d up to lmax_mask above)
                 key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
                 wm_arr = get_cl(m_key, wm).array
@@ -277,7 +279,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
                 Xi_p_dec = purify_xip(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
+                    cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_rad
                 )
                 xi_EE = 0.5 * (Xi_p_dec + Xi_m)
                 xi_BB = 0.5 * (Xi_p_dec - Xi_m)
@@ -332,19 +334,15 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        # look the mask correlation up via get_cl, not a direct wm[m_key]
-        # index -- wm's keys may only have the symmetric ordering stored
-        # (get_cl checks both and transposes as needed; plain indexing
-        # would KeyError on those)
         _wm_result = get_cl(m_key, wm)
         _wm = _wm_result.array
         _wd = wd[key].array
         ratio = _wd / _wm
         # theta is only needed by apod_window when theta_max is actually
-        # given (it returns a flat 1.0 without it otherwise) -- skip
-        # computing it in that case, since .ell isn't always populated
-        # (e.g. the ratio dicts jackknife.py's correct_footprint_naturalspice
-        # passes in as wm)
+        # given (both logistic/gaussian return a flat 1.0 without it
+        # otherwise) -- skip computing it in that case, since .ell isn't
+        # always populated (e.g. the ratio dicts jackknife.py's
+        # correct_footprint_naturalspice passes in as wm)
         if theta_max is not None:
             xvals = _wm_result.ell
             theta = np.degrees(np.arccos(xvals))
