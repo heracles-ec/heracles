@@ -343,7 +343,12 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        _wm = get_cl(m_key, wm).array
+        # get_cl returns the array stored in wm/wd by reference (not a
+        # copy), so *=/ /= below would otherwise mutate wm's own arrays in
+        # place -- corrupting later, unrelated uses of wm (e.g. purify's
+        # own C+(beta) computation, which needs the pristine, unapodized
+        # mask correlation)
+        _wm = get_cl(m_key, wm).array.copy()
         _wd = wd[key].array
         if apodization == "logistic":
             _wm *= logistic(np.log10(abs(_wm)), x0=x0)
