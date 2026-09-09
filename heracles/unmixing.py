@@ -70,7 +70,7 @@ def _isolate(x, lmax):
     return _corr2cl(corr, (2, 2), lmax=lmax)[0, 0]
 
 
-def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
+def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -86,14 +86,12 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
         cl_mask: raw Cl of the (scalar) mask
         lmax: maximum l
         xvals: cos(theta) values (Gauss-Legendre nodes) at which to
-            evaluate the correction
-        Xi_p: the natural (mask-ratio) Xi_+ = (EE+BB)-like correlation at
-            those same nodes -- C+(beta) at the Gauss-Legendre nodes is
-            just this, since `xvals` is the same grid the caller's own
-            data/mask correlation functions are already evaluated on,
-            i.e. `wd[key][0, 0] / wm[key]`. PolSpice's `cplus`
-            (cumul2.f90) re-derives it from the Cls instead, but there is
-            nothing to recompute here.
+            evaluate the correction -- C+(beta) at these nodes is computed
+            internally, the same way as at the coarse grid below (see
+            module/notebook discussion: C+ is a ratio, not itself
+            band-limited, so there is no way to get it here other than by
+            evaluating cl_ee/cl_bb/cl_mask's own transform, same as the
+            caller would have to do to hand it in as a separate argument)
         thetamax: integration domain in radians
     Returns:
         c_beta: the cumulative-integral correction, evaluated at `xvals`
@@ -145,12 +143,20 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, Xi_p, thetamax):
     uc = np.linspace(0.0, 1.0, ncoarse)
     beta_coarse = eps + (beta_max - eps) * uc**3
     xvals_coarse = np.cos(beta_coarse)
+
+    # C+(beta) at the native nodes (xvals) themselves is computed the same
+    # way, in the same batch, rather than requiring the caller to have
+    # already computed it -- both are cheap point sets (native: lmax+1;
+    # coarse: ~8*(lmax+1)) evaluated with a single _cl2corr call each.
+    n_native = len(xvals)
+    xvals_all = np.concatenate([xvals, xvals_coarse])
     cl = np.zeros((2, 2, lmax + 1))
     cl[0, 0] = cl_sum
-    xi_p_coarse = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals_coarse)[0, 0]
-    xi_mask_coarse = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_coarse)
+    xi_p_all = _cl2corr(cl, (2, 2), lmax=lmax, xvals=xvals_all)[0, 0]
+    xi_mask_all = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_all)
     with np.errstate(divide="ignore", invalid="ignore"):
-        cp_coarse = np.where(xi_mask_coarse > 0, xi_p_coarse / xi_mask_coarse, 0.0)
+        cp_all = np.where(xi_mask_all > 0, xi_p_all / xi_mask_all, 0.0)
+    Xi_p, cp_coarse = cp_all[:n_native], cp_all[n_native:]
     cp_grid = CubicSpline(beta_coarse, cp_coarse)(beta_grid)
 
     # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing needed
@@ -278,17 +284,12 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 m_key = (masks[a], masks[b], i, j)
                 wm_arr = get_cl(m_key, wm).array
                 Xi_m = wd[key][1, 1] / wm_arr
-                # C+(beta) at the Gauss-Legendre nodes is just Xi_p, the
-                # ratio of the Xi_+ (EE+BB) and mask correlations already
-                # computed above at those same nodes -- no need to re-derive
-                # it from the Cls (see _cumul_pure_eb's docstring).
-                Xi_p = wd[key][0, 0] / wm_arr
 
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
                 c_beta = _cumul_pure_eb(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, Xi_p, thetamax_rad
+                    cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
                 )
                 xi_EE = 0.5 * (c_beta + Xi_m)
                 xi_BB = 0.5 * (c_beta - Xi_m)
