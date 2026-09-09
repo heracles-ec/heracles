@@ -281,7 +281,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 theta = np.degrees(np.arccos(xvals))
                 wm_arr = get_cl(m_key, wm).array
 
-                apod = apod_window(theta, theta_max, type=apodization)
+                apod = apod_window(theta, theta_max, type="gaussian")
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
@@ -302,8 +302,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
 
                 # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
                 fl = _corr2cl(apod * csc2, (2, -2))
-                cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2)) / fl
-                cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2)) / fl
+                with np.errstate(divide="ignore"):
+                    cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2)) / fl
+                    cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2)) / fl
 
                 # Replace the EE/BB entries in the output dictionary with the purified values
                 cl = np.array(corr_d[key].array, copy=True)
