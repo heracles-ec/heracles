@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
-from scipy.integrate import cumulative_trapezoid
+from scipy.integrate import quad
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
 from .transforms import cl2corr, corr2cl, _corr2cl, legendre_funcs, legendre_p_all
@@ -110,25 +110,32 @@ def _cumul_pure_eb(cl_ee, cl_bb, cl_mask, lmax, xvals, thetamax):
     cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
     cl_mask = cl_mask[: lmax + 1]
 
-    # fine, fixed grid for the cumulative integral (PolSpice instead uses
-    # an adaptive-tolerance Simpson's rule; a sufficiently oversampled
-    # fixed grid + cumulative trapezoid is used here for simplicity)
-    n_grid = max(8 * (lmax + 1), 4000)
-    eps = 1e-6
-    beta_grid = np.linspace(eps, thetamax - eps, n_grid)
-    cp_grid = _cplus(cl_sum, cl_mask, lmax, beta_grid)
+    def cplus_scalar(beta):
+        return _cplus(cl_sum, cl_mask, lmax, beta)[0]
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        fsub1 = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * cp_grid
-        fsub2 = np.tan(beta_grid / 2) ** 3 * cp_grid
+    def fsub1(beta):
+        # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing
+        # needed there; singular as beta -> pi (see module docs/notebook)
+        return np.sin(beta) / np.cos(beta / 2) ** 4 * cplus_scalar(beta)
 
-    sum1_grid = cumulative_trapezoid(fsub1, beta_grid, initial=0.0)
-    sum2_grid = cumulative_trapezoid(fsub2, beta_grid, initial=0.0)
+    def fsub2(beta):
+        return np.tan(beta / 2) ** 3 * cplus_scalar(beta)
 
     theta_nodes = np.arccos(xvals)
-    cp_nodes = np.interp(theta_nodes, beta_grid, cp_grid)
-    sum1_nodes = np.interp(theta_nodes, beta_grid, sum1_grid)
-    sum2_nodes = np.interp(theta_nodes, beta_grid, sum2_grid)
+    cp_nodes = _cplus(cl_sum, cl_mask, lmax, theta_nodes)
+
+    # cumulative integral from 0 to each node, via adaptive quadrature
+    # (matching PolSpice's adaptive-tolerance Simpson's rule, cumul2.f90's
+    # simpson2/cumul_simpson, far more closely than a fixed grid); nodes
+    # beyond thetamax are capped there, same as PolSpice's own cumul()
+    sum1_nodes = np.zeros_like(theta_nodes)
+    sum2_nodes = np.zeros_like(theta_nodes)
+    for i, theta in enumerate(theta_nodes):
+        upper = min(theta, thetamax)
+        if upper <= 0:
+            continue
+        sum1_nodes[i], _ = quad(fsub1, 0.0, upper, limit=200)
+        sum2_nodes[i], _ = quad(fsub2, 0.0, upper, limit=200)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         c_beta = (
