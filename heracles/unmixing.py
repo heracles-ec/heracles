@@ -90,7 +90,7 @@ def apod_window(theta, thetamax, type="logistic"):
         raise ValueError(f"Unknown apodization type: {type!r}")
 
 
-def purify_xip(cl_ee, cl_bb, cl_mask, thetamax):
+def purify_xip(cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xvals=None):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -105,13 +105,22 @@ def purify_xip(cl_ee, cl_bb, cl_mask, thetamax):
         cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
         cl_mask: raw Cl of the (scalar) mask
         thetamax: integration domain in radians
+        lmax: optional maximum multipole to use (default: inferred from the input Cl)
+        sampling_factor: optional oversampling factor for the cumulative
+            integral's grid (default: 1); the grid size itself already
+            scales with lmax (see `ngrid` below), so this is for cases
+            that need extra headroom beyond that scaling, not a
+            replacement for it
+        xvals: optional precomputed Gauss-Legendre nodes (cos(beta)) to evaluate the cumulative integral at; if None, they will be computed internally for lmax+1 nodes
     Returns:
         c_beta: the cumulative-integral correction, evaluated at the Gauss-Legendre nodes
     """
-    lmax = len(cl_ee) - 1
+    if lmax is None:
+        lmax = len(cl_ee) - 1
+    if xvals is None:
+        xvals, _ = _cached_gauss_legendre(int(lmax) + 1)
     cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
-    cl_mask = cl_mask[: lmax + 1]
-    xvals, _ = _cached_gauss_legendre(int(lmax) + 1)
+    cl_mask = cl_mask[: lmax + 1]   
     theta_nodes = np.arccos(xvals)
 
     # cumulative integral from 0 to each node, via a fixed grid + cumulative
@@ -133,7 +142,16 @@ def purify_xip(cl_ee, cl_bb, cl_mask, thetamax):
     # (cubic spacing) fixes this far more cheaply than simply raising
     # ngrid uniformly (verified: matches a 100x larger uniform grid's
     # result at ~1/50th the points).
-    ngrid = 20000
+    #
+    # ngrid scales with lmax (rather than a flat constant) since higher l
+    # needs finer angular resolution near beta=0 to keep resolving that
+    # cancellation -- 200 points per l reproduces the flat ngrid=20000
+    # this was originally verified at (lmax~95-100), and keeps the same
+    # accuracy margin at other lmax rather than over/under-sampling
+    # relative to what that verification actually covered.
+    # sampling_factor multiplies this on top, for callers that want extra
+    # headroom beyond the lmax-based scaling.
+    ngrid = max(2000, int(sampling_factor * 200 * (lmax + 1)))
     eps = 1e-6
     beta_max = max(thetamax - eps, eps)
     u = np.linspace(0.0, 1.0, ngrid)
@@ -260,12 +278,6 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 m_key = (masks[a], masks[b], i, j)
 
                 xvals = get_result_array(wd[key], "ell")[0]
-                # the resolution wd/wm (and hence xvals/theta/apod/csc2/
-                # xi_EE/xi_BB below) were actually computed at -- this is
-                # lmax_mask, not the outer (pre-padding) lmax, and can
-                # genuinely differ from it (that's the whole point of
-                # padding d up to lmax_mask above)
-                key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
                 wm_arr = get_cl(m_key, wm).array
 
@@ -289,9 +301,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 xi_BB = xi_BB * apod
 
                 # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
-                fl = _corr2cl(apod * csc2, (2, -2), key_lmax)
-                cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2), key_lmax) / fl
-                cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2), key_lmax) / fl
+                fl = _corr2cl(apod * csc2, (2, -2))
+                cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2)) / fl
+                cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2)) / fl
 
                 # Replace the EE/BB entries in the output dictionary with the purified values
                 cl = np.array(corr_d[key].array, copy=True)
