@@ -32,7 +32,15 @@ except ImportError:
 
 
 def logistic(x, x0=-2, k=20):
-    return 1.0 + np.exp(-k * (x - x0))
+    """
+    Logistic sigmoid, ranging from ~0 well below `x0` to ~1 well above it.
+    Used by `_naturalspice`'s default "logistic" apodization as a
+    multiplicative weight on the natural mask-ratio correlation, evaluated
+    at `x = log10(abs(Xi_mask))`: this suppresses the ratio near the mask
+    correlation's zero-crossings (where dividing by it would otherwise
+    blow up) while leaving it essentially untouched away from them.
+    """
+    return 1.0 / (1.0 + np.exp(-k * (x - x0)))
 
 
 def gaussian(theta, thetamax):
@@ -339,19 +347,28 @@ def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progre
         progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        # get_cl returns the array stored in wm/wd by reference (not a
-        # copy), so *=/ /= below would otherwise mutate wm's own arrays in
-        # place -- corrupting later, unrelated uses of wm (e.g. purify's
-        # own C+(beta) computation, which needs the pristine, unapodized
-        # mask correlation)
-        _wm = get_cl(m_key, wm).array.copy()
+        # the natural, unweighted mask-ratio correlation -- read-only, no
+        # in-place mutation of wm's arrays (unlike the old *=/ /= version),
+        # so no .copy() is needed and later, unrelated uses of wm (e.g.
+        # purify's own C+(beta) computation, which needs the pristine,
+        # unapodized mask correlation) can't be corrupted by this
+        _wm = get_cl(m_key, wm).array
         _wd = wd[key].array
+        ratio = _wd / _wm
+        # apply the apodization window as a multiplicative factor on the
+        # ratio itself, not folded into the mask denominator -- both
+        # options are genuine (0, 1)-ranged windows (logistic: ~0 well
+        # below x0, ~1 well above; gaussian: ~1 near theta=0, ~0 beyond
+        # thetamax), so "apod * ratio" is the natural, consistent way to
+        # apply either
         if apodization == "logistic":
-            _wm *= logistic(np.log10(abs(_wm)), x0=x0)
+            apod = logistic(np.log10(abs(_wm)), x0=x0)
         elif apodization == "gaussian":
             xvals = wm[m_key].ell
             theta = np.degrees(np.arccos(xvals))
-            _wm /= gaussian(theta, theta_max)
-        corr_wds[key] = replace(wd[key], array=_wd/_wm)
+            apod = gaussian(theta, theta_max)
+        else:
+            apod = 1.0
+        corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds
