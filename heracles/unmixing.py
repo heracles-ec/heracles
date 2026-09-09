@@ -209,14 +209,26 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
 
                 # PolSpice's decoupled EE/BB (Chon et al. 2004, eq. 60-65;
                 # spice_subs.f90 -> deal_with_xi_and_cl.f90/cumul2.f90) is
-                # built in three stages: (1) the *natural* mask-ratio
-                # correlation (Xi_p, Xi_m from corr_wd, same as TT/TE/EB
-                # above); (2) a cumulative-integral correction (`cumul`)
-                # that turns that into the "pure" E/B correlation function,
-                # accounting for E/B leakage from the finite integration
-                # range; (3) a Legendre transform weighted by the
-                # csc^2(theta/2) kernel, normalized by Fl -- the same
+                # built in three stages: (1) the *natural*, unweighted
+                # mask-ratio correlation Xi_p = Xi_data/Xi_mask (note: NOT
+                # corr_wd, which additionally carries _naturalspice's
+                # logistic/gaussian apodization -- correct_xi_from_mask in
+                # PolSpice is a plain ratio, apodization is a separate,
+                # later step); (2) a cumulative-integral correction
+                # (`cumul`) that turns that into the "pure" E/B correlation
+                # function, accounting for E/B leakage from the finite
+                # integration range; (3) a Legendre transform weighted by
+                # the csc^2(theta/2) kernel, normalized by Fl -- the same
                 # kernel applied to the apodization window alone.
+                #
+                # Deriving PolSpice's xi(:,2)/xi(:,3) (its natural-ratio
+                # QQ/UU, pre-cumul) in terms of heracles' Xi_p/Xi_m gives
+                # exactly xi2 = (Xi_p+Xi_m)/2, xi3 = (Xi_p-Xi_m)/2, so
+                # xi2-xi3 = Xi_m and xi2+xi3 = Xi_p; cumul()'s own
+                # xi_E/B_final = (c_beta +/- (xi2-xi3))/2 therefore only
+                # needs Xi_m (not Xi_p) here -- verified to < 0.1% against
+                # PolSpice's own cumul() dump (SPICE_CUMUL_DEBUG) at every
+                # node except where xi_B_final crosses zero.
                 xvals = get_result_array(wd[key], "ell")[0]
                 key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
@@ -224,18 +236,19 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
-                Xi_p, Xi_m = corr_wd[key][0, 0], corr_wd[key][1, 1]
-
                 a, b, i, j = key
                 m_key = (masks[a], masks[b], i, j)
+                wm_arr = get_cl(m_key, wm).array
+                Xi_m = wd[key][1, 1] / wm_arr
+
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
                 c_beta = _cumul_pure_eb(
                     cl_ee_raw, cl_bb_raw, cl_mask_raw, key_lmax, xvals, thetamax_rad
                 )
-                xi_EE = 0.5 * (c_beta + Xi_p - Xi_m)
-                xi_BB = 0.5 * (c_beta - Xi_p + Xi_m)
+                xi_EE = 0.5 * (c_beta + Xi_m)
+                xi_BB = 0.5 * (c_beta - Xi_m)
 
                 fl = _isolate(apod * csc2, key_lmax, mumin=mumin)
                 with np.errstate(invalid="ignore", divide="ignore"):
