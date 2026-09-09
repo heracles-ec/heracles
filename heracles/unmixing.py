@@ -34,18 +34,23 @@ def logistic(x, x0=-2, k=20):
     return 1.0 + np.exp(-k * (x - x0))
 
 
-def gaussian_apod(theta, theta_max):
+def gaussian_apod(theta, fwhm, thetamax=None):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
-    `apodizefunction` type 0 (see apodize_mod.f90 in the PolSpice source):
-    `theta_max` is used as both the taper's FWHM and its hard cutoff radius.
-    If `theta_max` is None, no apodization is applied (flat weight of 1
-    everywhere).
+    `apodizefunction` type 0 (apodize_mod.f90): `fwhm` (PolSpice's
+    `-apodizesigma`, despite the name) sets the taper's FWHM, and
+    `thetamax` (PolSpice's separate `-thetamax`) sets its hard cutoff --
+    these are two independent PolSpice options, not the same value.
+    If `thetamax` is None, it defaults to `fwhm` (matching the previous,
+    single-parameter behaviour). If `fwhm` is None, no apodization is
+    applied (flat weight of 1 everywhere).
     """
-    if theta_max is None:
+    if fwhm is None:
         return np.ones_like(theta)
-    sigma = theta_max / np.sqrt(8 * np.log(2))
-    return np.where(theta < theta_max, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
+    if thetamax is None:
+        thetamax = fwhm
+    sigma = fwhm / np.sqrt(8 * np.log(2))
+    return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
 def _isolate(x, lmax, mumin=None):
@@ -232,7 +237,23 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 xvals = get_result_array(wd[key], "ell")[0]
                 key_lmax = len(xvals) - 1
                 theta = np.degrees(np.arccos(xvals))
-                apod = gaussian_apod(theta, theta_max)
+                # NOTE: this apodization window is PolSpice's independent
+                # -apodizesigma option, *not* the same thing as theta_max
+                # (-thetamax, the grid/integration cutoff already handled
+                # via mumin/thetamax_rad above) -- naturalspice doesn't
+                # currently expose apodizesigma separately. Chon et al.
+                # (2004) recommend apodizesigma = theta_max/2, so that is
+                # used as the default width whenever theta_max is given
+                # (verified against PolSpice's own Fl(l) dump,
+                # SPICE_FL_DEBUG, with matching -apodizesigma: exact to
+                # machine precision -- using theta_max itself as the width,
+                # the previous behaviour, was wrong by a large,
+                # l-dependent factor).
+                apod = (
+                    gaussian_apod(theta, theta_max / 2, thetamax=theta_max)
+                    if theta_max is not None
+                    else np.ones_like(theta)
+                )
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
@@ -250,10 +271,27 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 xi_EE = 0.5 * (c_beta + Xi_m)
                 xi_BB = 0.5 * (c_beta - Xi_m)
 
+                # PolSpice applies the apodization window to xi_final
+                # itself, for every channel, right before the Legendre
+                # transform (spice_subs.f90: `xi_final(l,:) = xi_final(l,:)
+                # * tempo` under `if (apodize)`) -- separate from (in
+                # addition to) apod entering Fl below. c_beta/Xi_m
+                # themselves are unaffected (cumul() never calls
+                # apodizefunction).
+                xi_EE = xi_EE * apod
+                xi_BB = xi_BB * apod
+
+                # PolSpice's do_cl_from_xi (decouple branch): cl_raw(l) =
+                # 2*_isolate(xi_final)(l), Fl(l) = _isolate(apod*csc2)(l)/pi
+                # (both exact identities of _isolate's own d2m2-kernel sum,
+                # not dependent on any full-sky assumption), so
+                # cl = cl_raw/Fl = 2*pi*isolate(xi_final)/isolate(apod*csc2).
+                # Verified against PolSpice's own Fl(l)/cl(l,2)/cl(l,3) dump
+                # (SPICE_FL_DEBUG) to machine precision for l >= 2.
                 fl = _isolate(apod * csc2, key_lmax, mumin=mumin)
                 with np.errstate(invalid="ignore", divide="ignore"):
-                    cl_EE = _isolate(xi_EE, key_lmax, mumin=mumin) / fl
-                    cl_BB = _isolate(xi_BB, key_lmax, mumin=mumin) / fl
+                    cl_EE = 2 * np.pi * _isolate(xi_EE, key_lmax, mumin=mumin) / fl
+                    cl_BB = 2 * np.pi * _isolate(xi_BB, key_lmax, mumin=mumin) / fl
 
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
