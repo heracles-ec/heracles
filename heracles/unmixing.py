@@ -55,7 +55,7 @@ def gaussian(theta, thetamax):
     separate `-thetamax`) sets its hard cutoff. The taper's FWHM is fixed
     at `thetamax / 2`, per Chon et al. (2004)'s recommended
     `apodizesigma = thetamax / 2` -- PolSpice's `-apodizesigma` and
-    `-thetamax` are independent options in general, but naturalspice
+    `-thetamax` are independent options in general, but `unmix`
     doesn't expose apodizesigma separately, so this bakes in that
     recommended ratio (verified against PolSpice's own Fl(l) dump,
     SPICE_FL_DEBUG, with matching -apodizesigma: exact to machine
@@ -72,8 +72,8 @@ def gaussian(theta, thetamax):
 
 def apod_window(theta, thetamax, type="logistic"):
     """
-    Unified apodization-window dispatch, shared by `naturalspice`'s
-    purify loop and `_naturalspice`. Returns a multiplicative weight the
+    Unified apodization-window dispatch, shared by `unmix`'s
+    purify loop and `_unmix`. Returns a multiplicative weight the
     same shape as `theta`, in [0, 1]: `type="logistic"` (see `logistic`)
     or `type="gaussian"` (PolSpice's apodizefunction type 0, see
     `gaussian`) -- both take `theta`/`thetamax` the same way, and both
@@ -214,7 +214,7 @@ def purify_xip(
     return c_beta
 
 
-def naturalspice(
+def unmix(
     d,
     m,
     fields,
@@ -261,7 +261,7 @@ def naturalspice(
     with progress.task("mask correlations") as task:
         wm = cl2corr(m, progress=task)
     with progress.task("unmixing") as task:
-        corr_wd = _naturalspice(
+        corr_wd = _unmix(
             wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task
         )
 
@@ -334,7 +334,7 @@ def naturalspice(
     return corr_d
 
 
-def _naturalspice(
+def _unmix(
     wd,
     wm,
     fields,
@@ -376,7 +376,7 @@ def _naturalspice(
         # given (both logistic/gaussian return a flat 1.0 without it
         # otherwise) -- skip computing it in that case, since .ell isn't
         # always populated (e.g. the ratio dicts jackknife.py's
-        # correct_footprint_naturalspice passes in as wm)
+        # correct_footprint_mixing passes in as wm)
         if theta_max is not None:
             xvals = _wm_result.ell
             theta = np.degrees(np.arccos(xvals))

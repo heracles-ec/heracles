@@ -99,8 +99,8 @@ def test_get_delete2_fsky(jk_map, njk):
 def test_full_mask_correction(cls0, mls0, fields):
     from heracles.dices.jackknife import _mask_correlation_ratio
 
-    # When mljk == mls0, correct_footprint_naturalspice should recover the original cls
-    _cls = dices.correct_footprint_naturalspice(cls0, mls0, mls0, fields, unmixed=False)
+    # When mljk == mls0, correct_footprint_mixing should recover the original cls
+    _cls = dices.correct_footprint_mixing(cls0, mls0, mls0, fields, unmixed=False)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
@@ -114,7 +114,7 @@ def test_full_mask_correction(cls0, mls0, fields):
     # exactly 0.5 there), so this exact-recovery check needs no
     # apodization at all rather than relying on a window that happens
     # not to taper
-    __cls = heracles.unmixing.naturalspice(
+    __cls = heracles.unmixing.unmix(
         cls0, cls_alphas, fields, theta_max=180, apodization=None
     )
     for key in list(cls0.keys()):
@@ -140,7 +140,7 @@ def test_fast_mask_correction(cls0, jk_map):
 
 def test_decouple_recovers_ee_minus_bb():
     """
-    The `naturalspice(..., purify=True)` EE/BB decoupling (PolSpice's
+    The `unmix(..., purify=True)` EE/BB decoupling (PolSpice's
     "decouple" estimator, Chon et al. 2004 eq. 65) builds both Cl^EE and
     Cl^BB from the same d^l_{2,-2} kernel, normalized by a per-l coupling
     factor Fl. For a full-sky (unmasked) correlation function -- so Fl
