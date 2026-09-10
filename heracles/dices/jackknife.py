@@ -418,7 +418,7 @@ def _mask_correlation_ratio(mljk, mls0, unmixed=False):
         alpha = _wmljk
         if not unmixed:
             alpha = alpha / _wmls0
-        alphas[key] = replace(mls0[key], array=alpha)
+        alphas[key] = replace(wmls0[key], array=alpha)
     return alphas
 
 
