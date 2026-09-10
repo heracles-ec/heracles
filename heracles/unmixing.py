@@ -23,7 +23,14 @@ from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import CubicSpline
 from .progress import NoProgress, Progress
 from .result import binned, get_result_array
-from .transforms import cl2corr, corr2cl, _cl2corr, _corr2cl, _cached_gauss_legendre
+from .transforms import (
+    cl2corr,
+    corr2cl,
+    _cl2corr,
+    _corr2cl,
+    _cached_gauss_legendre,
+    _cached_shifted_gauss_legendre,
+)
 from .utils import get_cl
 
 try:
@@ -93,7 +100,13 @@ def apod_window(theta, thetamax, type="logistic"):
 
 
 def purify_xip(
-    cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xvals=None
+    cl_ee,
+    cl_bb,
+    cl_mask,
+    thetamax,
+    lmax=None,
+    sampling_factor=200,
+    xvals=None,
 ):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
@@ -105,16 +118,26 @@ def purify_xip(
     cumulative integral of C+(beta) = Xi_+^raw(beta)/Xi_mask(beta) against
     two trigonometric kernels.
 
+    Note: c_beta is only genuinely accurate for theta <= thetamax --
+    beyond that, both its sum1/sum2 terms (via theta_capped) and its
+    C+(beta) term (via the same capping, see below) just repeat the
+    theta=thetamax boundary value rather than continuing the true
+    calculation. This is deliberate and safe for this function's actual
+    use (`unmix`'s purify branch always applies a downstream apodization
+    window that is exactly zero at and beyond thetamax, discarding
+    whatever c_beta says there) but means a direct, unapodized comparison
+    against PolSpice's own debug dump (which does not cap) will disagree
+    beyond thetamax.
+
     Args:
         cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
         cl_mask: raw Cl of the (scalar) mask
-        thetamax: integration domain in radians
+        thetamax: integration domain in rad
         lmax: optional maximum multipole to use (default: inferred from the input Cl)
         sampling_factor: optional oversampling factor for the cumulative
-            integral's grid (default: 1); the grid size itself already
-            scales with lmax (see `ngrid` below), so this is for cases
-            that need extra headroom beyond that scaling, not a
-            replacement for it
+            integral's fine grid (default: 1); already scales with lmax
+            (see `ngrid` below), so this is for cases that need extra
+            headroom beyond that scaling, not a replacement for it
         xvals: optional precomputed Gauss-Legendre nodes (cos(beta)) to evaluate the cumulative integral at; if None, they will be computed internally for lmax+1 nodes
     Returns:
         c_beta: the cumulative-integral correction, evaluated at the Gauss-Legendre nodes
@@ -155,7 +178,7 @@ def purify_xip(
     # relative to what that verification actually covered.
     # sampling_factor multiplies this on top, for callers that want extra
     # headroom beyond the lmax-based scaling.
-    ngrid = max(2000, int(sampling_factor * 200 * (lmax + 1)))
+    ngrid = max(2000, int(sampling_factor * (lmax + 1)))
     eps = 1e-6
     beta_max = max(thetamax - eps, eps)
     u = np.linspace(0.0, 1.0, ngrid)
@@ -166,31 +189,31 @@ def purify_xip(
     # lmax -- evaluating it at all `ngrid` points (chosen only for the
     # *cumulative integral* below, which genuinely needs that many samples
     # to resolve the sin/cos kernels near beta=0) massively oversamples
-    # what the transform itself carries information for. Evaluate it on a
-    # much coarser sub-grid instead and cubic-spline interpolate onto the
-    # full fine grid: verified against direct evaluation at all `ngrid`
-    # points to ~1e-7 median relative error (occasional larger relative
-    # outliers are all at C+'s own benign zero-crossings, where relative
-    # error is meaningless -- absolute error there is still ~1e-6 on
-    # values of order unity) -- >10x faster for this function's expensive
-    # part, with no measurable effect on the final Cl.
-    ncoarse = min(ngrid, max(200, 8 * (lmax + 1)))
-    uc = np.linspace(0.0, 1.0, ncoarse)
-    beta_coarse = eps + (beta_max - eps) * uc**3
-    xvals_coarse = np.cos(beta_coarse)
+    # what the transform itself carries information for. Evaluate it on
+    # one dedicated grid of just `lmax+1` points, spanning [0, thetamax]
+    # only (this function's own domain -- C+ is never needed beyond it,
+    # see the docstring), with the same near-zero-concentrated (u**3)
+    # spacing used elsewhere in this function, and cubic-spline
+    # interpolate everything else from it: both the fine cumulative-
+    # integral grid below, *and* (via `theta_capped`, the same capping
+    # sum1/sum2 already use) C+ at this function's own output nodes
+    # (theta_nodes) -- no separate/direct Legendre evaluation at those
+    # nodes is needed at all. This one grid's evaluation (2 Legendre/
+    # Wigner-d transforms -- Xi_p and Xi_mask, one batched _cl2corr call
+    # each) is the actual expensive part of this function (the fine-grid
+    # cumulative trapezoid itself is cheap, plain vectorized numpy ops).
+    nrel = lmax + 1
+    ur = np.linspace(0.0, 1.0, nrel)
+    beta_rel = eps + (beta_max - eps) * ur**3
+    xvals_rel = np.cos(beta_rel)
 
-    # C+(beta) at the native nodes (xvals) themselves is computed the same
-    # way, in the same batch, rather than requiring the caller to have
-    # already computed it -- both are cheap point sets (native: lmax+1;
-    # coarse: ~8*(lmax+1)) evaluated with a single _cl2corr call each.
-    n_native = len(xvals)
-    xvals_all = np.concatenate([xvals, xvals_coarse])
-    xi_p_all = _cl2corr(cl_sum, (2, 2), lmax=lmax, xvals=xvals_all)
-    xi_mask_all = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_all)
+    xi_p_rel = _cl2corr(cl_sum, (2, 2), lmax=lmax, xvals=xvals_rel)
+    xi_mask_rel = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_rel)
     with np.errstate(divide="ignore", invalid="ignore"):
-        cp_all = np.where(xi_mask_all > 0, xi_p_all / xi_mask_all, 0.0)
-    Xi_p, cp_coarse = cp_all[:n_native], cp_all[n_native:]
-    cp_grid = CubicSpline(beta_coarse, cp_coarse)(beta_grid)
+        cp_rel = np.where(xi_mask_rel > 0, xi_p_rel / xi_mask_rel, 0.0)
+
+    cp_spline = CubicSpline(beta_rel, cp_rel)
+    cp_grid = cp_spline(beta_grid)
 
     # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing needed
     # there; singular as beta -> pi (see module docs/notebook)
@@ -200,6 +223,10 @@ def purify_xip(
     cumsum2_grid = cumulative_trapezoid(fsub2_grid, beta_grid, initial=0.0)
 
     theta_capped = np.minimum(theta_nodes, thetamax)
+    # cp_spline's domain starts at eps, not exactly 0
+    theta_capped_safe = np.maximum(theta_capped, eps)
+    Xi_p = cp_spline(theta_capped_safe)
+
     sum1_nodes = np.interp(theta_capped, beta_grid, cumsum1_grid)
     sum2_nodes = np.interp(theta_capped, beta_grid, cumsum2_grid)
     sum1_nodes[theta_capped <= 0] = 0.0
@@ -256,29 +283,31 @@ def unmix(
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
+    # Theta max is the maximum angle to use for the unmixing, in degrees. 
+    # If None, use all angles.
+    theta_max = 180.0 if theta_max is None else theta_max
+    thetamax_pad_rad = min(np.radians(theta_max) + np.radians(3.0), np.pi)
+    domain = (np.cos(thetamax_pad_rad), 1.0)
     with progress.task("data correlations") as task:
-        wd = cl2corr(d, progress=task)
+        wd = cl2corr(d, domain=domain, progress=task)
     with progress.task("mask correlations") as task:
-        wm = cl2corr(m, progress=task)
+        wm = cl2corr(m, domain=domain, progress=task)
     with progress.task("unmixing") as task:
         corr_wd = _unmix(
             wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task
         )
+    # transform back to Cl
+    with progress.task("transform back to Cl") as task:
+        corr_d = corr2cl(corr_wd, domain=domain, progress=task)
 
-    # trnasform back to Cl
+    # purification (PolSpice's "decouple").
     if purify:
         with progress.task("purified transform back to Cl") as task:
-            # start from the regular (natural/mask-ratio) transform, which
-            # already gives us correct TT/TE/EB -- purification (PolSpice's
-            # "decouple") only changes how EE/BB are estimated.
-            corr_d = corr2cl(corr_wd)
 
             masks = {}
             for key, field in fields.items():
                 if field.mask is not None:
                     masks[key] = field.mask
-
-            thetamax_rad = np.pi if theta_max is None else np.radians(theta_max)
 
             spin2_keys = [
                 key
@@ -294,7 +323,9 @@ def unmix(
                 m_key = (masks[a], masks[b], i, j)
 
                 xvals = get_result_array(wd[key], "ell")[0]
+                weights = _cached_shifted_gauss_legendre(len(xvals), *domain)[1]
                 theta = np.degrees(np.arccos(xvals))
+
                 wm_arr = get_cl(m_key, wm).array
 
                 apod = apod_window(theta, theta_max, type="gaussian")
@@ -306,7 +337,9 @@ def unmix(
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
-                Xi_p_dec = purify_xip(cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_rad)
+                Xi_p_dec = purify_xip(
+                    cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_pad_rad, xvals=xvals
+                )
                 xi_EE = 0.5 * (Xi_p_dec + Xi_m)
                 xi_BB = 0.5 * (Xi_p_dec - Xi_m)
 
@@ -315,19 +348,20 @@ def unmix(
                 xi_BB = xi_BB * apod
 
                 # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
-                fl = _corr2cl(apod * csc2, (2, -2))
+                fl = _corr2cl(apod * csc2, (2, -2), xvals=xvals, weights=weights)
                 with np.errstate(divide="ignore"):
-                    cl_EE = 2 * np.pi * _corr2cl(xi_EE, (2, -2)) / fl
-                    cl_BB = 2 * np.pi * _corr2cl(xi_BB, (2, -2)) / fl
+                    cl_EE = (
+                        2 * np.pi * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights) / fl
+                    )
+                    cl_BB = (
+                        2 * np.pi * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights) / fl
+                    )
 
                 # Replace the EE/BB entries in the output dictionary with the purified values
                 cl = np.array(corr_d[key].array, copy=True)
                 cl[0, 0] = cl_EE
                 cl[1, 1] = cl_BB
                 corr_d[key] = replace(corr_d[key], array=cl)
-    else:
-        with progress.task("transform back to Cl") as task:
-            corr_d = corr2cl(corr_wd, progress=task)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy.special import roots_legendre
 from .progress import NoProgress, Progress
 from .result import get_result_array
 
@@ -52,12 +53,37 @@ def _cached_gauss_legendre(npoints, cache=True):
             xvals.flags.writeable = False
             weights.flags.writeable = False
         else:
-            xvals, weights = np.polynomial.legendre.leggauss(npoints)
+            # scipy's roots_legendre (Newton iteration off asymptotic
+            # initial guesses) rather than np.polynomial.legendre.leggauss
+            # (dense eigvalsh of the n x n Jacobi matrix, O(n^3)) -- both
+            # give the same nodes/weights to ~1e-14, but leggauss is the
+            # dominant cost of a cold call at the lmax this module is used
+            # at (e.g. ~13s at lmax=4000 for leggauss alone, vs ~0.6s for
+            # roots_legendre) since it's recomputed once per distinct
+            # npoints, not amortized like the cache below implies for
+            # repeat calls at the same npoints.
+            xvals, weights = roots_legendre(npoints)
             xvals.flags.writeable = False
             weights.flags.writeable = False
         if cache:
             _gauss_legendre_cache[key] = xvals, weights
         return xvals, weights
+
+
+def _cached_shifted_gauss_legendre(npoints, a, b):
+    """
+    Gauss-Legendre quadrature nodes/weights for `npoints` points on
+    `[a, b]` -- an affine shift of the standard `[-1, 1]` rule
+    (`_cached_gauss_legendre`), exact for the same polynomial degree as
+    the standard rule, just on this sub-interval. Cheap regardless of
+    `(a, b)`: reuses the cached standard-rule nodes, no new expensive
+    computation and no dedicated cache for the shift itself.
+    """
+    xvals, weights = _cached_gauss_legendre(npoints)
+    scale = (b - a) / 2
+    xvals_shifted = a + (xvals + 1) * scale
+    weights_shifted = weights * scale
+    return xvals_shifted, weights_shifted
 
 
 def legendre_funcs(lmax, x, spin, lfacs=None, lfacs2=None, lrootfacs=None):
@@ -197,7 +223,7 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     return corr
 
 
-def _corr2cl(corr, kernel, lmax=None, sampling_factor=1):
+def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=None):
     """
     Transform a single correlation-function component (1D array) back to a
     single Cl component, via the explicit kernel selected by `kernel` --
@@ -211,7 +237,13 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1):
     :param kernel: (s1, s2) kernel selector; only (0, 0), (2, 0)/(0, 2),
         (2, 2), and (2, -2) are supported
     :param lmax: maximum :math:`\ell` to calculate :math:`C_\ell`
-    :param sampling_factor: oversampling factor for the quadrature grid
+    :param sampling_factor: oversampling factor for the quadrature grid,
+        ignored if `xvals`/`weights` are given
+    :param xvals, weights: optional explicit quadrature nodes/weights to
+        use instead of the standard `[-1, 1]` Gauss-Legendre rule (e.g.
+        from `_cached_shifted_gauss_legendre`, for a domain-restricted
+        reconstruction) -- `corr` must already be evaluated at exactly
+        these `xvals`. Either both must be given or neither.
     :return: Cl component array, the theta axis replaced by the l axis.
         Includes :math:`\ell(\ell+1)/2\pi` factors.
     """
@@ -220,11 +252,23 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1):
     if lmax is None:
         lmax = corr.shape[-1] - 1
 
-    xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
+    if xvals is None:
+        assert weights is None, "xvals and weights must be given together"
+        xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
+    else:
+        assert weights is not None, "xvals and weights must be given together"
 
     if kernel == (0, 0):
         cl = np.zeros(lmax + 1)
         for x, weight, c in zip(xvals, weights, corr):
+            # a node whose correlation value is exactly 0 contributes
+            # exactly 0 to the sum regardless of P -- skip the expensive
+            # Legendre evaluation there. This is a no-op when `corr` has
+            # no exact zeros (the common case), but a real win when it
+            # does (e.g. a purify_xip caller that has zeroed out a
+            # thetamax-apodized tail before calling this)
+            if c == 0.0:
+                continue
             P = legendre_funcs(lmax, x, (0, 0))
             cl += (weight * c) * P
         return 2 * np.pi * cl
@@ -242,17 +286,27 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1):
 
     cl = np.zeros(lmax + 1)
     for x, weight, c in zip(xvals, weights, corr):
+        # same exact-zero skip as above
+        if c == 0.0:
+            continue
         d20, d22, d2m2 = legendre_funcs(lmax, x, (2, 2), lfacs, lfacs2, lrootfacs)
         d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
         cl[2:] += (weight * c) * d
     return 2 * np.pi * cl
 
 
-def cl2corr(cls, progress: Progress | None = None):
+def cl2corr(cls, domain=None, progress: Progress | None = None):
     """
     Transforms cls to correlation functions
     Args:
         cls: Data Cl
+        domain: optional `(a, b)` bounds in cos(theta) to evaluate every
+            key at, via a genuine (affine-shifted) Gauss-Legendre
+            quadrature confined to that sub-interval
+            (`_cached_shifted_gauss_legendre`) instead of the standard
+            `[-1, 1]` rule -- each key gets its own correctly-sized grid
+            for its own derived `lmax` (keys need not share `lmax`).
+            `None` (default) is today's behavior, unchanged.
         progress: optional progress reporter
     Returns:
         corr: correlation function
@@ -273,12 +327,16 @@ def cl2corr(cls, progress: Progress | None = None):
             # Determine lmax from ell field or shape along ell axis
             (ell,) = get_result_array(cl, "ell")
             lmax = len(ell) - 1
-            xvals, _ = _cached_gauss_legendre(lmax + 1)
+            if domain is None:
+                xvals_key, _ = _cached_gauss_legendre(lmax + 1)
+            else:
+                a, b = domain
+                xvals_key, _ = _cached_shifted_gauss_legendre(lmax + 1, a, b)
             # transform to corrs, dispatching directly on spin: add/subtract
             # into the "+/-" basis, then transform each component with its
             # own kernel
             if spin == (0, 0):
-                wd = _cl2corr(cl.array, (0, 0), lmax=lmax)
+                wd = _cl2corr(cl.array, (0, 0), lmax=lmax, xvals=xvals_key)
             elif spin in ((0, 2), (2, 0)):
                 # T x spin-2 cross correlation: both combinations use the
                 # same d20 kernel
@@ -286,8 +344,8 @@ def cl2corr(cls, progress: Progress | None = None):
                 cp, cm = Ta + Tb, Ta - Tb
                 wd = np.array(
                     [
-                        _cl2corr(cp, (2, 0), lmax=lmax),
-                        _cl2corr(cm, (2, 0), lmax=lmax),
+                        _cl2corr(cp, (2, 0), lmax=lmax, xvals=xvals_key),
+                        _cl2corr(cm, (2, 0), lmax=lmax, xvals=xvals_key),
                     ]
                 )
             else:
@@ -309,8 +367,8 @@ def cl2corr(cls, progress: Progress | None = None):
                 cm = facs[2:] * (EE - BB)[2 : lmax + 1]
                 icp = facs[2:] * (EB - BE)[2 : lmax + 1]
                 icm = facs[2:] * (EB + BE)[2 : lmax + 1]
-                wd = np.zeros((2, 2, len(xvals)))
-                for i, x in enumerate(xvals):
+                wd = np.zeros((2, 2, len(xvals_key)))
+                for i, x in enumerate(xvals_key):
                     _, d22, d2m2 = legendre_funcs(
                         lmax, x, spin, lfacs, lfacs2, lrootfacs
                     )
@@ -322,17 +380,25 @@ def cl2corr(cls, progress: Progress | None = None):
             wd = np.array(list(wd), dtype=dtype)
             wds[key] = replace(
                 cls[key],
-                ell=xvals,
+                ell=xvals_key,
                 array=wd,
             )
     return wds
 
 
-def corr2cl(wds, progress: Progress | None = None):
+def corr2cl(wds, domain=None, progress: Progress | None = None):
     """
     Transforms correlation functions to cls
     Args:
         wds: data correlation functions
+        domain: optional `(a, b)` bounds in cos(theta), matching whatever
+            `domain` `cl2corr` was given to produce `wds` (each key's own
+            nodes are already stored in its `ell` field; this only
+            supplies the corresponding quadrature weights, since a
+            shifted rule's weights depend on `(a, b)`, not just point
+            count) -- used instead of the standard `[-1, 1]`
+            Gauss-Legendre weights. `None` (default) is today's
+            behavior, unchanged.
         progress: optional progress reporter
     Returns:
         corr: correlation function
@@ -352,16 +418,20 @@ def corr2cl(wds, progress: Progress | None = None):
             dtype = wd.array.dtype
             # Derive lmax from xvals stored in the correlation's ell field
             xvals = wd.ell
-            weights = _cached_gauss_legendre(len(xvals))[1]
+            if domain is None:
+                weights_key = _cached_gauss_legendre(len(xvals))[1]
+            else:
+                a, b = domain
+                weights_key = _cached_shifted_gauss_legendre(len(xvals), a, b)[1]
             lmax = len(xvals) - 1
             # transform to cl, dispatching directly on spin: undo each
             # component's own kernel, then add/subtract back to the
             # physical [[EE, EB], [BE, BB]] (or [Ta, Tb]) layout
             if spin == (0, 0):
-                cl = _corr2cl(wd.array, (0, 0), lmax=lmax)
+                cl = _corr2cl(wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key)
             elif spin in ((0, 2), (2, 0)):
-                clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax)
-                clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax)
+                clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
+                clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
                 cl = np.array([(clp + clm) / 2, (clp - clm) / 2])
             else:
                 # spin (2, 2): kept as one shared loop, mirroring cl2corr's
@@ -371,7 +441,7 @@ def corr2cl(wds, progress: Progress | None = None):
                 lfacs2 = (ls + 2) * (ls - 1)
                 lrootfacs = np.sqrt(lfacs * lfacs2)
                 r = np.zeros((2, 2, lmax + 1))
-                for i, (x, weight) in enumerate(zip(xvals, weights)):
+                for i, (x, weight) in enumerate(zip(xvals, weights_key)):
                     _, d22, d2m2 = legendre_funcs(
                         lmax, x, spin, lfacs, lfacs2, lrootfacs
                     )
