@@ -11,8 +11,10 @@ def legendre_p_all(n, x, *, diff_n=0):
     allP[0] = 1.0
     if n >= 1:
         allP[1] = x
-    for l in range(1, n):
-        allP[l + 1] = ((2 * l + 1) * x * allP[l] - l * allP[l - 1]) / (l + 1)
+    for ell in range(1, n):
+        allP[ell + 1] = ((2 * ell + 1) * x * allP[ell] - ell * allP[ell - 1]) / (
+            ell + 1
+        )
     if diff_n == 0:
         return allP
     assert diff_n == 1, "only diff_n=1 is supported"
