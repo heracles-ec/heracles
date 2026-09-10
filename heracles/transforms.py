@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import numpy as np
 from .progress import NoProgress, Progress
+from .result import get_result_array
 
 
 def legendre_p_all(n, x, *, diff_n=0):
@@ -268,7 +271,8 @@ def cl2corr(cls, progress: Progress | None = None):
             # Grab metadata
             dtype = cl.array.dtype
             # Determine lmax from ell field or shape along ell axis
-            lmax = len(cl.ell) - 1
+            (ell,) = get_result_array(cl, "ell")
+            lmax = len(ell) - 1
             xvals, _ = _cached_gauss_legendre(lmax + 1)
             # transform to corrs, dispatching directly on spin: add/subtract
             # into the "+/-" basis, then transform each component with its
