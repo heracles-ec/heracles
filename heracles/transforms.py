@@ -1,4 +1,5 @@
 import numpy as np
+from .progress import NoProgress, Progress
 
 
 def legendre_p_all(n, x, *, diff_n=0):
@@ -26,9 +27,6 @@ try:
 except ImportError:
     # Python < 3.13
     from dataclasses import replace
-
-from .progress import NoProgress, Progress
-from .result import get_result_array
 
 gauss_legendre = None
 _gauss_legendre_cache = {}
@@ -268,7 +266,7 @@ def cl2corr(cls, progress: Progress | None = None):
             # Grab metadata
             dtype = cl.array.dtype
             # Determine lmax from ell field or shape along ell axis
-            lmax = len(get_result_array(cl, "ell")[0]) - 1
+            lmax = len(cl.ell) - 1
             xvals, _ = _cached_gauss_legendre(lmax + 1)
             # transform to corrs, dispatching directly on spin: add/subtract
             # into the "+/-" basis, then transform each component with its
@@ -347,7 +345,7 @@ def corr2cl(wds, progress: Progress | None = None):
             # Grab metadata
             dtype = wd.array.dtype
             # Derive lmax from xvals stored in the correlation's ell field
-            xvals = get_result_array(wd, "ell")[0]
+            xvals = wd.ell
             weights = _cached_gauss_legendre(len(xvals))[1]
             lmax = len(xvals) - 1
             # transform to cl, dispatching directly on spin: undo each
