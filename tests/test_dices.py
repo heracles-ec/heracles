@@ -108,7 +108,15 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
-    __cls = heracles.unmixing.naturalspice(cls0, cls_alphas, fields, theta_max=180)
+    # apodization=None: with theta_max=180 (the whole sphere), any real
+    # theta-based apodization window (the default "logistic", or
+    # "gaussian") inevitably tapers near theta=180 by construction (it's
+    # exactly 0.5 there), so this exact-recovery check needs no
+    # apodization at all rather than relying on a window that happens
+    # not to taper
+    __cls = heracles.unmixing.naturalspice(
+        cls0, cls_alphas, fields, theta_max=180, apodization=None
+    )
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = __cls[key].array
@@ -116,7 +124,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     _alphas = _mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
-        wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
+        wmls0 = heracles.transforms._cl2corr(mls0[key].array, (0, 0))
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
@@ -133,18 +141,109 @@ def test_fast_mask_correction(cls0, jk_map):
 def test_polspice(cls0):
     from heracles.utils import get_cl
 
-    cls = np.array(
-        [
-            get_cl(("POS", "POS", 1, 1), cls0),
-            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
-            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
-            get_cl(("POS", "SHE", 1, 1), cls0)[0],
-        ]
-    ).T
-    corrs = heracles.transforms._cl2corr(cls)
-    _cls = heracles.transforms._corr2cl(corrs)
-    for cl, _cl in zip(cls.T, _cls.T):
-        assert np.isclose(cl[2:], _cl[2:]).all()
+    # TT round-trip (spin (0, 0))
+    cl_tt = get_cl(("POS", "POS", 1, 1), cls0)
+    corr_tt = heracles.transforms._cl2corr(cl_tt, (0, 0))
+    _cl_tt = heracles.transforms._corr2cl(corr_tt, (0, 0))
+    assert np.isclose(cl_tt[2:], _cl_tt[2:]).all()
+
+    # EE/BB round-trip (spin (2, 2), no EB/BE cross-term): rotate manually
+    # into the "+"/"-" combinations, then transform each rotated component
+    # with its own kernel -- (2, 2) for "+", (2, -2) for "-"
+    cl_ee = get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0]
+    cl_bb = get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1]
+    cp, cm = cl_ee + cl_bb, cl_ee - cl_bb
+    xi_p = heracles.transforms._cl2corr(cp, (2, 2))
+    xi_m = heracles.transforms._cl2corr(cm, (2, -2))
+    _cp = heracles.transforms._corr2cl(xi_p, (2, 2))
+    _cm = heracles.transforms._corr2cl(xi_m, (2, -2))
+    _cl_ee, _cl_bb = (_cp + _cm) / 2, (_cp - _cm) / 2
+    assert np.isclose(cl_ee[2:], _cl_ee[2:]).all()
+    assert np.isclose(cl_bb[2:], _cl_bb[2:]).all()
+
+    # TE round-trip (one spin zero, no TB counterpart): both rotated
+    # combinations share the same (2, 0) kernel
+    cl_te = get_cl(("POS", "SHE", 1, 1), cls0)[0]
+    cp, cm = cl_te, cl_te
+    corr_p = heracles.transforms._cl2corr(cp, (2, 0))
+    corr_m = heracles.transforms._cl2corr(cm, (2, 0))
+    _cp = heracles.transforms._corr2cl(corr_p, (2, 0))
+    _cm = heracles.transforms._corr2cl(corr_m, (2, 0))
+    _cl_te = (_cp + _cm) / 2
+    assert np.isclose(cl_te[2:], _cl_te[2:]).all()
+
+
+def test_decouple_recovers_ee_minus_bb():
+    """
+    The `naturalspice(..., purify=True)` EE/BB decoupling (PolSpice's
+    "decouple" estimator, Chon et al. 2004 eq. 65) builds both Cl^EE and
+    Cl^BB from the same d^l_{2,-2} kernel, normalized by a per-l coupling
+    factor Fl. For a full-sky (unmasked) correlation function -- so Fl
+    reduces to a constant, independent of l -- this construction must
+    recover Cl^EE - Cl^BB exactly, since that combination is exactly what
+    an ordinary (undecoupled) Xi^- round-trip already recovers losslessly;
+    it is only the individual EE/BB split that needs genuine mask
+    information to resolve.
+    """
+    rng = np.random.default_rng(0)
+    lmax = 40
+    ls = np.arange(lmax + 1)
+    cl_ee = np.zeros(lmax + 1)
+    cl_bb = np.zeros(lmax + 1)
+    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    cl_bb[2:] = 0.3 * rng.uniform(0.5, 1.5, lmax - 1) / (ls[2:] * (ls[2:] + 1)) ** 1.2
+
+    xi_p = heracles.transforms._cl2corr(cl_ee + cl_bb, (2, 2), lmax=lmax)
+    xi_m = heracles.transforms._cl2corr(cl_ee - cl_bb, (2, -2), lmax=lmax)
+    n = xi_p.shape[0]
+    xvals = np.polynomial.legendre.leggauss(n)[0]
+    theta = np.degrees(np.arccos(xvals))
+    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+    def isolate(x):
+        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
+
+    fl = isolate(csc2)  # no apodization (apod=1) -> Fl is exactly constant (=pi)
+    with np.errstate(invalid="ignore"):
+        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
+        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
+
+    np.testing.assert_allclose(
+        cl_ee_dec[2:] - cl_bb_dec[2:], cl_ee[2:] - cl_bb[2:], atol=1e-10
+    )
+
+
+def test_decouple_finite_with_apodization():
+    """
+    With a small `theta_max` (used as the Gaussian apodization FWHM/cutoff
+    for the decoupling normalization), the decoupled Cl^EE/Cl^BB must stay
+    finite -- unlike the earlier delta-function `purify()` operator, which
+    blew up for `theta` just past `theta_max`.
+    """
+    from heracles.unmixing import gaussian
+
+    lmax = 40
+    ls = np.arange(lmax + 1)
+    cl_ee = np.zeros(lmax + 1)
+    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    xi_p = heracles.transforms._cl2corr(cl_ee, (2, 2), lmax=lmax)
+    xi_m = heracles.transforms._cl2corr(cl_ee, (2, -2), lmax=lmax)
+    n = xi_p.shape[0]
+    xvals = np.polynomial.legendre.leggauss(n)[0]
+    theta = np.degrees(np.arccos(xvals))
+
+    apod = gaussian(theta, 30.0)
+    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+    def isolate(x):
+        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
+
+    fl = isolate(apod * csc2)
+    with np.errstate(invalid="ignore"):
+        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
+        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
+    assert np.all(np.isfinite(cl_ee_dec[2:]))
+    assert np.all(np.isfinite(cl_bb_dec[2:]))
 
 
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):
