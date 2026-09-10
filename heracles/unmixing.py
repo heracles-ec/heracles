@@ -90,7 +90,9 @@ def apod_window(theta, thetamax, type="logistic"):
         raise ValueError(f"Unknown apodization type: {type!r}")
 
 
-def purify_xip(cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xvals=None):
+def purify_xip(
+    cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xvals=None
+):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
     correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
@@ -120,7 +122,7 @@ def purify_xip(cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xv
     if xvals is None:
         xvals, _ = _cached_gauss_legendre(int(lmax) + 1)
     cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
-    cl_mask = cl_mask[: lmax + 1]   
+    cl_mask = cl_mask[: lmax + 1]
     theta_nodes = np.arccos(xvals)
 
     # cumulative integral from 0 to each node, via a fixed grid + cumulative
@@ -210,7 +212,15 @@ def purify_xip(cl_ee, cl_bb, cl_mask, thetamax, lmax=None, sampling_factor=1, xv
     return c_beta
 
 
-def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logistic", progress: Progress | None = None):
+def naturalspice(
+    d,
+    m,
+    fields,
+    theta_max=None,
+    purify=False,
+    apodization="logistic",
+    progress: Progress | None = None,
+):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -249,7 +259,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     with progress.task("mask correlations") as task:
         wm = cl2corr(m, progress=task)
     with progress.task("unmixing") as task:
-        corr_wd = _naturalspice(wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task)
+        corr_wd = _naturalspice(
+            wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task
+        )
 
     # trnasform back to Cl
     if purify:
@@ -267,7 +279,9 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
             thetamax_rad = np.pi if theta_max is None else np.radians(theta_max)
 
             spin2_keys = [
-                key for key, cwd in corr_wd.items() if cwd.spin[0] != 0 and cwd.spin[1] != 0
+                key
+                for key, cwd in corr_wd.items()
+                if cwd.spin[0] != 0 and cwd.spin[1] != 0
             ]
             current, total = 0, len(spin2_keys)
             for key in spin2_keys:
@@ -290,9 +304,7 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
                 cl_ee_raw = d[key].array[0, 0]
                 cl_bb_raw = d[key].array[1, 1]
                 cl_mask_raw = get_cl(m_key, m).array
-                Xi_p_dec = purify_xip(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_rad
-                )
+                Xi_p_dec = purify_xip(cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_rad)
                 xi_EE = 0.5 * (Xi_p_dec + Xi_m)
                 xi_BB = 0.5 * (Xi_p_dec - Xi_m)
 
@@ -320,7 +332,14 @@ def naturalspice(d, m, fields, theta_max=None, purify=False, apodization="logist
     return corr_d
 
 
-def _naturalspice(wd, wm, fields, theta_max=None, apodization="logistic", progress: Progress | None = None):
+def _naturalspice(
+    wd,
+    wm,
+    fields,
+    theta_max=None,
+    apodization="logistic",
+    progress: Progress | None = None,
+):
     """
     Natural unmixing of the data correlation function.
     Args:

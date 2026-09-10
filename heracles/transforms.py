@@ -120,8 +120,7 @@ def legendre_funcs(lmax, x, spin, lfacs=None, lfacs2=None, lrootfacs=None):
         )
     else:
         d2m2 = (
-            (lfacs - (4 * x + 8) / fac1) * P
-            + 4 / fac * (-fac1 + (x + 2) / lfacs) * dP
+            (lfacs - (4 * x + 8) / fac1) * P + 4 / fac * (-fac1 + (x + 2) / lfacs) * dP
         ) / lfacs2
     d20 = (2 * x * dP - lfacs * P) / lrootfacs
     return d20, d22, d2m2
