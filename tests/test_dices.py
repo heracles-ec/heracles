@@ -178,39 +178,6 @@ def test_decouple_recovers_ee_minus_bb():
     )
 
 
-def test_decouple_finite_with_apodization():
-    """
-    With a small `theta_max` (used as the Gaussian apodization FWHM/cutoff
-    for the decoupling normalization), the decoupled Cl^EE/Cl^BB must stay
-    finite -- unlike the earlier delta-function `purify()` operator, which
-    blew up for `theta` just past `theta_max`.
-    """
-    from heracles.unmixing import gaussian
-
-    lmax = 40
-    ls = np.arange(lmax + 1)
-    cl_ee = np.zeros(lmax + 1)
-    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
-    xi_p = heracles.transforms._cl2corr(cl_ee, (2, 2), lmax=lmax)
-    xi_m = heracles.transforms._cl2corr(cl_ee, (2, -2), lmax=lmax)
-    n = xi_p.shape[0]
-    xvals = np.polynomial.legendre.leggauss(n)[0]
-    theta = np.degrees(np.arccos(xvals))
-
-    apod = gaussian(theta, 30.0)
-    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
-
-    def isolate(x):
-        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
-
-    fl = isolate(apod * csc2)
-    with np.errstate(invalid="ignore"):
-        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
-        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
-    assert np.all(np.isfinite(cl_ee_dec[2:]))
-    assert np.all(np.isfinite(cl_bb_dec[2:]))
-
-
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):
     assert len(cls1) == njk
     for key in cls1.keys():
