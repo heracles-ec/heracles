@@ -16,6 +16,8 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
+from __future__ import annotations
+
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import CubicSpline
