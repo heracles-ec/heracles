@@ -6,25 +6,41 @@ from .progress import NoProgress, Progress
 from .result import get_result_array
 
 
-def legendre_p_all(n, x, *, diff_n=0):
+def legendre_p_all_vec(n, xvals, *, diff_n=0):
     """
-    All Legendre polynomials of the first kind up to the specified degree n,
-    evaluated at a scalar x, optionally with their first derivatives.
+    All Legendre polynomials of the first kind up to degree n, evaluated
+    at every point in the 1D array `xvals` at once, optionally with
+    their first derivatives, via the standard three-term recurrence.
+
+    The walk over `l` is inherently sequential and stays a Python loop,
+    but each step is a single vectorized numpy expression over all
+    points at once -- this is the actual hot path in `_cl2corr`/
+    `_corr2cl`, so it matters that it's O(lmax) Python-level iterations,
+    each O(npoints) C-level work, rather than O(npoints) Python-level
+    calls each doing O(lmax) more Python-level work (the O(lmax^2)
+    interpreter overhead an earlier, per-point scalar version had at
+    npoints ~ lmax).
+
+    :param n: maximum degree
+    :param xvals: 1D array of x values to evaluate at
+    :param diff_n: if 1, also return the first derivatives
+    :return: `allP` (or `(allP, alldP)`), shape `(n+1, len(xvals))`
     """
-    allP = np.empty(n + 1)
+    xvals = np.asarray(xvals, dtype=np.float64)
+    allP = np.empty((n + 1, len(xvals)))
     allP[0] = 1.0
     if n >= 1:
-        allP[1] = x
+        allP[1] = xvals
     for ell in range(1, n):
-        allP[ell + 1] = ((2 * ell + 1) * x * allP[ell] - ell * allP[ell - 1]) / (
+        allP[ell + 1] = ((2 * ell + 1) * xvals * allP[ell] - ell * allP[ell - 1]) / (
             ell + 1
         )
     if diff_n == 0:
         return allP
     assert diff_n == 1, "only diff_n=1 is supported"
-    ls = np.arange(1, n + 1)
+    ls = np.arange(1, n + 1)[:, None]
     alldP = np.zeros_like(allP)
-    alldP[1:] = ls * (allP[:-1] - x * allP[1:]) / (1 - x**2)
+    alldP[1:] = ls * (allP[:-1] - xvals * allP[1:]) / (1 - xvals**2)
     return allP, alldP
 
 
@@ -86,72 +102,81 @@ def _cached_shifted_gauss_legendre(npoints, a, b):
     return xvals_shifted, weights_shifted
 
 
-def legendre_funcs(lmax, x, spin, lfacs=None, lfacs2=None, lrootfacs=None):
+def legendre_funcs_vec(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=None):
     """
     Utility function to return the Legendre/Wigner-d functions needed to
     transform a Cl of the given `spin` to/from a correlation function, for
-    all :math:`\ell` up to lmax. Note that the spin functions start at
-    :math:`\ell=2`, so are shorter than the spin (0, 0) case.
+    all :math:`\ell` up to lmax, evaluated at every point in the 1D array
+    `xvals` at once (shape `(nl, len(xvals))`). Note that the spin
+    functions start at :math:`\ell=2`, so are shorter than the spin (0, 0)
+    case.
 
     Only spin (0, 0), (0, 2)/(2, 0), and (2, 2) are supported.
 
     :param lmax: maximum :math:`\ell`
-    :param x: scalar value of :math:`\cos(\theta)` at which to evaluate
+    :param xvals: 1D array of :math:`\cos(\theta)` values to evaluate at
     :param spin: (s1, s2) spin of the field pair -- selects which functions
         are computed
     :param lfacs: optional pre-computed :math:`\ell(\ell+1)` float array
         (ignored for spin (0, 0))
     :param lfacs2: optional pre-computed :math:`(\ell+2)*(\ell-1)` float array
     :param lrootfacs: optional pre-computed sqrt(lfacs*lfacs2) array
-    :return: `P`, starting at :math:`\ell=0`, for spin (0, 0); otherwise
-        `(d_{20}, d_{22}, d_{2,-2})`, starting at :math:`\ell=2`
+    :return: `P` with shape `(lmax+1, len(xvals))` for spin (0, 0);
+        otherwise `(d_{20}, d_{22}, d_{2,-2})`, each shape
+        `(lmax-1, len(xvals))`
     """
     s1, s2 = spin
     if s1 == 0 and s2 == 0:
-        return legendre_p_all(lmax, x)
+        return legendre_p_all_vec(lmax, xvals)
     elif not ({s1, s2} == {0, 2} or (s1 == 2 and s2 == 2)):
         raise ValueError(
             f"unsupported spin combination {spin!r}: only (0, 0), "
             "(0, 2)/(2, 0), and (2, 2) are supported"
         )
 
-    allP, alldP = legendre_p_all(lmax, x, diff_n=1)
-    fac1 = 1 - x
-    fac2 = 1 + x
+    xvals = np.asarray(xvals, dtype=np.float64)
+    allP, alldP = legendre_p_all_vec(lmax, xvals, diff_n=1)
+    fac1 = 1 - xvals
+    fac2 = 1 + xvals
 
     if lfacs is None:
         ls = np.arange(2, lmax + 1, dtype=np.float64)
         lfacs = ls * (ls + 1)
         lfacs2 = (ls + 2) * (ls - 1)
         lrootfacs = np.sqrt(lfacs * lfacs2)
+    lfacs_c = lfacs[:, None]
+    lfacs2_c = lfacs2[:, None]
+    lrootfacs_c = lrootfacs[:, None]
     P = allP[2:]
     dP = alldP[2:]
 
     fac = fac1 / fac2
     d22 = (
-        ((4 * x - 8) / fac2 + lfacs) * P + 4 * fac * (fac2 + (x - 2) / lfacs) * dP
-    ) / lfacs2
-    if x > 0.998:
+        ((4 * xvals - 8) / fac2 + lfacs_c) * P
+        + 4 * fac * (fac2 + (xvals - 2) / lfacs_c) * dP
+    ) / lfacs2_c
+
+    # general-case formula everywhere first, then overwrite the
+    # small-angle points' low-l rows with the series below
+    d2m2 = (
+        (lfacs_c - (4 * xvals + 8) / fac1) * P
+        + 4 / fac * (-fac1 + (xvals + 2) / lfacs_c) * dP
+    ) / lfacs2_c
+
+    small_angle = xvals > 0.998
+    for j in np.nonzero(small_angle)[0]:
+        x = xvals[j]
         # for stability use series at small angles (thanks Pavel Motloch)
-        d2m2 = np.empty(lmax - 1)
         indser = int(np.sqrt((400.0 + 3 / (1 - x**2)) / 150)) - 1
-        d2m2[indser:] = (
-            (lfacs[indser:] - (4 * x + 8) / fac1) * P[indser:]
-            + 4 / fac * (-fac1 + (x + 2) / lfacs[indser:]) * dP[indser:]
-        ) / lfacs2[indser:]
         sin2 = 1 - x**2
-        d2m2[:indser] = (
+        d2m2[:indser, j] = (
             lfacs[:indser]
             * lfacs2[:indser]
             * sin2**2
             / 7680
             * (20 + sin2 * (16 - lfacs[:indser]))
         )
-    else:
-        d2m2 = (
-            (lfacs - (4 * x + 8) / fac1) * P + 4 / fac * (-fac1 + (x + 2) / lfacs) * dP
-        ) / lfacs2
-    d20 = (2 * x * dP - lfacs * P) / lrootfacs
+    d20 = (2 * xvals * dP - lfacs_c * P) / lrootfacs_c
     return d20, d22, d2m2
 
 
@@ -197,11 +222,8 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
 
     if kernel == (0, 0):
         ct = facs * cl[: lmax + 1]
-        corr = np.empty(len(xvals))
-        for i, x in enumerate(xvals):
-            P = legendre_funcs(lmax, x, (0, 0))
-            corr[i] = np.dot(ct, P)
-        return corr
+        P = legendre_funcs_vec(lmax, xvals, (0, 0))
+        return np.einsum("l,lp->p", ct, P)
     elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
         raise ValueError(
             f"unsupported kernel {kernel!r}: only (0, 0), (0, 2)/(2, 0), "
@@ -215,12 +237,9 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     lrootfacs = np.sqrt(lfacs * lfacs2)
 
     ct = facs[2:] * cl[2 : lmax + 1]
-    corr = np.empty(len(xvals))
-    for i, x in enumerate(xvals):
-        d20, d22, d2m2 = legendre_funcs(lmax, x, (2, 2), lfacs, lfacs2, lrootfacs)
-        d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
-        corr[i] = np.dot(ct, d)
-    return corr
+    d20, d22, d2m2 = legendre_funcs_vec(lmax, xvals, (2, 2), lfacs, lfacs2, lrootfacs)
+    d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
+    return np.einsum("l,lp->p", ct, d)
 
 
 def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=None):
@@ -257,20 +276,17 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
         xvals, weights = _cached_gauss_legendre(int(sampling_factor * lmax) + 1)
     else:
         assert weights is not None, "xvals and weights must be given together"
+        xvals = np.asarray(xvals, dtype=np.float64)
+        weights = np.asarray(weights, dtype=np.float64)
 
     if kernel == (0, 0):
-        cl = np.zeros(lmax + 1)
-        for x, weight, c in zip(xvals, weights, corr):
-            # a node whose correlation value is exactly 0 contributes
-            # exactly 0 to the sum regardless of P -- skip the expensive
-            # Legendre evaluation there. This is a no-op when `corr` has
-            # no exact zeros (the common case), but a real win when it
-            # does (e.g. a purify_xip caller that has zeroed out a
-            # thetamax-apodized tail before calling this)
-            if c == 0.0:
-                continue
-            P = legendre_funcs(lmax, x, (0, 0))
-            cl += (weight * c) * P
+        # a node whose correlation value is exactly 0
+        #  contributes exactly 0 to the sum
+        nz = corr != 0.0
+        if not np.any(nz):
+            return np.zeros(lmax + 1)
+        P = legendre_funcs_vec(lmax, xvals[nz], (0, 0))
+        cl = np.einsum("p,lp->l", weights[nz] * corr[nz], P)
         return 2 * np.pi * cl
     elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
         raise ValueError(
@@ -285,6 +301,18 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
     lrootfacs = np.sqrt(lfacs * lfacs2)
 
     cl = np.zeros(lmax + 1)
+    # same exact-zero skip as above
+    nz = corr != 0.0
+    if not np.any(nz):
+        return cl
+    d20, d22, d2m2 = legendre_funcs_vec(
+        lmax, xvals[nz], (2, 2), lfacs, lfacs2, lrootfacs
+    )
+    d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
+    cl[2:] = np.einsum("p,lp->l", weights[nz] * corr[nz], d)
+    return 2 * np.pi * cl
+
+    cl = np.zeros(lmax + 1)
     for x, weight, c in zip(xvals, weights, corr):
         # same exact-zero skip as above
         if c == 0.0:
@@ -293,7 +321,6 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
         d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
         cl[2:] += (weight * c) * d
     return 2 * np.pi * cl
-
 
 def cl2corr(cls, domain=None, progress: Progress | None = None):
     """
@@ -368,14 +395,13 @@ def cl2corr(cls, domain=None, progress: Progress | None = None):
                 icp = facs[2:] * (EB - BE)[2 : lmax + 1]
                 icm = facs[2:] * (EB + BE)[2 : lmax + 1]
                 wd = np.zeros((2, 2, len(xvals_key)))
-                for i, x in enumerate(xvals_key):
-                    _, d22, d2m2 = legendre_funcs(
-                        lmax, x, spin, lfacs, lfacs2, lrootfacs
-                    )
-                    wd[0, 0, i] = np.dot(cp, d22)  # EE-like
-                    wd[1, 1, i] = np.dot(cm, d2m2)  # BB-like
-                    wd[0, 1, i] = -np.dot(icp, d22)  # EB-like
-                    wd[1, 0, i] = -np.dot(icm, d2m2)  # BE-like
+                _, d22, d2m2 = legendre_funcs_vec(
+                    lmax, xvals_key, spin, lfacs, lfacs2, lrootfacs
+                )
+                wd[0, 0] = np.einsum("l,lp->p", cp, d22)  # EE-like
+                wd[1, 1] = np.einsum("l,lp->p", cm, d2m2)  # BB-like
+                wd[0, 1] = -np.einsum("l,lp->p", icp, d22)  # EB-like
+                wd[1, 0] = -np.einsum("l,lp->p", icm, d2m2)  # BE-like
             # Add metadata back
             wd = np.array(list(wd), dtype=dtype)
             wds[key] = replace(
@@ -428,10 +454,16 @@ def corr2cl(wds, domain=None, progress: Progress | None = None):
             # component's own kernel, then add/subtract back to the
             # physical [[EE, EB], [BE, BB]] (or [Ta, Tb]) layout
             if spin == (0, 0):
-                cl = _corr2cl(wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key)
+                cl = _corr2cl(
+                    wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
             elif spin in ((0, 2), (2, 0)):
-                clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
-                clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
+                clp = _corr2cl(
+                    wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
+                clm = _corr2cl(
+                    wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
                 cl = np.array([(clp + clm) / 2, (clp - clm) / 2])
             else:
                 # spin (2, 2): kept as one shared loop, mirroring cl2corr's
@@ -441,14 +473,13 @@ def corr2cl(wds, domain=None, progress: Progress | None = None):
                 lfacs2 = (ls + 2) * (ls - 1)
                 lrootfacs = np.sqrt(lfacs * lfacs2)
                 r = np.zeros((2, 2, lmax + 1))
-                for i, (x, weight) in enumerate(zip(xvals, weights_key)):
-                    _, d22, d2m2 = legendre_funcs(
-                        lmax, x, spin, lfacs, lfacs2, lrootfacs
-                    )
-                    r[0, 0, 2:] += (weight * wd.array[0, 0, i]) * d22
-                    r[0, 1, 2:] += (weight * wd.array[1, 1, i]) * d2m2
-                    r[1, 0, 2:] += -(weight * wd.array[1, 0, i]) * d2m2
-                    r[1, 1, 2:] += -(weight * wd.array[0, 1, i]) * d22
+                _, d22, d2m2 = legendre_funcs_vec(
+                    lmax, xvals, spin, lfacs, lfacs2, lrootfacs
+                )
+                r[0, 0, 2:] = np.einsum("p,lp->l", weights_key * wd.array[0, 0], d22)
+                r[0, 1, 2:] = np.einsum("p,lp->l", weights_key * wd.array[1, 1], d2m2)
+                r[1, 0, 2:] = -np.einsum("p,lp->l", weights_key * wd.array[1, 0], d2m2)
+                r[1, 1, 2:] = -np.einsum("p,lp->l", weights_key * wd.array[0, 1], d22)
                 p_diag, m_diag = r[0, 0], r[0, 1]
                 p_anti, m_anti = r[1, 0], r[1, 1]
                 EE, BB = (p_diag + m_diag) / 2, (p_diag - m_diag) / 2
