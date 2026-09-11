@@ -109,7 +109,10 @@ def test_full_mask_correction(cls0, mls0, fields):
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
     __cls = heracles.unmixing.naturalspice(
-        cls0, cls_alphas, fields, theta_max=180,
+        cls0,
+        cls_alphas,
+        fields,
+        theta_max=180,
     )
     for key in list(cls0.keys()):
         cl = cls0[key].array
@@ -122,6 +125,7 @@ def test_full_mask_correction(cls0, mls0, fields):
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
+
 
 def test_fast_mask_correction(cls0, jk_map):
     _cls0 = dices.correct_footprint_fsky(cls0, jk_map, 0, 0)
