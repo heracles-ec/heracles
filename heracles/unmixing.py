@@ -102,7 +102,7 @@ def purify_xip(
     xi_p,
     thetamax,
     lmax=None,
-    sampling_factor=200,
+    sampling_factor=4,
 ):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
