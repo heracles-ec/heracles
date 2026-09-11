@@ -108,7 +108,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
-    __cls = heracles.unmixing.naturalspice(
+    __cls = heracles.unmixing.unmix(
         cls0,
         cls_alphas,
         fields,
