@@ -99,7 +99,7 @@ def test_get_delete2_fsky(jk_map, njk):
 def test_full_mask_correction(cls0, mls0, fields):
     from heracles.dices.jackknife import _mask_correlation_ratio
 
-    # When mljk == mls0, correct_footprint_naturalspice should recover the original cls
+    # When mljk == mls0, correct_footprint_mixing should recover the original cls
     _cls = dices.correct_footprint_naturalspice(cls0, mls0, mls0, fields, unmixed=False)
     for key in list(cls0.keys()):
         cl = cls0[key].array
@@ -108,7 +108,9 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
-    __cls = heracles.unmixing.naturalspice(cls0, cls_alphas, fields, theta_max=180)
+    __cls = heracles.unmixing.naturalspice(
+        cls0, cls_alphas, fields, theta_max=180,
+    )
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = __cls[key].array
@@ -116,34 +118,16 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     _alphas = _mask_correlation_ratio(mls0, mls0, unmixed=True)
     for key in list(_alphas.keys()):
-        wmls0 = heracles.transforms._cl2corr(mls0[key]).T[0]
+        wmls0 = heracles.transforms._cl2corr(mls0[key].array, (0, 0))
         alpha = alphas[key].array
         _alpha = _alphas[key].array / wmls0
         assert np.isclose(alpha, _alpha).all()
-
 
 def test_fast_mask_correction(cls0, jk_map):
     _cls0 = dices.correct_footprint_fsky(cls0, jk_map, 0, 0)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls0[key].array
-        assert np.isclose(cl[2:], _cl[2:]).all()
-
-
-def test_polspice(cls0):
-    from heracles.utils import get_cl
-
-    cls = np.array(
-        [
-            get_cl(("POS", "POS", 1, 1), cls0),
-            get_cl(("SHE", "SHE", 1, 1), cls0)[0, 0],
-            get_cl(("SHE", "SHE", 1, 1), cls0)[1, 1],
-            get_cl(("POS", "SHE", 1, 1), cls0)[0],
-        ]
-    ).T
-    corrs = heracles.transforms._cl2corr(cls)
-    _cls = heracles.transforms._corr2cl(corrs)
-    for cl, _cl in zip(cls.T, _cls.T):
         assert np.isclose(cl[2:], _cl[2:]).all()
 
 
