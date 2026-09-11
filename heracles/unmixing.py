@@ -26,9 +26,7 @@ from .result import binned, get_result_array
 from .transforms import (
     cl2corr,
     corr2cl,
-    _cl2corr,
     _corr2cl,
-    _cached_gauss_legendre,
     _cached_shifted_gauss_legendre,
 )
 from .utils import get_cl
@@ -100,13 +98,11 @@ def apod_window(theta, thetamax, type="logistic"):
 
 
 def purify_xip(
-    cl_ee,
-    cl_bb,
-    cl_mask,
+    xvals,
+    xi_p,
     thetamax,
     lmax=None,
     sampling_factor=200,
-    xvals=None,
 ):
     """
     Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
@@ -118,114 +114,51 @@ def purify_xip(
     cumulative integral of C+(beta) = Xi_+^raw(beta)/Xi_mask(beta) against
     two trigonometric kernels.
 
-    Note: c_beta is only genuinely accurate for theta <= thetamax --
-    beyond that, both its sum1/sum2 terms (via theta_capped) and its
-    C+(beta) term (via the same capping, see below) just repeat the
-    theta=thetamax boundary value rather than continuing the true
-    calculation. This is deliberate and safe for this function's actual
-    use (`unmix`'s purify branch always applies a downstream apodization
-    window that is exactly zero at and beyond thetamax, discarding
-    whatever c_beta says there) but means a direct, unapodized comparison
-    against PolSpice's own debug dump (which does not cap) will disagree
-    beyond thetamax.
-
     Args:
-        cl_ee, cl_bb: raw (masked, not yet unmixed) Cl_EE, Cl_BB of the data
-        cl_mask: raw Cl of the (scalar) mask
+        xvals: the Gauss-Legendre (or other quadrature) nodes (cos(beta)) at which `xi_p` is evaluated
+        xi_p: Xi_p^raw(beta), the (2,2)-kernel transform of
+            cl_ee+cl_bb, evaluated at exactly `xvals`
         thetamax: integration domain in rad
-        lmax: optional maximum multipole to use (default: inferred from the input Cl)
+        lmax: optional maximum multipole to use (default: inferred from
+            `len(xi_p) - 1`)
         sampling_factor: optional oversampling factor for the cumulative
             integral's fine grid (default: 1); already scales with lmax
             (see `ngrid` below), so this is for cases that need extra
             headroom beyond that scaling, not a replacement for it
-        xvals: optional precomputed Gauss-Legendre nodes (cos(beta)) to evaluate the cumulative integral at; if None, they will be computed internally for lmax+1 nodes
     Returns:
         c_beta: the cumulative-integral correction, evaluated at the Gauss-Legendre nodes
     """
     if lmax is None:
-        lmax = len(cl_ee) - 1
-    if xvals is None:
-        xvals, _ = _cached_gauss_legendre(int(lmax) + 1)
-    cl_sum = cl_ee[: lmax + 1] + cl_bb[: lmax + 1]
-    cl_mask = cl_mask[: lmax + 1]
+        lmax = len(xi_p) - 1
     theta_nodes = np.arccos(xvals)
 
-    # cumulative integral from 0 to each node, via a fixed grid + cumulative
-    # trapezoid rule -- matching PolSpice's own `cumul_simpson` (cumul2.f90),
-    # which likewise samples C+(beta) on an independent fine mesh of
-    # [0, thetamax] rather than reusing the Gauss-Legendre node grid, since
-    # the cumulative integral needs a genuinely finer sampling than the
-    # handful of quadrature nodes gives; nodes beyond thetamax are capped
-    # there, same as PolSpice's own cumul().
-    #
     # c_beta = cp + sum1/sin^2(theta/2) - 2*sum2*(2+cos(theta))/sin^4(theta/2)
     # is a near-total cancellation between O(1) terms as theta -> 0 (sum1,
     # sum2 -> 0 just fast enough to keep c_beta finite), so a uniform grid's
     # *relative* error in sum1/sum2 (dominated by the well-resolved bulk of
     # [0, thetamax]) gets massively amplified by the 1/sin^2, 1/sin^4
-    # factors for the smallest theta nodes -- this showed up as xi_B_final
-    # (and hence the purified Cl_BB) spuriously blowing up at high l instead
-    # of decaying like PolSpice's. Concentrating grid points near beta=0
-    # (cubic spacing) fixes this far more cheaply than simply raising
-    # ngrid uniformly (verified: matches a 100x larger uniform grid's
-    # result at ~1/50th the points).
-    #
-    # ngrid scales with lmax (rather than a flat constant) since higher l
-    # needs finer angular resolution near beta=0 to keep resolving that
-    # cancellation -- 200 points per l reproduces the flat ngrid=20000
-    # this was originally verified at (lmax~95-100), and keeps the same
-    # accuracy margin at other lmax rather than over/under-sampling
-    # relative to what that verification actually covered.
-    # sampling_factor multiplies this on top, for callers that want extra
-    # headroom beyond the lmax-based scaling.
+    # factors for the smallest theta nodes 
     ngrid = max(2000, int(sampling_factor * (lmax + 1)))
     eps = 1e-6
     beta_max = max(thetamax - eps, eps)
     u = np.linspace(0.0, 1.0, ngrid)
     beta_grid = eps + (beta_max - eps) * u**3
-
-    # C+(beta) = Xi_p(beta)/Xi_mask(beta) is itself a finite sum of
-    # Wigner-d/Legendre functions up to degree lmax, i.e. band-limited by
-    # lmax -- evaluating it at all `ngrid` points (chosen only for the
-    # *cumulative integral* below, which genuinely needs that many samples
-    # to resolve the sin/cos kernels near beta=0) massively oversamples
-    # what the transform itself carries information for. Evaluate it on
-    # one dedicated grid of just `lmax+1` points, spanning [0, thetamax]
-    # only (this function's own domain -- C+ is never needed beyond it,
-    # see the docstring), with the same near-zero-concentrated (u**3)
-    # spacing used elsewhere in this function, and cubic-spline
-    # interpolate everything else from it: both the fine cumulative-
-    # integral grid below, *and* (via `theta_capped`, the same capping
-    # sum1/sum2 already use) C+ at this function's own output nodes
-    # (theta_nodes) -- no separate/direct Legendre evaluation at those
-    # nodes is needed at all. This one grid's evaluation (2 Legendre/
-    # Wigner-d transforms -- Xi_p and Xi_mask, one batched _cl2corr call
-    # each) is the actual expensive part of this function (the fine-grid
-    # cumulative trapezoid itself is cheap, plain vectorized numpy ops).
-    nrel = lmax + 1
-    ur = np.linspace(0.0, 1.0, nrel)
-    beta_rel = eps + (beta_max - eps) * ur**3
-    xvals_rel = np.cos(beta_rel)
-
-    xi_p_rel = _cl2corr(cl_sum, (2, 2), lmax=lmax, xvals=xvals_rel)
-    xi_mask_rel = _cl2corr(cl_mask, (0, 0), lmax=lmax, xvals=xvals_rel)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        cp_rel = np.where(xi_mask_rel > 0, xi_p_rel / xi_mask_rel, 0.0)
-
-    cp_spline = CubicSpline(beta_rel, cp_rel)
-    cp_grid = cp_spline(beta_grid)
+    sort_idx = np.argsort(theta_nodes)
+    xi_p_spline = CubicSpline(theta_nodes[sort_idx], xi_p[sort_idx])
+    xi_p_grid = xi_p_spline(beta_grid)
 
     # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing needed
     # there; singular as beta -> pi (see module docs/notebook)
-    fsub1_grid = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * cp_grid
-    fsub2_grid = np.tan(beta_grid / 2) ** 3 * cp_grid
+    fsub1_grid = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * xi_p_grid
+    fsub2_grid = np.tan(beta_grid / 2) ** 3 * xi_p_grid
     cumsum1_grid = cumulative_trapezoid(fsub1_grid, beta_grid, initial=0.0)
     cumsum2_grid = cumulative_trapezoid(fsub2_grid, beta_grid, initial=0.0)
 
     theta_capped = np.minimum(theta_nodes, thetamax)
-    # cp_spline's domain starts at eps, not exactly 0
-    theta_capped_safe = np.maximum(theta_capped, eps)
-    Xi_p = cp_spline(theta_capped_safe)
+    theta_capped_safe = np.clip(
+        theta_capped, xi_p_spline.x[0], xi_p_spline.x[-1]
+    )
+    Xi_p = xi_p_spline(theta_capped_safe)
 
     sum1_nodes = np.interp(theta_capped, beta_grid, cumsum1_grid)
     sum2_nodes = np.interp(theta_capped, beta_grid, cumsum2_grid)
@@ -334,12 +267,8 @@ def unmix(
 
                 # Purify
                 Xi_m = wd[key][1, 1] / wm_arr
-                cl_ee_raw = d[key].array[0, 0]
-                cl_bb_raw = d[key].array[1, 1]
-                cl_mask_raw = get_cl(m_key, m).array
-                Xi_p_dec = purify_xip(
-                    cl_ee_raw, cl_bb_raw, cl_mask_raw, thetamax_pad_rad, xvals=xvals
-                )
+                Xi_p = wd[key][0, 0] / wm_arr
+                Xi_p_dec = purify_xip(xvals, Xi_p, thetamax_pad_rad)
                 xi_EE = 0.5 * (Xi_p_dec + Xi_m)
                 xi_BB = 0.5 * (Xi_p_dec - Xi_m)
 
