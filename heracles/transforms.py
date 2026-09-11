@@ -322,6 +322,7 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
         cl[2:] += (weight * c) * d
     return 2 * np.pi * cl
 
+
 def cl2corr(cls, domain=None, progress: Progress | None = None):
     """
     Transforms cls to correlation functions

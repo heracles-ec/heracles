@@ -137,7 +137,7 @@ def purify_xip(
     # sum2 -> 0 just fast enough to keep c_beta finite), so a uniform grid's
     # *relative* error in sum1/sum2 (dominated by the well-resolved bulk of
     # [0, thetamax]) gets massively amplified by the 1/sin^2, 1/sin^4
-    # factors for the smallest theta nodes 
+    # factors for the smallest theta nodes
     ngrid = max(2000, int(sampling_factor * (lmax + 1)))
     eps = 1e-6
     beta_max = max(thetamax - eps, eps)
@@ -155,9 +155,7 @@ def purify_xip(
     cumsum2_grid = cumulative_trapezoid(fsub2_grid, beta_grid, initial=0.0)
 
     theta_capped = np.minimum(theta_nodes, thetamax)
-    theta_capped_safe = np.clip(
-        theta_capped, xi_p_spline.x[0], xi_p_spline.x[-1]
-    )
+    theta_capped_safe = np.clip(theta_capped, xi_p_spline.x[0], xi_p_spline.x[-1])
     Xi_p = xi_p_spline(theta_capped_safe)
 
     sum1_nodes = np.interp(theta_capped, beta_grid, cumsum1_grid)
@@ -216,7 +214,7 @@ def unmix(
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
-    # Theta max is the maximum angle to use for the unmixing, in degrees. 
+    # Theta max is the maximum angle to use for the unmixing, in degrees.
     # If None, use all angles.
     theta_max = 180.0 if theta_max is None else theta_max
     thetamax_pad_rad = min(np.radians(theta_max) + np.radians(3.0), np.pi)
@@ -236,7 +234,6 @@ def unmix(
     # purification (PolSpice's "decouple").
     if purify:
         with progress.task("purified transform back to Cl") as task:
-
             masks = {}
             for key, field in fields.items():
                 if field.mask is not None:
@@ -280,10 +277,16 @@ def unmix(
                 fl = _corr2cl(apod * csc2, (2, -2), xvals=xvals, weights=weights)
                 with np.errstate(divide="ignore"):
                     cl_EE = (
-                        2 * np.pi * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights) / fl
+                        2
+                        * np.pi
+                        * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights)
+                        / fl
                     )
                     cl_BB = (
-                        2 * np.pi * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights) / fl
+                        2
+                        * np.pi
+                        * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights)
+                        / fl
                     )
 
                 # Replace the EE/BB entries in the output dictionary with the purified values
