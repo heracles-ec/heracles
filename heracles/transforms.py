@@ -32,9 +32,9 @@ def legendre_p_all_vec(n, xvals, *, diff_n=0):
     if n >= 1:
         allP[1] = xvals
     for ell in range(1, n):
-        allP[ell + 1] = (
-            (2 * ell + 1) * xvals * allP[ell] - ell * allP[ell - 1]
-        ) / (ell + 1)
+        allP[ell + 1] = ((2 * ell + 1) * xvals * allP[ell] - ell * allP[ell - 1]) / (
+            ell + 1
+        )
     if diff_n == 0:
         return allP
     assert diff_n == 1, "only diff_n=1 is supported"
@@ -112,13 +112,6 @@ def legendre_funcs_vec(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=Non
     case.
 
     Only spin (0, 0), (0, 2)/(2, 0), and (2, 2) are supported.
-
-    The `x > 0.998` small-angle-series branch (see below) is a boolean
-    mask over `xvals`, since different points may fall on either side of
-    it; the `indser` split within that branch is itself per-point
-    (depends on `x` via `1 - x**2`), so it stays a small Python loop, but
-    only over the (typically far fewer) points actually needing the
-    series -- not over all points.
 
     :param lmax: maximum :math:`\ell`
     :param xvals: 1D array of :math:`\cos(\theta)` values to evaluate at
@@ -452,10 +445,16 @@ def corr2cl(wds, domain=None, progress: Progress | None = None):
             # component's own kernel, then add/subtract back to the
             # physical [[EE, EB], [BE, BB]] (or [Ta, Tb]) layout
             if spin == (0, 0):
-                cl = _corr2cl(wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key)
+                cl = _corr2cl(
+                    wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
             elif spin in ((0, 2), (2, 0)):
-                clp = _corr2cl(wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
-                clm = _corr2cl(wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key)
+                clp = _corr2cl(
+                    wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
+                clm = _corr2cl(
+                    wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                )
                 cl = np.array([(clp + clm) / 2, (clp - clm) / 2])
             else:
                 # spin (2, 2): kept as one shared loop, mirroring cl2corr's
