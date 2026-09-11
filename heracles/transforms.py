@@ -312,6 +312,16 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
     cl[2:] = np.einsum("p,lp->l", weights[nz] * corr[nz], d)
     return 2 * np.pi * cl
 
+    cl = np.zeros(lmax + 1)
+    for x, weight, c in zip(xvals, weights, corr):
+        # same exact-zero skip as above
+        if c == 0.0:
+            continue
+        d20, d22, d2m2 = legendre_funcs(lmax, x, (2, 2), lfacs, lfacs2, lrootfacs)
+        d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
+        cl[2:] += (weight * c) * d
+    return 2 * np.pi * cl
+
 
 def cl2corr(cls, domain=None, progress: Progress | None = None):
     """

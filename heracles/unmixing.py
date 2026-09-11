@@ -16,11 +16,20 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
+from __future__ import annotations
+
 import numpy as np
-from .result import binned
-from .transforms import cl2corr, corr2cl
+from scipy.integrate import cumulative_trapezoid
+from scipy.interpolate import CubicSpline
+from .progress import NoProgress, Progress
+from .result import binned, get_result_array
+from .transforms import (
+    cl2corr,
+    corr2cl,
+    _corr2cl,
+    _cached_shifted_gauss_legendre,
+)
 from .utils import get_cl
-from .transforms import _cached_gauss_legendre
 
 try:
     from copy import replace
@@ -29,11 +38,149 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(x, x0=-2, k=50):
-    return 1.0 + np.exp(-k * (x - x0))
+def logistic(theta, thetamax, k=20.0):
+    """
+    Logistic-sigmoid apodization window in theta (degrees), analogous to
+    `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
+    with the step centered at `thetamax` and its smoothness set by `k`
+    (degrees^-1; larger k -> sharper step, k -> infinity recovers a hard
+    cutoff at thetamax).
+    If `thetamax` is None, no apodization is applied (flat weight of 1
+    everywhere).
+    """
+    if thetamax is None:
+        return np.ones_like(theta)
+    return 1.0 / (1.0 + np.exp(k * (theta - thetamax)))
 
 
-def naturalspice(d, m, fields, theta_max=None):
+def gaussian(theta, thetamax):
+    """
+    Gaussian apodization window in theta (degrees), matching PolSpice's
+    `apodizefunction` type 0 (apodize_mod.f90): `thetamax` (PolSpice's
+    separate `-thetamax`) sets its hard cutoff. The taper's FWHM is fixed
+    at `thetamax / 2`, per Chon et al. (2004)'s recommended
+    `apodizesigma = thetamax / 2` -- PolSpice's `-apodizesigma` and
+    `-thetamax` are independent options in general, but `unmix`
+    doesn't expose apodizesigma separately, so this bakes in that
+    recommended ratio (verified against PolSpice's own Fl(l) dump,
+    SPICE_FL_DEBUG, with matching -apodizesigma: exact to machine
+    precision; using `thetamax` itself as the width, instead of half of
+    it, is wrong by a large, l-dependent factor).
+    If `thetamax` is None, no apodization is applied (flat weight of 1
+    everywhere).
+    """
+    if thetamax is None:
+        return np.ones_like(theta)
+    sigma = (thetamax / 2) / np.sqrt(8 * np.log(2))
+    return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
+
+
+def apod_window(theta, thetamax, type="logistic"):
+    """
+    Unified apodization-window dispatch, shared by `unmix`'s
+    purify loop and `_unmix`. Returns a multiplicative weight the
+    same shape as `theta`, in [0, 1]: `type="logistic"` (see `logistic`)
+    or `type="gaussian"` (PolSpice's apodizefunction type 0, see
+    `gaussian`) -- both take `theta`/`thetamax` the same way, and both
+    already return a flat weight of 1 (no apodization) if `thetamax` is
+    None. `type=None` explicitly means no apodization (flat weight of 1)
+    regardless of `thetamax`. Any other `type` will raise a ValueError,
+    to catch typos rather than silently applying no apodization.
+    """
+    if type is None:
+        return 1.0
+    elif type == "logistic":
+        return logistic(theta, thetamax)
+    elif type == "gaussian":
+        return gaussian(theta, thetamax)
+    else:
+        raise ValueError(f"Unknown apodization type: {type!r}")
+
+
+def purify_xip(
+    xvals,
+    xi_p,
+    thetamax,
+    lmax=None,
+    sampling_factor=4,
+):
+    """
+    Port of PolSpice's `cumul` (cumul2.f90): the cumulative-integral
+    correction that turns the natural (mask-ratio) Xi_+/Xi_- correlation
+    into the "pure" E/B correlation function used by the decouple
+    estimator (Chon et al. 2004, eq. 60-65). This is the piece missing
+    from a plain Fl-normalized Legendre transform: it accounts for E/B
+    leakage from the finite integration range (`thetamax`) via a
+    cumulative integral of C+(beta) = Xi_+^raw(beta)/Xi_mask(beta) against
+    two trigonometric kernels.
+
+    Args:
+        xvals: the Gauss-Legendre (or other quadrature) nodes (cos(beta)) at which `xi_p` is evaluated
+        xi_p: Xi_p^raw(beta), the (2,2)-kernel transform of
+            cl_ee+cl_bb, evaluated at exactly `xvals`
+        thetamax: integration domain in rad
+        lmax: optional maximum multipole to use (default: inferred from
+            `len(xi_p) - 1`)
+        sampling_factor: optional oversampling factor for the cumulative
+            integral's fine grid (default: 1); already scales with lmax
+            (see `ngrid` below), so this is for cases that need extra
+            headroom beyond that scaling, not a replacement for it
+    Returns:
+        c_beta: the cumulative-integral correction, evaluated at the Gauss-Legendre nodes
+    """
+    if lmax is None:
+        lmax = len(xi_p) - 1
+    theta_nodes = np.arccos(xvals)
+
+    # c_beta = cp + sum1/sin^2(theta/2) - 2*sum2*(2+cos(theta))/sin^4(theta/2)
+    # is a near-total cancellation between O(1) terms as theta -> 0 (sum1,
+    # sum2 -> 0 just fast enough to keep c_beta finite), so a uniform grid's
+    # *relative* error in sum1/sum2 (dominated by the well-resolved bulk of
+    # [0, thetamax]) gets massively amplified by the 1/sin^2, 1/sin^4
+    # factors for the smallest theta nodes
+    ngrid = max(2000, int(sampling_factor * (lmax + 1)))
+    eps = 1e-6
+    beta_max = max(thetamax - eps, eps)
+    u = np.linspace(0.0, 1.0, ngrid)
+    beta_grid = eps + (beta_max - eps) * u**3
+    sort_idx = np.argsort(theta_nodes)
+    xi_p_spline = CubicSpline(theta_nodes[sort_idx], xi_p[sort_idx])
+    xi_p_grid = xi_p_spline(beta_grid)
+
+    # sin(beta)/cos(beta/2)**4 -> 0 as beta -> 0, no special-casing needed
+    # there; singular as beta -> pi (see module docs/notebook)
+    fsub1_grid = np.sin(beta_grid) / np.cos(beta_grid / 2) ** 4 * xi_p_grid
+    fsub2_grid = np.tan(beta_grid / 2) ** 3 * xi_p_grid
+    cumsum1_grid = cumulative_trapezoid(fsub1_grid, beta_grid, initial=0.0)
+    cumsum2_grid = cumulative_trapezoid(fsub2_grid, beta_grid, initial=0.0)
+
+    theta_capped = np.minimum(theta_nodes, thetamax)
+    theta_capped_safe = np.clip(theta_capped, xi_p_spline.x[0], xi_p_spline.x[-1])
+    Xi_p = xi_p_spline(theta_capped_safe)
+
+    sum1_nodes = np.interp(theta_capped, beta_grid, cumsum1_grid)
+    sum2_nodes = np.interp(theta_capped, beta_grid, cumsum2_grid)
+    sum1_nodes[theta_capped <= 0] = 0.0
+    sum2_nodes[theta_capped <= 0] = 0.0
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        c_beta = (
+            Xi_p
+            + sum1_nodes / np.sin(theta_nodes / 2) ** 2
+            - 2 * sum2_nodes * (2 + np.cos(theta_nodes)) / np.sin(theta_nodes / 2) ** 4
+        )
+    return c_beta
+
+
+def unmix(
+    d,
+    m,
+    fields,
+    theta_max=None,
+    purify=False,
+    apodization="logistic",
+    progress: Progress | None = None,
+):
     """
     Natural unmixing of the data Cl.
     Args:
@@ -41,9 +188,24 @@ def naturalspice(d, m, fields, theta_max=None):
         m: mask Cl
         fields: list of fields
         theta_max: maximum angle to use for the unmixing, in degrees. If None, use all angles.
+        purify: whether to purify the EE/BB estimator (only affects s1=s2=2 fields)
+        apodization: apodization window passed to `apod_window`, shared by
+            both the natural (TT/TE/EB) estimator and, when `purify` is
+            True, the purified EE/BB estimator's Fl-normalization step --
+            "logistic" and "gaussian" give genuinely different results
+            for each, so a PolSpice-matching `purify=True` run needs
+            "gaussian" explicitly (matching its own `-apodizetype 0`
+            window; the default "logistic" is a heracles-only heuristic
+            that does not correspond to anything PolSpice does at this
+            step). Comparisons against real PolSpice output should always
+            pass the same apodization type PolSpice itself was run with.
+        progress: optional progress reporter
     Returns:
         corr_d: Corrected Cl
     """
+    if progress is None:
+        progress = NoProgress()
+
     first_wd = list(d.values())[0]
     first_wm = list(m.values())[0]
     lmax = first_wd.shape[first_wd.axis[0]]
@@ -52,19 +214,100 @@ def naturalspice(d, m, fields, theta_max=None):
     # pad correlation functions to lmax_mask
     d = binned(d, np.arange(0, lmax_mask + 1))
 
-    wd = cl2corr(d)
-    wm = cl2corr(m)
-    corr_wds = _naturalspice(wd, wm, fields, theta_max=theta_max)
+    # Theta max is the maximum angle to use for the unmixing, in degrees.
+    # If None, use all angles.
+    theta_max = 180.0 if theta_max is None else theta_max
+    thetamax_pad_rad = min(np.radians(theta_max) + np.radians(3.0), np.pi)
+    domain = (np.cos(thetamax_pad_rad), 1.0)
+    with progress.task("data correlations") as task:
+        wd = cl2corr(d, domain=domain, progress=task)
+    with progress.task("mask correlations") as task:
+        wm = cl2corr(m, domain=domain, progress=task)
+    with progress.task("unmixing") as task:
+        corr_wd = _unmix(
+            wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task
+        )
+    # transform back to Cl
+    with progress.task("transform back to Cl") as task:
+        corr_d = corr2cl(corr_wd, domain=domain, progress=task)
 
-    # trnasform back to Cl
-    corr_d = corr2cl(corr_wds)
+    # purification (PolSpice's "decouple").
+    if purify:
+        with progress.task("purified transform back to Cl") as task:
+            masks = {}
+            for key, field in fields.items():
+                if field.mask is not None:
+                    masks[key] = field.mask
+
+            spin2_keys = [
+                key
+                for key, cwd in corr_wd.items()
+                if cwd.spin[0] != 0 and cwd.spin[1] != 0
+            ]
+            current, total = 0, len(spin2_keys)
+            for key in spin2_keys:
+                current += 1
+                task.update(current, total)
+
+                a, b, i, j = key
+                m_key = (masks[a], masks[b], i, j)
+
+                xvals = get_result_array(wd[key], "ell")[0]
+                weights = _cached_shifted_gauss_legendre(len(xvals), *domain)[1]
+                theta = np.degrees(np.arccos(xvals))
+
+                wm_arr = get_cl(m_key, wm).array
+
+                apod = apod_window(theta, theta_max, type="gaussian")
+                with np.errstate(divide="ignore"):
+                    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+                # Purify
+                Xi_m = wd[key][1, 1] / wm_arr
+                Xi_p = wd[key][0, 0] / wm_arr
+                Xi_p_dec = purify_xip(xvals, Xi_p, thetamax_pad_rad)
+                xi_EE = 0.5 * (Xi_p_dec + Xi_m)
+                xi_BB = 0.5 * (Xi_p_dec - Xi_m)
+
+                # Apodize
+                xi_EE = xi_EE * apod
+                xi_BB = xi_BB * apod
+
+                # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
+                fl = _corr2cl(apod * csc2, (2, -2), xvals=xvals, weights=weights)
+                with np.errstate(divide="ignore"):
+                    cl_EE = (
+                        2
+                        * np.pi
+                        * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights)
+                        / fl
+                    )
+                    cl_BB = (
+                        2
+                        * np.pi
+                        * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights)
+                        / fl
+                    )
+
+                # Replace the EE/BB entries in the output dictionary with the purified values
+                cl = np.array(corr_d[key].array, copy=True)
+                cl[0, 0] = cl_EE
+                cl[1, 1] = cl_BB
+                corr_d[key] = replace(corr_d[key], array=cl)
 
     # truncate to lmax
     corr_d = binned(corr_d, np.arange(0, lmax + 1))
     return corr_d
 
 
-def _naturalspice(wd, wm, fields, theta_max=None):
+def _unmix(
+    wd,
+    wm,
+    fields,
+    theta_max=None,
+    apodization="logistic",
+    progress: Progress | None = None,
+):
     """
     Natural unmixing of the data correlation function.
     Args:
@@ -72,31 +315,40 @@ def _naturalspice(wd, wm, fields, theta_max=None):
         wm: mask correlation function
         fields: list of fields
         theta_max: maximum angle in degrees for the logistic cutoff. If None, uses default x0=-2.
+        progress: optional progress reporter
     Returns:
         corr_d: Corrected Cl
     """
+    if progress is None:
+        progress = NoProgress()
+
     masks = {}
     for key, field in fields.items():
         if field.mask is not None:
             masks[key] = field.mask
 
-    if theta_max is not None:
-        first_wm = list(wm.values())[0]
-        lmax_mask = first_wm.shape[first_wm.axis[0]]
-        xvals, _ = _cached_gauss_legendre(lmax_mask)
-        theta = np.arccos(xvals) * 180 / np.pi
-        i_theta_max = np.abs(theta - theta_max).argmin()
-        x0 = np.log10(abs(first_wm[i_theta_max]))
-    else:
-        x0 = -5
-
     corr_wds = {}
+    current, total = 0, len(wd)
     for key in wd.keys():
+        current += 1
+        progress.update(current, total)
         a, b, i, j = key
         m_key = (masks[a], masks[b], i, j)
-        _wm = get_cl(m_key, wm).array
+        _wm_result = get_cl(m_key, wm)
+        _wm = _wm_result.array
         _wd = wd[key].array
-        _wm *= logistic(np.log10(abs(_wm)), x0=x0)
-        corr_wds[key] = replace(wd[key], array=(_wd / _wm))
+        ratio = _wd / _wm
+        # theta is only needed by apod_window when theta_max is actually
+        # given (both logistic/gaussian return a flat 1.0 without it
+        # otherwise) -- skip computing it in that case, since .ell isn't
+        # always populated (e.g. the ratio dicts jackknife.py's
+        # correct_footprint_mixing passes in as wm)
+        if theta_max is not None:
+            xvals = _wm_result.ell
+            theta = np.degrees(np.arccos(xvals))
+        else:
+            theta = None
+        apod = apod_window(theta, theta_max, type=apodization)
+        corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds

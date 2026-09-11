@@ -75,7 +75,7 @@ __all__ = [
     "cl2corr",
     "corr2cl",
     # unmixing
-    "naturalspice",
+    "unmix",
 ]
 
 try:
@@ -155,5 +155,5 @@ from .transforms import (
 )
 
 from .unmixing import (
-    naturalspice,
+    unmix,
 )

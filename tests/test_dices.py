@@ -100,7 +100,7 @@ def test_full_mask_correction(cls0, mls0, fields):
     from heracles.dices.jackknife import _mask_correlation_ratio
 
     # When mljk == mls0, correct_footprint_mixing should recover the original cls
-    _cls = dices.correct_footprint_naturalspice(cls0, mls0, mls0, fields, unmixed=False)
+    _cls = dices.correct_footprint_mixing(cls0, mls0, mls0, fields, unmixed=False)
     for key in list(cls0.keys()):
         cl = cls0[key].array
         _cl = _cls[key].array
@@ -108,7 +108,7 @@ def test_full_mask_correction(cls0, mls0, fields):
 
     alphas = _mask_correlation_ratio(mls0, mls0, unmixed=False)
     cls_alphas = heracles.corr2cl(alphas)
-    __cls = heracles.unmixing.naturalspice(
+    __cls = heracles.unmixing.unmix(
         cls0,
         cls_alphas,
         fields,
@@ -133,6 +133,46 @@ def test_fast_mask_correction(cls0, jk_map):
         cl = cls0[key].array
         _cl = _cls0[key].array
         assert np.isclose(cl[2:], _cl[2:]).all()
+
+
+def test_decouple_recovers_ee_minus_bb():
+    """
+    The `unmix(..., purify=True)` EE/BB decoupling (PolSpice's
+    "decouple" estimator, Chon et al. 2004 eq. 65) builds both Cl^EE and
+    Cl^BB from the same d^l_{2,-2} kernel, normalized by a per-l coupling
+    factor Fl. For a full-sky (unmasked) correlation function -- so Fl
+    reduces to a constant, independent of l -- this construction must
+    recover Cl^EE - Cl^BB exactly, since that combination is exactly what
+    an ordinary (undecoupled) Xi^- round-trip already recovers losslessly;
+    it is only the individual EE/BB split that needs genuine mask
+    information to resolve.
+    """
+    rng = np.random.default_rng(0)
+    lmax = 40
+    ls = np.arange(lmax + 1)
+    cl_ee = np.zeros(lmax + 1)
+    cl_bb = np.zeros(lmax + 1)
+    cl_ee[2:] = 1.0 / (ls[2:] * (ls[2:] + 1))
+    cl_bb[2:] = 0.3 * rng.uniform(0.5, 1.5, lmax - 1) / (ls[2:] * (ls[2:] + 1)) ** 1.2
+
+    xi_p = heracles.transforms._cl2corr(cl_ee + cl_bb, (2, 2), lmax=lmax)
+    xi_m = heracles.transforms._cl2corr(cl_ee - cl_bb, (2, -2), lmax=lmax)
+    n = xi_p.shape[0]
+    xvals = np.polynomial.legendre.leggauss(n)[0]
+    theta = np.degrees(np.arccos(xvals))
+    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
+
+    def isolate(x):
+        return heracles.transforms._corr2cl(x, (2, -2), lmax=lmax)
+
+    fl = isolate(csc2)  # no apodization (apod=1) -> Fl is exactly constant (=pi)
+    with np.errstate(invalid="ignore"):
+        cl_ee_dec = np.pi * isolate(xi_p + xi_m) / fl
+        cl_bb_dec = np.pi * isolate(xi_p - xi_m) / fl
+
+    np.testing.assert_allclose(
+        cl_ee_dec[2:] - cl_bb_dec[2:], cl_ee[2:] - cl_bb[2:], atol=1e-10
+    )
 
 
 def test_jackknife(nside, njk, cov_jk, cls0, cls1):

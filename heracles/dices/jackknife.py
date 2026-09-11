@@ -26,7 +26,7 @@ from ..core import update_metadata
 from ..result import Result, get_result_array, binned
 from ..mapping import transform
 from ..twopoint import angular_power_spectra
-from ..unmixing import _naturalspice
+from ..unmixing import _unmix
 from ..transforms import cl2corr, corr2cl
 from ..io import write_alms, read_alms, write, read
 from ..progress import NoProgress
@@ -233,9 +233,7 @@ def _compute_single_jk_cls(
             _accumulate_alms(os.path.join(dir, f"vis_alms_{r}.fits") for r in regions),
         )
         _cls_mm = angular_power_spectra(vis_alms_jk)
-        _cls = correct_footprint_naturalspice(
-            _cls, _cls_mm, mls0, fields, unmixed=unmixed
-        )
+        _cls = correct_footprint_mixing(_cls, _cls_mm, mls0, fields, unmixed=unmixed)
 
     elif mask_correction == "Fast":
         _cls = correct_footprint_fsky(_cls, jk_map, *regions, unmixed=unmixed)
@@ -422,7 +420,7 @@ def _mask_correlation_ratio(mljk, mls0, unmixed=False):
     return alphas
 
 
-def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
+def correct_footprint_mixing(cls, cls_mm, mls0, fields, unmixed=False):
     """
     Corrects the Cls for footprint reduction using the full NaMaster/naturalspice approach.
     inputs:
@@ -441,7 +439,7 @@ def correct_footprint_naturalspice(cls, cls_mm, mls0, fields, unmixed=False):
     lmax_mask = first_mls.shape[first_mls.axis[0]]
     cls = binned(cls, np.arange(0, lmax_mask + 1))
     wcls = cl2corr(cls)
-    wcls = _naturalspice(wcls, alphas, fields)
+    wcls = _unmix(wcls, alphas, fields)
     cls = corr2cl(wcls)
     return binned(cls, np.arange(0, lmax + 1))
 
