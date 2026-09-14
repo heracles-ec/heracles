@@ -258,7 +258,7 @@ def unmix(
 
                 wm_arr = get_cl(m_key, wm).array
 
-                apod = apod_window(theta, theta_max, type="gaussian")
+                apod = apod_window(theta, theta_max, type=apodization)
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
