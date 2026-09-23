@@ -18,6 +18,8 @@
 # License along with Heracles. If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import CubicSpline
@@ -38,7 +40,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(theta, thetamax, k=10.0):
+def logistic(theta, thetamax, k=2.0):
     """
     Logistic-sigmoid apodization window in theta (degrees), analogous to
     `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
@@ -53,7 +55,7 @@ def logistic(theta, thetamax, k=10.0):
     return 1.0 / (1.0 + np.exp(k * (theta - thetamax)))
 
 
-def gaussian(theta, thetamax):
+def gaussian(theta, thetamax, k=2.0):
     """
     Gaussian apodization window in theta (degrees), matching PolSpice's
     `apodizefunction` type 0 (apodize_mod.f90): `thetamax` (PolSpice's
@@ -71,11 +73,11 @@ def gaussian(theta, thetamax):
     """
     if thetamax is None:
         return np.ones_like(theta)
-    sigma = thetamax / np.sqrt(8 * np.log(2))
+    sigma = (thetamax/k) / np.sqrt(8 * np.log(2))
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
-def apod_window(theta, thetamax, type="logistic"):
+def apod_window(theta, thetamax, type="logistic", k=2.0):
     """
     Unified apodization-window dispatch, shared by `unmix`'s
     purify loop and `_unmix`. Returns a multiplicative weight the
@@ -90,9 +92,9 @@ def apod_window(theta, thetamax, type="logistic"):
     if type is None:
         return 1.0
     elif type == "logistic":
-        return logistic(theta, thetamax)
+        return logistic(theta, thetamax, k=k)
     elif type == "gaussian":
-        return gaussian(theta, thetamax)
+        return gaussian(theta, thetamax, k=k)
     else:
         raise ValueError(f"Unknown apodization type: {type!r}")
 
@@ -176,6 +178,7 @@ def unmix(
     d,
     m,
     fields,
+    k=2,
     theta_max=None,
     purify=False,
     apodization="logistic",
@@ -187,6 +190,7 @@ def unmix(
         d: Data Cl
         m: mask Cl
         fields: list of fields
+        k: parameter controlling the width of the apodization window
         theta_max: maximum angle to use for the unmixing, in degrees. If None, use all angles.
         purify: whether to purify the EE/BB estimator (only affects s1=s2=2 fields)
         apodization: apodization window passed to `apod_window`, shared by
@@ -223,9 +227,10 @@ def unmix(
         wd = cl2corr(d, domain=domain, progress=task)
     with progress.task("mask correlations") as task:
         wm = cl2corr(m, domain=domain, progress=task)
+    apod_fn = partial(apod_window, thetamax=theta_max, type=apodization, k=k)
     with progress.task("unmixing") as task:
         corr_wd = _unmix(
-            wd, wm, fields, theta_max=theta_max, apodization=apodization, progress=task
+            wd, wm, fields, apod_fn=apod_fn, theta_max=theta_max, progress=task
         )
     # transform back to Cl
     with progress.task("transform back to Cl") as task:
@@ -258,7 +263,7 @@ def unmix(
 
                 wm_arr = get_cl(m_key, wm).array
 
-                apod = apod_window(theta, theta_max, type=apodization)
+                apod = apod_fn(theta)
                 with np.errstate(divide="ignore"):
                     csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
@@ -304,8 +309,8 @@ def _unmix(
     wd,
     wm,
     fields,
+    apod_fn=None,
     theta_max=None,
-    apodization="logistic",
     progress: Progress | None = None,
 ):
     """
@@ -314,6 +319,11 @@ def _unmix(
         wd: data correlation function
         wm: mask correlation function
         fields: list of fields
+        apod_fn: apodization window function, taking `theta` (degrees) and
+            returning a same-shaped multiplicative weight, e.g. a
+            `functools.partial(apod_window, thetamax=..., type=..., k=...)`.
+            If None, defaults to a window built from `theta_max` alone
+            (flat weight of 1 if `theta_max` is also None).
         theta_max: maximum angle in degrees for the logistic cutoff. If None, uses default x0=-2.
         progress: optional progress reporter
     Returns:
@@ -321,6 +331,9 @@ def _unmix(
     """
     if progress is None:
         progress = NoProgress()
+
+    if apod_fn is None:
+        apod_fn = partial(apod_window, thetamax=theta_max)
 
     masks = {}
     for key, field in fields.items():
@@ -348,7 +361,7 @@ def _unmix(
             theta = np.degrees(np.arccos(xvals))
         else:
             theta = None
-        apod = apod_window(theta, theta_max, type=apodization)
+        apod = apod_fn(theta)
         corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds
