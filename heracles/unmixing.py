@@ -310,7 +310,6 @@ def _unmix(
     wm,
     fields,
     apod_fn=None,
-    theta_max=None,
     progress: Progress | None = None,
 ):
     """
@@ -331,9 +330,6 @@ def _unmix(
     """
     if progress is None:
         progress = NoProgress()
-
-    if apod_fn is None:
-        apod_fn = partial(apod_window, thetamax=theta_max)
 
     masks = {}
     for key, field in fields.items():
@@ -356,12 +352,12 @@ def _unmix(
         # otherwise) -- skip computing it in that case, since .ell isn't
         # always populated (e.g. the ratio dicts jackknife.py's
         # correct_footprint_mixing passes in as wm)
-        if theta_max is not None:
+        if apod_fn is not None:
             xvals = _wm_result.ell
             theta = np.degrees(np.arccos(xvals))
+            apod = apod_fn(theta)
         else:
-            theta = None
-        apod = apod_fn(theta)
+            apod = 1.0
         corr_wds[key] = replace(wd[key], array=apod * ratio)
 
     return corr_wds
