@@ -38,7 +38,7 @@ except ImportError:
     from dataclasses import replace
 
 
-def logistic(theta, thetamax, k=20.0):
+def logistic(theta, thetamax, k=10.0):
     """
     Logistic-sigmoid apodization window in theta (degrees), analogous to
     `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
@@ -58,8 +58,8 @@ def gaussian(theta, thetamax):
     Gaussian apodization window in theta (degrees), matching PolSpice's
     `apodizefunction` type 0 (apodize_mod.f90): `thetamax` (PolSpice's
     separate `-thetamax`) sets its hard cutoff. The taper's FWHM is fixed
-    at `thetamax / 2`, per Chon et al. (2004)'s recommended
-    `apodizesigma = thetamax / 2` -- PolSpice's `-apodizesigma` and
+    at `thetamax`, per Chon et al. (2004)'s recommended
+    `apodizesigma = thetamax` -- PolSpice's `-apodizesigma` and
     `-thetamax` are independent options in general, but `unmix`
     doesn't expose apodizesigma separately, so this bakes in that
     recommended ratio (verified against PolSpice's own Fl(l) dump,
@@ -71,7 +71,7 @@ def gaussian(theta, thetamax):
     """
     if thetamax is None:
         return np.ones_like(theta)
-    sigma = (thetamax / 2) / np.sqrt(8 * np.log(2))
+    sigma = thetamax / np.sqrt(8 * np.log(2))
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
