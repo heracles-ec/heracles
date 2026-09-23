@@ -366,14 +366,12 @@ def cl2corr(cls, domain=None, progress: Progress | None = None):
             if spin == (0, 0):
                 wd = _cl2corr(cl.array, (0, 0), lmax=lmax, xvals=xvals_key)
             elif spin in ((0, 2), (2, 0)):
-                # T x spin-2 cross correlation: both combinations use the
-                # same d20 kernel
-                Ta, Tb = cl.array[0], cl.array[1]
-                cp, cm = Ta + Tb, Ta - Tb
+                # T x spin-2 cross correlation: both components use the
+                # same d20 kernel, so transform each directly
                 wd = np.array(
                     [
-                        _cl2corr(cp, (2, 0), lmax=lmax, xvals=xvals_key),
-                        _cl2corr(cm, (2, 0), lmax=lmax, xvals=xvals_key),
+                        _cl2corr(cl.array[0], (2, 0), lmax=lmax, xvals=xvals_key),
+                        _cl2corr(cl.array[1], (2, 0), lmax=lmax, xvals=xvals_key),
                     ]
                 )
             else:
@@ -459,13 +457,18 @@ def corr2cl(wds, domain=None, progress: Progress | None = None):
                     wd.array, (0, 0), lmax=lmax, xvals=xvals, weights=weights_key
                 )
             elif spin in ((0, 2), (2, 0)):
-                clp = _corr2cl(
-                    wd.array[0], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
+                cl = np.array(
+                    [
+                        _corr2cl(
+                            wd.array[i],
+                            (2, 0),
+                            lmax=lmax,
+                            xvals=xvals,
+                            weights=weights_key,
+                        )
+                        for i in range(2)
+                    ]
                 )
-                clm = _corr2cl(
-                    wd.array[1], (2, 0), lmax=lmax, xvals=xvals, weights=weights_key
-                )
-                cl = np.array([(clp + clm) / 2, (clp - clm) / 2])
             else:
                 # spin (2, 2): kept as one shared loop, mirroring cl2corr's
                 # (2, 2) branch -- see there for the kernel/slot mapping.
