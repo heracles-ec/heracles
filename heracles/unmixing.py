@@ -241,9 +241,7 @@ def unmix(
     fl_cache = {}
     for key in corr_wd:
         fl = _apod_response(corr_d[key], domain, apod_fn, fl_cache)
-        corr_d[key] = replace(
-            corr_d[key], array=_divide_fl(corr_d[key].array, fl)
-        )
+        corr_d[key] = replace(corr_d[key], array=corr_d[key].array / fl)
 
     # purification (PolSpice's "decouple").
     if purify:
@@ -273,6 +271,8 @@ def unmix(
                 wm_arr = get_cl(m_key, wm).array
 
                 apod = apod_fn(theta)
+                with np.errstate(divide="ignore"):
+                    csc2 = 1.0 / np.sin(np.radians(theta) / 2) ** 2
 
                 # Purify
                 Xi_m = wd[key][1, 1] / wm_arr
@@ -285,16 +285,21 @@ def unmix(
                 xi_EE = xi_EE * apod
                 xi_BB = xi_BB * apod
 
-                # Transform and normalize by the same Fl as the natural estimator
-                fl = _apod_response(corr_d[key], domain, apod_fn, fl_cache)
-                cl_EE = _divide_fl(
-                    2 * np.pi * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights),
-                    fl[0, 0],
-                )
-                cl_BB = _divide_fl(
-                    2 * np.pi * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights),
-                    fl[1, 1],
-                )
+                # Transform and normalize by Fl (the same kernel applied to the apodization window alone)
+                fl = _corr2cl(apod * csc2, (2, -2), xvals=xvals, weights=weights)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cl_EE = (
+                        2
+                        * np.pi
+                        * _corr2cl(xi_EE, (2, -2), xvals=xvals, weights=weights)
+                        / fl
+                    )
+                    cl_BB = (
+                        2
+                        * np.pi
+                        * _corr2cl(xi_BB, (2, -2), xvals=xvals, weights=weights)
+                        / fl
+                    )
 
                 # Replace the EE/BB entries in the output dictionary with the purified values
                 cl = np.array(corr_d[key].array, copy=True)
@@ -307,11 +312,6 @@ def unmix(
     return corr_d
 
 
-# Fl below this is treated as "window has removed this multipole": the ell is
-# left uncorrected rather than amplifying noise by 1/Fl
-_FL_MIN = 1e-2
-
-
 def _apod_response(template, domain, apod_fn, cache):
     """
     Response Fl of the apodization window, per component of `template`'s
@@ -320,6 +320,10 @@ def _apod_response(template, domain, apod_fn, cache):
     same component is read back. Depends only on spin, lmax and window, so
     results are cached per spin/shape in `cache`.
     """
+    if template.spin == (0, 0):
+        # a flat spectrum is a delta at theta=0, which the window leaves
+        # untouched: Fl = apod(0) = 1
+        return np.ones(template.array.shape)
     ck = (template.spin, template.array.shape)
     if ck in cache:
         return cache[ck]
@@ -331,18 +335,11 @@ def _apod_response(template, domain, apod_fn, cache):
         w = cl2corr({"k": replace(template, array=flat)}, domain=domain)["k"]
         theta = np.degrees(np.arccos(w.ell))
         w = replace(w, array=apod_fn(theta) * w.array)
-        fl[idx] = corr2cl({"k": w}, domain=domain)["k"].array[idx]
+        # below the kernel's first valid ell Fl is 0; keep 1 there so the
+        # division leaves those (empty) multipoles alone
+        fl[idx][lmin:] = corr2cl({"k": w}, domain=domain)["k"].array[idx][lmin:]
     cache[ck] = fl
     return fl
-
-
-def _divide_fl(cl, fl):
-    """
-    Divide `cl` by `fl`, leaving multipoles with |Fl| < `_FL_MIN` (including
-    the ell below the kernel's first valid one, where Fl is 0) uncorrected.
-    """
-    ok = np.abs(fl) >= _FL_MIN
-    return np.where(ok, cl / np.where(ok, fl, 1.0), cl)
 
 
 def _unmix(
