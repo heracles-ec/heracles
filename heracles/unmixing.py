@@ -230,7 +230,7 @@ def unmix(
     apod_fn = partial(apod_window, thetamax=theta_max, type=apodization, k=k)
     with progress.task("unmixing") as task:
         corr_wd = _unmix(
-            wd, wm, fields, apod_fn=apod_fn, theta_max=theta_max, progress=task
+            wd, wm, fields, apod_fn=apod_fn, progress=task
         )
     # transform back to Cl
     with progress.task("transform back to Cl") as task:
