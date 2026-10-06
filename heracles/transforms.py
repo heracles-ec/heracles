@@ -6,7 +6,7 @@ from .progress import NoProgress, Progress
 from .result import get_result_array
 
 
-def legendre_p_all_vec(n, xvals, *, diff_n=0):
+def legendre_p_all(n, xvals, *, diff_n=0):
     """
     All Legendre polynomials of the first kind up to degree n, evaluated
     at every point in the 1D array `xvals` at once, optionally with
@@ -102,7 +102,7 @@ def _cached_shifted_gauss_legendre(npoints, a, b):
     return xvals_shifted, weights_shifted
 
 
-def legendre_funcs_vec(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=None):
+def legendre_funcs(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=None):
     """
     Utility function to return the Legendre/Wigner-d functions needed to
     transform a Cl of the given `spin` to/from a correlation function, for
@@ -127,7 +127,7 @@ def legendre_funcs_vec(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=Non
     """
     s1, s2 = spin
     if s1 == 0 and s2 == 0:
-        return legendre_p_all_vec(lmax, xvals)
+        return legendre_p_all(lmax, xvals)
     elif not ({s1, s2} == {0, 2} or (s1 == 2 and s2 == 2)):
         raise ValueError(
             f"unsupported spin combination {spin!r}: only (0, 0), "
@@ -135,7 +135,7 @@ def legendre_funcs_vec(lmax, xvals, spin, lfacs=None, lfacs2=None, lrootfacs=Non
         )
 
     xvals = np.asarray(xvals, dtype=np.float64)
-    allP, alldP = legendre_p_all_vec(lmax, xvals, diff_n=1)
+    allP, alldP = legendre_p_all(lmax, xvals, diff_n=1)
     fac1 = 1 - xvals
     fac2 = 1 + xvals
 
@@ -222,7 +222,7 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
 
     if kernel == (0, 0):
         ct = facs * cl[: lmax + 1]
-        P = legendre_funcs_vec(lmax, xvals, (0, 0))
+        P = legendre_funcs(lmax, xvals, (0, 0))
         return np.einsum("l,lp->p", ct, P)
     elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
         raise ValueError(
@@ -237,7 +237,7 @@ def _cl2corr(cl, kernel, lmax=None, sampling_factor=1, xvals=None):
     lrootfacs = np.sqrt(lfacs * lfacs2)
 
     ct = facs[2:] * cl[2 : lmax + 1]
-    d20, d22, d2m2 = legendre_funcs_vec(lmax, xvals, (2, 2), lfacs, lfacs2, lrootfacs)
+    d20, d22, d2m2 = legendre_funcs(lmax, xvals, (2, 2), lfacs, lfacs2, lrootfacs)
     d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
     return np.einsum("l,lp->p", ct, d)
 
@@ -285,7 +285,7 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
         nz = corr != 0.0
         if not np.any(nz):
             return np.zeros(lmax + 1)
-        P = legendre_funcs_vec(lmax, xvals[nz], (0, 0))
+        P = legendre_funcs(lmax, xvals[nz], (0, 0))
         cl = np.einsum("p,lp->l", weights[nz] * corr[nz], P)
         return 2 * np.pi * cl
     elif kernel not in ((0, 2), (2, 0), (2, 2), (2, -2)):
@@ -305,9 +305,7 @@ def _corr2cl(corr, kernel, lmax=None, sampling_factor=1, xvals=None, weights=Non
     nz = corr != 0.0
     if not np.any(nz):
         return cl
-    d20, d22, d2m2 = legendre_funcs_vec(
-        lmax, xvals[nz], (2, 2), lfacs, lfacs2, lrootfacs
-    )
+    d20, d22, d2m2 = legendre_funcs(lmax, xvals[nz], (2, 2), lfacs, lfacs2, lrootfacs)
     d = d2m2 if kernel == (2, -2) else (d22 if kernel == (2, 2) else d20)
     cl[2:] = np.einsum("p,lp->l", weights[nz] * corr[nz], d)
     return 2 * np.pi * cl
@@ -394,7 +392,7 @@ def cl2corr(cls, domain=None, progress: Progress | None = None):
                 icp = facs[2:] * (EB - BE)[2 : lmax + 1]
                 icm = facs[2:] * (EB + BE)[2 : lmax + 1]
                 wd = np.zeros((2, 2, len(xvals_key)))
-                _, d22, d2m2 = legendre_funcs_vec(
+                _, d22, d2m2 = legendre_funcs(
                     lmax, xvals_key, spin, lfacs, lfacs2, lrootfacs
                 )
                 wd[0, 0] = np.einsum("l,lp->p", cp, d22)  # EE-like
@@ -477,7 +475,7 @@ def corr2cl(wds, domain=None, progress: Progress | None = None):
                 lfacs2 = (ls + 2) * (ls - 1)
                 lrootfacs = np.sqrt(lfacs * lfacs2)
                 r = np.zeros((2, 2, lmax + 1))
-                _, d22, d2m2 = legendre_funcs_vec(
+                _, d22, d2m2 = legendre_funcs(
                     lmax, xvals, spin, lfacs, lfacs2, lrootfacs
                 )
                 r[0, 0, 2:] = np.einsum("p,lp->l", weights_key * wd.array[0, 0], d22)

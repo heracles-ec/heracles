@@ -73,7 +73,7 @@ def gaussian(theta, thetamax, k=2.0):
     """
     if thetamax is None:
         return np.ones_like(theta)
-    sigma = (thetamax/k) / np.sqrt(8 * np.log(2))
+    sigma = (thetamax / k) / np.sqrt(8 * np.log(2))
     return np.where(theta < thetamax, np.exp(-0.5 * (theta / sigma) ** 2), 0.0)
 
 
@@ -229,9 +229,7 @@ def unmix(
         wm = cl2corr(m, domain=domain, progress=task)
     apod_fn = partial(apod_window, thetamax=theta_max, type=apodization, k=k)
     with progress.task("unmixing") as task:
-        corr_wd = _unmix(
-            wd, wm, fields, apod_fn=apod_fn, progress=task
-        )
+        corr_wd = _unmix(wd, wm, fields, apod_fn=apod_fn, progress=task)
     # transform back to Cl
     with progress.task("transform back to Cl") as task:
         corr_d = corr2cl(corr_wd, domain=domain, progress=task)
