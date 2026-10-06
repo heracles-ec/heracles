@@ -41,36 +41,12 @@ except ImportError:
 
 
 def logistic(theta, thetamax, k=2.0):
-    """
-    Logistic-sigmoid apodization window in theta (degrees), analogous to
-    `gaussian`: ~1 for theta well below `thetamax`, ~0 well above it,
-    with the step centered at `thetamax` and its smoothness set by `k`
-    (degrees^-1; larger k -> sharper step, k -> infinity recovers a hard
-    cutoff at thetamax).
-    If `thetamax` is None, no apodization is applied (flat weight of 1
-    everywhere).
-    """
     if thetamax is None:
         return np.ones_like(theta)
     return 1.0 / (1.0 + np.exp(k * (theta - thetamax)))
 
 
 def gaussian(theta, thetamax, k=2.0):
-    """
-    Gaussian apodization window in theta (degrees), matching PolSpice's
-    `apodizefunction` type 0 (apodize_mod.f90): `thetamax` (PolSpice's
-    separate `-thetamax`) sets its hard cutoff. The taper's FWHM is fixed
-    at `thetamax`, per Chon et al. (2004)'s recommended
-    `apodizesigma = thetamax` -- PolSpice's `-apodizesigma` and
-    `-thetamax` are independent options in general, but `unmix`
-    doesn't expose apodizesigma separately, so this bakes in that
-    recommended ratio (verified against PolSpice's own Fl(l) dump,
-    SPICE_FL_DEBUG, with matching -apodizesigma: exact to machine
-    precision; using `thetamax` itself as the width, instead of half of
-    it, is wrong by a large, l-dependent factor).
-    If `thetamax` is None, no apodization is applied (flat weight of 1
-    everywhere).
-    """
     if thetamax is None:
         return np.ones_like(theta)
     sigma = (thetamax / k) / np.sqrt(8 * np.log(2))
@@ -78,17 +54,6 @@ def gaussian(theta, thetamax, k=2.0):
 
 
 def apod_window(theta, thetamax, type="logistic", k=2.0):
-    """
-    Unified apodization-window dispatch, shared by `unmix`'s
-    purify loop and `_unmix`. Returns a multiplicative weight the
-    same shape as `theta`, in [0, 1]: `type="logistic"` (see `logistic`)
-    or `type="gaussian"` (PolSpice's apodizefunction type 0, see
-    `gaussian`) -- both take `theta`/`thetamax` the same way, and both
-    already return a flat weight of 1 (no apodization) if `thetamax` is
-    None. `type=None` explicitly means no apodization (flat weight of 1)
-    regardless of `thetamax`. Any other `type` will raise a ValueError,
-    to catch typos rather than silently applying no apodization.
-    """
     if type is None:
         return 1.0
     elif type == "logistic":
