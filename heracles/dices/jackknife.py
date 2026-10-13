@@ -19,6 +19,7 @@
 import os
 import numpy as np
 import itertools
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from itertools import combinations
 from ..utils import add_to_Cls, sub_to_Cls
@@ -48,6 +49,7 @@ def jackknife_cls(
     nd=1,
     dir="./dices",
     progress=None,
+    max_workers=None,
 ):
     """
     Compute the Cls of removing 1 Jackknife.
@@ -60,6 +62,13 @@ def jackknife_cls(
         nd (int): Number of Jackknife regions
         dir (str): Directory for caching intermediate ALMs.
         progress (Progress): Progress reporter.
+        max_workers (int): Max workers used to process regions concurrently
+            (default: the executor's default based on CPU count). ALMs are
+            computed using threads; Cls are computed using processes, since
+            that stage is CPU-bound pure-Python/numpy work that doesn't
+            release the GIL. Pass 1 to run sequentially in the main thread
+            (no executor at all), which is easier to debug (breakpoints,
+            tracebacks, etc. behave normally).
     returns:
         cls (dict): Dictionary of data Cls
     """
@@ -76,6 +85,7 @@ def jackknife_cls(
         fields,
         dir=dir,
         progress=progress,
+        max_workers=max_workers,
     )
 
     # calculate cls from saved alms
@@ -87,6 +97,7 @@ def jackknife_cls(
         nd=nd,
         dir=dir,
         progress=progress,
+        max_workers=max_workers,
     )
 
 
@@ -97,8 +108,16 @@ def compute_jk_alms(
     fields,
     dir="./dices",
     progress=None,
+    max_workers=None,
 ):
-    """Compute and save ALMs each JK region."""
+    """Compute and save ALMs for each JK region, in parallel (threads).
+
+    Note: the underlying transform may already use multiple threads
+    internally (e.g. via ducc0), so a large *max_workers* can oversubscribe
+    the available CPUs; tune it to the workload if needed. Pass
+    ``max_workers=1`` to run sequentially in the main thread (no executor),
+    which is easier to debug (breakpoints, tracebacks, etc. behave normally).
+    """
 
     if progress is None:
         progress = NoProgress()
@@ -111,7 +130,7 @@ def compute_jk_alms(
     current = 0
     progress.update(current, total)
 
-    for k in range(0, njk + 1):
+    def _run(k):
         with progress.task(f"ALMs {k}"):
             _compute_single_jk_alm(
                 k,
@@ -122,8 +141,19 @@ def compute_jk_alms(
                 dir,
             )
 
-        current += 1
-        progress.update(current, total)
+    if max_workers == 1:
+        for k in range(njk + 1):
+            _run(k)
+            current += 1
+            progress.update(current, total)
+        return
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_run, k) for k in range(njk + 1)]
+        for future in as_completed(futures):
+            future.result()  # re-raise any exception from the worker
+            current += 1
+            progress.update(current, total)
 
 
 def _compute_single_jk_alm(
@@ -161,6 +191,7 @@ def compute_jk_cls_from_alms(
     nd=1,
     dir="./dices",
     progress=None,
+    max_workers=None,
 ):
     if nd == 0:
         data_alms_full = read_alms(os.path.join(dir, "data_alms_0.fits"))
@@ -182,21 +213,57 @@ def compute_jk_cls_from_alms(
     current = 0
     progress.update(current, total)
 
-    for regions in all_regions:
-        with progress.task(f"Cls {regions}"):
-            cls[regions] = _compute_single_jk_cls(
-                regions,
-                jk_map,
-                fields,
-                mask_correction,
-                unmixed,
-                dir,
-            )
+    if max_workers == 1:
+        for regions in all_regions:
+            with progress.task(f"Cls {regions}"):
+                result = _compute_single_jk_cls(
+                    regions,
+                    jk_map,
+                    fields,
+                    mask_correction,
+                    unmixed,
+                    dir,
+                )
+            cls[regions] = result
+            current += 1
+            progress.update(current, total)
+        return cls
 
-        current += 1
-        progress.update(current, total)
+    # Use processes, not threads: the dominant cost here (alm2cl) is a
+    # pure-Python/numpy loop that holds the GIL, so threads see heavy GIL
+    # contention and can be *much* slower than running sequentially.
+    # Progress is only updated at the region level (no per-task label),
+    # since the Progress object cannot be shared across processes.
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        initializer=_init_cls_worker,
+        initargs=(jk_map, fields, mask_correction, unmixed, dir),
+    ) as executor:
+        futures = [executor.submit(_cls_worker, regions) for regions in all_regions]
+        for future in as_completed(futures):
+            regions, result = future.result()
+            cls[regions] = result
+            current += 1
+            progress.update(current, total)
 
     return cls
+
+
+_cls_worker_state = None
+
+
+def _init_cls_worker(jk_map, fields, mask_correction, unmixed, dir):
+    """Pool initializer: stash shared, read-only args once per worker process."""
+    global _cls_worker_state
+    _cls_worker_state = (jk_map, fields, mask_correction, unmixed, dir)
+
+
+def _cls_worker(regions):
+    """Picklable top-level task run in a worker process for one region combo."""
+    jk_map, fields, mask_correction, unmixed, dir = _cls_worker_state
+    return regions, _compute_single_jk_cls(
+        regions, jk_map, fields, mask_correction, unmixed, dir
+    )
 
 
 def _compute_single_jk_cls(
