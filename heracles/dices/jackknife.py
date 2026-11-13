@@ -19,7 +19,6 @@
 import os
 import numpy as np
 import itertools
-from copy import deepcopy
 from itertools import combinations
 from ..utils import add_to_Cls, sub_to_Cls
 from ..core import update_metadata
@@ -251,11 +250,14 @@ def _get_region_maps(maps, jk_map, jk):
     Returns maps with only the pixels belonging to jackknife region *jk* active.
     All other pixels are set to zero.
     """
-    _maps = deepcopy(maps)
-    for key_data in maps.keys():
-        _map = _maps[key_data]
-        _mask = (jk_map == float(jk)).astype(int)
+    _mask = (jk_map == float(jk)).astype(int)
+    _maps = {}
+    for key_data, _map in maps.items():
+        if isinstance(_map, Result):
+            _map = _map.array
+        _map = _map.copy()
         _map *= _mask
+        _maps[key_data] = _map
     return _maps
 
 
